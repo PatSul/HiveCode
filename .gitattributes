@@ -1,0 +1,3 @@
+# Tell GitHub linguist that this is a Rust project
+* linguist-vendored
+hive/**/*.rs linguist-vendored=false

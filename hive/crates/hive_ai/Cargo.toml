@@ -1,0 +1,27 @@
+[package]
+name = "hive_ai"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+hive_core = { path = "../hive_core" }
+
+async-trait = "0.1"
+once_cell = "1"
+
+reqwest = { workspace = true, features = ["multipart"] }
+tokio.workspace = true
+futures.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+tracing.workspace = true
+regex.workspace = true
+parking_lot.workspace = true
+
+[dev-dependencies]
+bytes = "1"
+http = "1"

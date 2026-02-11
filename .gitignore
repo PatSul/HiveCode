@@ -1,0 +1,42 @@
+# Build outputs
+hive/target/
+dist/
+lib/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+nul
+
+# Local tool configs (not for GitHub)
+.claude/
+.serena/
+
+# Legacy Electron artifacts
+images/
+test-electron-app/
+fresh-electron-test/
+node_modules/
+package-lock.json
+*.js.map
+
+# Temp files
+*.log
+*.tmp
+
+# Environment
+.env
+.env.local
+
+# Git Worktrees (parallel agent workspaces)
+worktree-*/
+
+# Agent metadata
+AGENT_BOARD.md.lock
+.agent-*/

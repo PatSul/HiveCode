@@ -1,0 +1,24 @@
+[package]
+name = "hive_integrations"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+hive_core = { path = "../hive_core" }
+
+reqwest.workspace = true
+tokio.workspace = true
+async-trait.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+regex.workspace = true
+sha2.workspace = true
+rand.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util", "macros"] }

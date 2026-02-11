@@ -1,0 +1,23 @@
+[package]
+name = "hive_fs"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+hive_core = { path = "../hive_core" }
+
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+notify.workspace = true
+ignore.workspace = true
+regex.workspace = true
+git2.workspace = true
+tracing.workspace = true
+chrono.workspace = true
+glob = "0.3"
+
+[dev-dependencies]
+tempfile = "3"

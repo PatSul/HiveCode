@@ -1,0 +1,30 @@
+[package]
+name = "hive_ui"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+hive_core = { path = "../hive_core" }
+hive_ai = { path = "../hive_ai" }
+hive_fs = { path = "../hive_fs" }
+hive_learn = { path = "../hive_learn" }
+hive_shield = { path = "../hive_shield" }
+hive_agents = { path = "../hive_agents" }
+hive_terminal = { path = "../hive_terminal" }
+hive_assistant = { path = "../hive_assistant" }
+hive_blockchain = { path = "../hive_blockchain" }
+hive_integrations = { path = "../hive_integrations" }
+
+gpui.workspace = true
+gpui-component.workspace = true
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+tracing.workspace = true
+pulldown-cmark.workspace = true
+tokio = { workspace = true, features = ["sync"] }
+
+[dev-dependencies]
+tempfile = "3"

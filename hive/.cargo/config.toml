@@ -1,0 +1,6 @@
+# MSVC config: linker + lib paths set via build.sh env vars
+
+# Increase stack size for rustc threads (GPUI's deeply-nested builder types
+# exhaust the default 8MB stack during test compilation).
+[env]
+RUST_MIN_STACK = "33554432"
