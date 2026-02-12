@@ -16,7 +16,7 @@ use serde::Deserialize;
 use tokio::sync::mpsc;
 use tracing::{debug, warn};
 
-use crate::types::{StreamChunk, TokenUsage};
+use crate::types::{StopReason, StreamChunk, ToolCall, TokenUsage};
 
 // ---------------------------------------------------------------------------
 // Wire types (deserialization only)
@@ -34,13 +34,27 @@ pub(crate) struct SseFrame {
 #[derive(Debug, Deserialize)]
 pub(crate) struct SseChoice {
     pub delta: Option<SseDelta>,
-    #[allow(dead_code)]
     pub finish_reason: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct SseDelta {
     pub content: Option<String>,
+    pub tool_calls: Option<Vec<SseToolCallDelta>>,
+}
+
+/// Streaming tool call delta from OpenAI-compatible APIs.
+#[derive(Debug, Deserialize)]
+pub(crate) struct SseToolCallDelta {
+    pub index: Option<usize>,
+    pub id: Option<String>,
+    pub function: Option<SseFunctionDelta>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct SseFunctionDelta {
+    pub name: Option<String>,
+    pub arguments: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -67,6 +81,20 @@ pub(crate) struct CompletionChoice {
 #[derive(Debug, Deserialize)]
 pub(crate) struct CompletionMessage {
     pub content: Option<String>,
+    pub tool_calls: Option<Vec<CompletionToolCall>>,
+}
+
+/// Non-streaming tool call from OpenAI-compatible APIs.
+#[derive(Debug, Deserialize)]
+pub(crate) struct CompletionToolCall {
+    pub id: String,
+    pub function: CompletionFunction,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct CompletionFunction {
+    pub name: String,
+    pub arguments: String,
 }
 
 // ---------------------------------------------------------------------------
@@ -77,6 +105,13 @@ pub(crate) struct CompletionMessage {
 /// deltas and forward them as [`StreamChunk`]s on the given `tx` channel.
 ///
 /// This function is meant to be spawned via `tokio::spawn`.
+/// State for accumulating tool calls across streaming deltas.
+struct ToolCallAccumulator {
+    id: String,
+    name: String,
+    arguments: String,
+}
+
 pub(crate) async fn drive_sse_stream(
     resp: reqwest::Response,
     tx: mpsc::Sender<StreamChunk>,
@@ -84,6 +119,8 @@ pub(crate) async fn drive_sse_stream(
     let mut stream = resp.bytes_stream();
     let mut buffer = String::new();
     let mut accumulated_usage: Option<TokenUsage> = None;
+    let mut tool_call_accumulators: Vec<ToolCallAccumulator> = Vec::new();
+    let mut finish_reason: Option<String> = None;
 
     while let Some(chunk_result) = stream.next().await {
         let bytes = match chunk_result {
@@ -108,17 +145,39 @@ pub(crate) async fn drive_sse_stream(
 
             // SSE lines start with "data: ".
             let Some(data) = line.strip_prefix("data: ") else {
-                // Could be a comment line (`:`) or other SSE field -- skip.
                 continue;
             };
 
             // Terminal sentinel.
             if data == "[DONE]" {
+                let stop_reason = finish_reason.as_deref().map(|r| match r {
+                    "tool_calls" => StopReason::ToolUse,
+                    "length" => StopReason::MaxTokens,
+                    "stop" => StopReason::EndTurn,
+                    _ => StopReason::EndTurn,
+                });
+                let tool_calls = if tool_call_accumulators.is_empty() {
+                    None
+                } else {
+                    Some(
+                        tool_call_accumulators
+                            .drain(..)
+                            .map(|acc| ToolCall {
+                                id: acc.id,
+                                name: acc.name,
+                                input: serde_json::from_str(&acc.arguments)
+                                    .unwrap_or(serde_json::Value::Object(serde_json::Map::new())),
+                            })
+                            .collect(),
+                    )
+                };
                 let chunk = StreamChunk {
                     content: String::new(),
                     done: true,
                     thinking: None,
                     usage: accumulated_usage.take(),
+                    tool_calls,
+                    stop_reason,
                 };
                 let _ = tx.send(chunk).await;
                 return;
@@ -127,13 +186,48 @@ pub(crate) async fn drive_sse_stream(
             // Parse the JSON frame.
             match serde_json::from_str::<SseFrame>(data) {
                 Ok(frame) => {
-                    // Extract delta content (may be empty on role-only deltas).
-                    let content = frame
-                        .choices
-                        .first()
+                    let choice = frame.choices.first();
+
+                    // Track finish_reason.
+                    if let Some(reason) = choice.and_then(|c| c.finish_reason.as_ref()) {
+                        finish_reason = Some(reason.clone());
+                    }
+
+                    // Extract delta content.
+                    let content = choice
                         .and_then(|c| c.delta.as_ref())
                         .and_then(|d| d.content.clone())
                         .unwrap_or_default();
+
+                    // Accumulate tool call deltas.
+                    if let Some(tc_deltas) = choice
+                        .and_then(|c| c.delta.as_ref())
+                        .and_then(|d| d.tool_calls.as_ref())
+                    {
+                        for tc in tc_deltas {
+                            let idx = tc.index.unwrap_or(0);
+                            // Grow accumulator vec if needed.
+                            while tool_call_accumulators.len() <= idx {
+                                tool_call_accumulators.push(ToolCallAccumulator {
+                                    id: String::new(),
+                                    name: String::new(),
+                                    arguments: String::new(),
+                                });
+                            }
+                            let acc = &mut tool_call_accumulators[idx];
+                            if let Some(ref id) = tc.id {
+                                acc.id = id.clone();
+                            }
+                            if let Some(ref func) = tc.function {
+                                if let Some(ref name) = func.name {
+                                    acc.name = name.clone();
+                                }
+                                if let Some(ref args) = func.arguments {
+                                    acc.arguments.push_str(args);
+                                }
+                            }
+                        }
+                    }
 
                     // Track usage if the final chunk includes it.
                     if let Some(u) = &frame.usage {
@@ -146,16 +240,18 @@ pub(crate) async fn drive_sse_stream(
                         });
                     }
 
-                    // Only send chunks with actual content (skip empty role-only deltas).
+                    // Only send chunks with actual content.
                     if !content.is_empty() {
                         let chunk = StreamChunk {
                             content,
                             done: false,
                             thinking: None,
                             usage: None,
+                            tool_calls: None,
+                            stop_reason: None,
                         };
                         if tx.send(chunk).await.is_err() {
-                            return; // receiver dropped
+                            return;
                         }
                     }
                 }
@@ -166,13 +262,36 @@ pub(crate) async fn drive_sse_stream(
         }
     }
 
-    // Stream ended without [DONE] -- send a final sentinel.
+    // Stream ended without [DONE] — send a final sentinel.
+    let stop_reason = finish_reason.as_deref().map(|r| match r {
+        "tool_calls" => StopReason::ToolUse,
+        "length" => StopReason::MaxTokens,
+        "stop" => StopReason::EndTurn,
+        _ => StopReason::EndTurn,
+    });
+    let tool_calls = if tool_call_accumulators.is_empty() {
+        None
+    } else {
+        Some(
+            tool_call_accumulators
+                .drain(..)
+                .map(|acc| ToolCall {
+                    id: acc.id,
+                    name: acc.name,
+                    input: serde_json::from_str(&acc.arguments)
+                        .unwrap_or(serde_json::Value::Object(serde_json::Map::new())),
+                })
+                .collect(),
+        )
+    };
     let _ = tx
         .send(StreamChunk {
             content: String::new(),
             done: true,
             thinking: None,
             usage: accumulated_usage,
+            tool_calls,
+            stop_reason,
         })
         .await;
 }

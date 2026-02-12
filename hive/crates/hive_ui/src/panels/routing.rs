@@ -343,6 +343,8 @@ fn build_task_mappings_from_router(router: &ModelRouter) -> Vec<TaskMapping> {
                 role: hive_ai::MessageRole::User,
                 content: task.to_string(),
                 timestamp: chrono::Utc::now(),
+                tool_call_id: None,
+                tool_calls: None,
             }];
             let result = router.classify(&messages, None);
 

@@ -221,17 +221,14 @@ impl<E: AiExecutor + 'static> Coordinator<E> {
         );
 
         let request = ChatRequest {
-            messages: vec![ChatMessage {
-                role: MessageRole::User,
-                content: prompt,
-                timestamp: chrono::Utc::now(),
-            }],
+            messages: vec![ChatMessage::text(MessageRole::User, prompt)],
             model: self.config.model_for_coordination.clone(),
             max_tokens: 4096,
             temperature: Some(0.2),
             system_prompt: Some(
                 "You are a project planning assistant. Return valid JSON only.".into(),
             ),
+            tools: None,
         };
 
         let response = self.executor.execute(&request).await?;
@@ -448,6 +445,7 @@ mod tests {
                 },
                 finish_reason: FinishReason::Stop,
                 thinking: None,
+                tool_calls: None,
             })
         }
     }

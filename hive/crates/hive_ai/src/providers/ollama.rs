@@ -99,6 +99,7 @@ impl OllamaProvider {
                     crate::types::MessageRole::Assistant => "assistant".into(),
                     crate::types::MessageRole::System => "system".into(),
                     crate::types::MessageRole::Error => "user".into(), // map errors to user
+                    crate::types::MessageRole::Tool => "user".into(),
                 },
                 content: m.content.clone(),
             })
@@ -241,6 +242,7 @@ impl AiProvider for OllamaProvider {
             },
             finish_reason: FinishReason::Stop,
             thinking: None,
+            tool_calls: None,
         })
     }
 
@@ -324,6 +326,8 @@ impl AiProvider for OllamaProvider {
                                 done,
                                 thinking: None,
                                 usage,
+                                tool_calls: None,
+                                stop_reason: None,
                             };
 
                             if tx.send(chunk).await.is_err() {
@@ -349,6 +353,8 @@ impl AiProvider for OllamaProvider {
                     done: true,
                     thinking: None,
                     usage: None,
+                    tool_calls: None,
+                    stop_reason: None,
                 })
                 .await;
         });

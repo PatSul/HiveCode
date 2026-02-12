@@ -109,6 +109,7 @@ impl GroqProvider {
                     crate::types::MessageRole::Assistant => "assistant".into(),
                     crate::types::MessageRole::System => "system".into(),
                     crate::types::MessageRole::Error => "user".into(),
+                    crate::types::MessageRole::Tool => "user".into(),
                 },
                 content: m.content.clone(),
             });
@@ -249,6 +250,7 @@ impl AiProvider for GroqProvider {
             usage,
             finish_reason,
             thinking: None,
+            tool_calls: None,
         })
     }
 
@@ -285,11 +287,14 @@ mod tests {
                 role: MessageRole::User,
                 content: "Hello".into(),
                 timestamp: chrono::Utc::now(),
+                tool_call_id: None,
+                tool_calls: None,
             }],
             model: model.into(),
             max_tokens: 1024,
             temperature: Some(0.7),
             system_prompt: None,
+            tools: None,
         }
     }
 

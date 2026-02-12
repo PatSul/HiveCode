@@ -12,7 +12,7 @@ use super::openai_sse::{self, ChatCompletionResponse};
 use super::{AiProvider, ProviderError};
 use crate::types::{
     ChatMessage, ChatRequest, ChatResponse, FinishReason, ModelInfo, ProviderType, StreamChunk,
-    TokenUsage,
+    ToolCall, TokenUsage,
 };
 
 // ---------------------------------------------------------------------------
@@ -33,6 +33,8 @@ struct OpenAIChatRequest {
     /// When streaming, ask the API to include usage in the final chunk.
     #[serde(skip_serializing_if = "Option::is_none")]
     stream_options: Option<StreamOptions>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tools: Option<Vec<OpenAITool>>,
 }
 
 #[derive(Debug, Serialize)]
@@ -41,9 +43,42 @@ struct StreamOptions {
 }
 
 #[derive(Debug, Serialize)]
+struct OpenAITool {
+    #[serde(rename = "type")]
+    tool_type: String,
+    function: OpenAIFunction,
+}
+
+#[derive(Debug, Serialize)]
+struct OpenAIFunction {
+    name: String,
+    description: String,
+    parameters: serde_json::Value,
+}
+
+#[derive(Debug, Serialize)]
 struct OpenAIMessage {
     role: String,
-    content: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    content: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tool_call_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tool_calls: Option<Vec<OpenAIToolCallMsg>>,
+}
+
+#[derive(Debug, Serialize)]
+struct OpenAIToolCallMsg {
+    id: String,
+    #[serde(rename = "type")]
+    call_type: String,
+    function: OpenAIFunctionCall,
+}
+
+#[derive(Debug, Serialize)]
+struct OpenAIFunctionCall {
+    name: String,
+    arguments: String,
 }
 
 // ---------------------------------------------------------------------------
@@ -107,19 +142,65 @@ impl OpenAIProvider {
         if let Some(sys) = system_prompt {
             out.push(OpenAIMessage {
                 role: "system".into(),
-                content: sys.to_string(),
+                content: Some(serde_json::Value::String(sys.to_string())),
+                tool_call_id: None,
+                tool_calls: None,
             });
         }
 
         for m in messages {
+            let role = match m.role {
+                crate::types::MessageRole::User => "user",
+                crate::types::MessageRole::Assistant => "assistant",
+                crate::types::MessageRole::System => "system",
+                crate::types::MessageRole::Error => "user",
+                crate::types::MessageRole::Tool => "tool",
+            };
+
+            // Tool result messages use "tool" role with tool_call_id.
+            if m.role == crate::types::MessageRole::Tool {
+                out.push(OpenAIMessage {
+                    role: role.into(),
+                    content: Some(serde_json::Value::String(m.content.clone())),
+                    tool_call_id: m.tool_call_id.clone(),
+                    tool_calls: None,
+                });
+                continue;
+            }
+
+            // Assistant messages with tool_calls.
+            if m.role == crate::types::MessageRole::Assistant {
+                if let Some(ref calls) = m.tool_calls {
+                    let tc_msgs: Vec<OpenAIToolCallMsg> = calls
+                        .iter()
+                        .map(|c| OpenAIToolCallMsg {
+                            id: c.id.clone(),
+                            call_type: "function".into(),
+                            function: OpenAIFunctionCall {
+                                name: c.name.clone(),
+                                arguments: serde_json::to_string(&c.input).unwrap_or_default(),
+                            },
+                        })
+                        .collect();
+                    out.push(OpenAIMessage {
+                        role: role.into(),
+                        content: if m.content.is_empty() {
+                            None
+                        } else {
+                            Some(serde_json::Value::String(m.content.clone()))
+                        },
+                        tool_call_id: None,
+                        tool_calls: Some(tc_msgs),
+                    });
+                    continue;
+                }
+            }
+
             out.push(OpenAIMessage {
-                role: match m.role {
-                    crate::types::MessageRole::User => "user".into(),
-                    crate::types::MessageRole::Assistant => "assistant".into(),
-                    crate::types::MessageRole::System => "system".into(),
-                    crate::types::MessageRole::Error => "user".into(),
-                },
-                content: m.content.clone(),
+                role: role.into(),
+                content: Some(serde_json::Value::String(m.content.clone())),
+                tool_call_id: None,
+                tool_calls: None,
             });
         }
 
@@ -161,6 +242,18 @@ impl OpenAIProvider {
             } else {
                 None
             },
+            tools: request.tools.as_ref().map(|defs| {
+                defs.iter()
+                    .map(|t| OpenAITool {
+                        tool_type: "function".into(),
+                        function: OpenAIFunction {
+                            name: t.name.clone(),
+                            description: t.description.clone(),
+                            parameters: t.input_schema.clone(),
+                        },
+                    })
+                    .collect()
+            }),
         }
     }
 
@@ -269,12 +362,29 @@ impl AiProvider for OpenAIProvider {
             }
         }).unwrap_or_default();
 
+        // Extract tool calls from the response.
+        let tool_calls = choice
+            .message
+            .tool_calls
+            .as_ref()
+            .map(|tcs| {
+                tcs.iter()
+                    .map(|tc| ToolCall {
+                        id: tc.id.clone(),
+                        name: tc.function.name.clone(),
+                        input: serde_json::from_str(&tc.function.arguments)
+                            .unwrap_or(serde_json::Value::Object(serde_json::Map::new())),
+                    })
+                    .collect()
+            });
+
         Ok(ChatResponse {
             content,
             model: data.model,
             usage,
             finish_reason,
             thinking: None,
+            tool_calls,
         })
     }
 
@@ -307,15 +417,12 @@ mod tests {
 
     fn sample_request(model: &str) -> ChatRequest {
         ChatRequest {
-            messages: vec![ChatMessage {
-                role: MessageRole::User,
-                content: "Hello".into(),
-                timestamp: chrono::Utc::now(),
-            }],
+            messages: vec![ChatMessage::text(MessageRole::User, "Hello")],
             model: model.into(),
             max_tokens: 1024,
             temperature: Some(0.7),
             system_prompt: None,
+            tools: None,
         }
     }
 
@@ -378,7 +485,10 @@ mod tests {
 
         assert_eq!(body.messages.len(), 2);
         assert_eq!(body.messages[0].role, "system");
-        assert_eq!(body.messages[0].content, "You are helpful.");
+        assert_eq!(
+            body.messages[0].content,
+            Some(serde_json::Value::String("You are helpful.".into()))
+        );
         assert_eq!(body.messages[1].role, "user");
     }
 

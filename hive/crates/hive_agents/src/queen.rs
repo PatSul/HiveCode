@@ -112,17 +112,14 @@ impl<E: AiExecutor + 'static> Queen<E> {
         );
 
         let request = ChatRequest {
-            messages: vec![ChatMessage {
-                role: MessageRole::User,
-                content: prompt,
-                timestamp: chrono::Utc::now(),
-            }],
+            messages: vec![ChatMessage::text(MessageRole::User, prompt)],
             model: self.config.queen_model.clone(),
             max_tokens: 4096,
             temperature: Some(0.3),
             system_prompt: Some(
                 "You are a swarm orchestration planner. Produce valid JSON only.".into(),
             ),
+            tools: None,
         };
 
         let response = self.executor.execute(&request).await?;
@@ -628,15 +625,12 @@ impl<E: AiExecutor + 'static> Queen<E> {
         );
 
         let request = ChatRequest {
-            messages: vec![ChatMessage {
-                role: MessageRole::User,
-                content: description.to_string(),
-                timestamp: chrono::Utc::now(),
-            }],
+            messages: vec![ChatMessage::text(MessageRole::User, description.to_string())],
             model: model.clone(),
             max_tokens: 4096,
             temperature: Some(0.3),
             system_prompt: Some(system_prompt),
+            tools: None,
         };
 
         let response = self.executor.execute(&request).await?;
@@ -665,11 +659,7 @@ impl<E: AiExecutor + 'static> Queen<E> {
             .unwrap_or_else(|| default_model_for_tier(ModelTier::Budget));
 
         let request = ChatRequest {
-            messages: vec![ChatMessage {
-                role: MessageRole::User,
-                content: description.to_string(),
-                timestamp: chrono::Utc::now(),
-            }],
+            messages: vec![ChatMessage::text(MessageRole::User, description.to_string())],
             model: model.clone(),
             max_tokens: 4096,
             temperature: Some(0.3),
@@ -677,6 +667,7 @@ impl<E: AiExecutor + 'static> Queen<E> {
                 "You are team '{}'. Complete the following objective thoroughly and concisely.",
                 objective.name
             )),
+            tools: None,
         };
 
         let response = self.executor.execute(&request).await?;
@@ -804,11 +795,7 @@ impl<E: AiExecutor + 'static> Queen<E> {
         );
 
         let request = ChatRequest {
-            messages: vec![ChatMessage {
-                role: MessageRole::User,
-                content: synthesis_prompt,
-                timestamp: chrono::Utc::now(),
-            }],
+            messages: vec![ChatMessage::text(MessageRole::User, synthesis_prompt)],
             model: self.config.queen_model.clone(),
             max_tokens: 4096,
             temperature: Some(0.3),
@@ -817,6 +804,7 @@ impl<E: AiExecutor + 'static> Queen<E> {
                  coherent, well-structured result. Preserve important details from each team."
                     .into(),
             ),
+            tools: None,
         };
 
         match self.executor.execute(&request).await {
@@ -1157,6 +1145,7 @@ mod tests {
                 usage: TokenUsage::default(),
                 finish_reason: FinishReason::Stop,
                 thinking: None,
+                tool_calls: None,
             })
         }
     }
@@ -1592,6 +1581,7 @@ mod tests {
             },
             finish_reason: FinishReason::Stop,
             thinking: None,
+            tool_calls: None,
         };
 
         let cost = estimate_cost("claude-sonnet", &response);
@@ -1611,6 +1601,7 @@ mod tests {
             },
             finish_reason: FinishReason::Stop,
             thinking: None,
+            tool_calls: None,
         };
 
         let cost = estimate_cost("local-llama", &response);

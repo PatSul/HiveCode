@@ -706,6 +706,8 @@ mod tests {
             role: MessageRole::User,
             content: content.to_string(),
             timestamp: Utc::now(),
+            tool_call_id: None,
+            tool_calls: None,
         }
     }
 

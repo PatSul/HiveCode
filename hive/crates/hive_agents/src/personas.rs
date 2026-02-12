@@ -356,15 +356,12 @@ pub async fn execute_with_persona<E: AiExecutor>(
     };
 
     let request = ChatRequest {
-        messages: vec![ChatMessage {
-            role: MessageRole::User,
-            content: task.to_string(),
-            timestamp: chrono::Utc::now(),
-        }],
+        messages: vec![ChatMessage::text(MessageRole::User, task.to_string())],
         model: model.clone(),
         max_tokens: persona.max_tokens,
         temperature: Some(0.3),
         system_prompt: Some(system_prompt),
+        tools: None,
     };
 
     let start = Instant::now();
@@ -487,6 +484,7 @@ mod tests {
                 },
                 finish_reason: FinishReason::Stop,
                 thinking: None,
+                tool_calls: None,
             })
         }
     }

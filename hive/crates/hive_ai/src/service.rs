@@ -24,7 +24,7 @@ use crate::providers::openrouter::OpenRouterProvider;
 use crate::providers::{AiProvider, ProviderError};
 use crate::routing::ModelRouter;
 use crate::types::{
-    ChatMessage, ChatRequest, ChatResponse, ProviderType, StreamChunk,
+    ChatMessage, ChatRequest, ChatResponse, ProviderType, StreamChunk, ToolDefinition,
 };
 
 // ---------------------------------------------------------------------------
@@ -235,6 +235,7 @@ impl AiService {
         &mut self,
         messages: Vec<ChatMessage>,
         model: &str,
+        tools: Option<Vec<ToolDefinition>>,
     ) -> Result<ChatResponse, ProviderError> {
         let (provider_type, provider) =
             self.resolve_provider(model).ok_or_else(|| {
@@ -247,6 +248,7 @@ impl AiService {
             max_tokens: 4096,
             temperature: None,
             system_prompt: None,
+            tools,
         };
 
         info!("Sending chat request to {:?} model={}", provider_type, model);
@@ -284,6 +286,7 @@ impl AiService {
         messages: Vec<ChatMessage>,
         model: &str,
         system_prompt: Option<String>,
+        tools: Option<Vec<ToolDefinition>>,
     ) -> Result<mpsc::Receiver<StreamChunk>, ProviderError> {
         let (provider_type, provider) =
             self.resolve_provider(model).ok_or_else(|| {
@@ -296,6 +299,7 @@ impl AiService {
             max_tokens: 4096,
             temperature: None,
             system_prompt,
+            tools,
         };
 
         info!(
@@ -313,7 +317,7 @@ impl AiService {
     ///
     /// ```ignore
     /// let (provider, request) = cx.global::<AppAiService>().0
-    ///     .prepare_stream(messages, model, None)
+    ///     .prepare_stream(messages, model, None, None)
     ///     .ok_or("no provider")?;
     /// cx.spawn(async move |_, _| {
     ///     let rx = provider.stream_chat(&request).await?;
@@ -325,6 +329,7 @@ impl AiService {
         messages: Vec<ChatMessage>,
         model: &str,
         system_prompt: Option<String>,
+        tools: Option<Vec<ToolDefinition>>,
     ) -> Option<(Arc<dyn AiProvider>, ChatRequest)> {
         let (_provider_type, provider) = self.resolve_provider(model)?;
         let request = ChatRequest {
@@ -333,6 +338,7 @@ impl AiService {
             max_tokens: 4096,
             temperature: None,
             system_prompt,
+            tools,
         };
         Some((provider, request))
     }
@@ -518,12 +524,8 @@ mod tests {
     #[test]
     fn test_prepare_stream_returns_provider_and_request() {
         let svc = AiService::new(test_config());
-        let messages = vec![ChatMessage {
-            role: MessageRole::User,
-            content: "Hello".into(),
-            timestamp: chrono::Utc::now(),
-        }];
-        let result = svc.prepare_stream(messages, "claude-sonnet-4-5", None);
+        let messages = vec![ChatMessage::text(MessageRole::User, "Hello")];
+        let result = svc.prepare_stream(messages, "claude-sonnet-4-5", None, None);
         assert!(result.is_some());
         let (provider, request) = result.unwrap();
         assert_eq!(request.model, "claude-sonnet-4-5");
@@ -539,7 +541,7 @@ mod tests {
             ..Default::default()
         };
         let svc = AiService::new(config);
-        let result = svc.prepare_stream(vec![], "test-model", None);
+        let result = svc.prepare_stream(vec![], "test-model", None, None);
         assert!(result.is_none());
     }
 

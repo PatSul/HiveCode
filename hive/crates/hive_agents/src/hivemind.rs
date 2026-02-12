@@ -427,15 +427,12 @@ impl<E: AiExecutor> HiveMind<E> {
     pub fn build_request(&self, role: AgentRole, task_content: &str) -> ChatRequest {
         let model = self.model_for_role(role);
         ChatRequest {
-            messages: vec![ChatMessage {
-                role: MessageRole::User,
-                content: task_content.to_string(),
-                timestamp: chrono::Utc::now(),
-            }],
+            messages: vec![ChatMessage::text(MessageRole::User, task_content.to_string())],
             model,
             max_tokens: 4096,
             temperature: Some(0.3),
             system_prompt: Some(role.system_prompt().to_string()),
+            tools: None,
         }
     }
 
@@ -835,6 +832,7 @@ mod tests {
                 },
                 finish_reason: FinishReason::Stop,
                 thinking: None,
+                tool_calls: None,
             })
         }
     }
@@ -1593,6 +1591,7 @@ mod tests {
                     },
                     finish_reason: FinishReason::Stop,
                     thinking: None,
+                    tool_calls: None,
                 })
             }
         }

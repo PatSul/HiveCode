@@ -302,6 +302,13 @@ impl CachedChatData {
 // ---------------------------------------------------------------------------
 
 /// A fully-resolved message ready for rendering.
+/// A tool call to display in the chat UI.
+#[derive(Clone)]
+pub struct ToolCallDisplay {
+    pub name: String,
+    pub args: String,
+}
+
 pub struct DisplayMessage {
     pub role: MessageRole,
     pub content: String,
@@ -311,6 +318,10 @@ pub struct DisplayMessage {
     pub tokens: Option<u32>,
     pub timestamp: chrono::DateTime<chrono::Utc>,
     pub show_thinking: bool,
+    /// Tool calls made by the assistant (rendered as collapsible blocks).
+    pub tool_calls: Vec<ToolCallDisplay>,
+    /// For tool result messages: the ID of the tool call this responds to.
+    pub tool_call_id: Option<String>,
 }
 
 impl DisplayMessage {
@@ -324,6 +335,8 @@ impl DisplayMessage {
             tokens: None,
             timestamp: chrono::Utc::now(),
             show_thinking: false,
+            tool_calls: Vec::new(),
+            tool_call_id: None,
         }
     }
 
@@ -337,6 +350,8 @@ impl DisplayMessage {
             tokens: None,
             timestamp: chrono::Utc::now(),
             show_thinking: false,
+            tool_calls: Vec::new(),
+            tool_call_id: None,
         }
     }
 
@@ -350,6 +365,8 @@ impl DisplayMessage {
             tokens: None,
             timestamp: chrono::Utc::now(),
             show_thinking: false,
+            tool_calls: Vec::new(),
+            tool_call_id: None,
         }
     }
 }
@@ -619,7 +636,22 @@ fn convert_service_message(msg: &chat_service::ChatMessage) -> DisplayMessage {
         chat_service::MessageRole::Assistant => MessageRole::Assistant,
         chat_service::MessageRole::System => MessageRole::System,
         chat_service::MessageRole::Error => MessageRole::Error,
+        chat_service::MessageRole::Tool => MessageRole::Tool,
     };
+    let tool_calls = msg
+        .tool_calls
+        .as_ref()
+        .map(|tcs| {
+            tcs.iter()
+                .map(|tc| ToolCallDisplay {
+                    name: tc.name.clone(),
+                    args: serde_json::to_string_pretty(&tc.input)
+                        .unwrap_or_else(|_| tc.input.to_string()),
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+
     DisplayMessage {
         role,
         content: msg.content.clone(),
@@ -629,6 +661,8 @@ fn convert_service_message(msg: &chat_service::ChatMessage) -> DisplayMessage {
         tokens: msg.tokens.map(|(i, o)| (i + o) as u32),
         timestamp: msg.timestamp,
         show_thinking: false,
+        tool_calls,
+        tool_call_id: msg.tool_call_id.clone(),
     }
 }
 
@@ -636,13 +670,51 @@ fn convert_service_message(msg: &chat_service::ChatMessage) -> DisplayMessage {
 // Message bubble
 // ---------------------------------------------------------------------------
 
+/// Render tool call blocks (shown on assistant messages that triggered tool use).
+fn render_tool_calls(calls: &[ToolCallDisplay], theme: &HiveTheme) -> AnyElement {
+    let mut container = div().flex().flex_col().gap(theme.space_1).mt(theme.space_2);
+
+    for call in calls {
+        let block = div()
+            .px(theme.space_2)
+            .py(theme.space_1)
+            .rounded(theme.radius_sm)
+            .bg(theme.bg_tertiary)
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap(theme.space_1)
+                    .child(
+                        div()
+                            .text_size(theme.font_size_xs)
+                            .text_color(theme.accent_cyan)
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .child(format!("Tool: {}", call.name)),
+                    ),
+            )
+            .child(
+                div()
+                    .text_size(theme.font_size_xs)
+                    .text_color(theme.text_muted)
+                    .font_family("monospace")
+                    .overflow_hidden()
+                    .max_h(px(80.0))
+                    .child(call.args.clone()),
+            );
+        container = container.child(block);
+    }
+
+    container.into_any_element()
+}
+
 fn render_message_bubble(msg: &DisplayMessage, theme: &HiveTheme) -> AnyElement {
     let is_user = msg.role == MessageRole::User;
     let is_error = msg.role == MessageRole::Error;
 
     let bg = match msg.role {
         MessageRole::User => theme.bg_tertiary,
-        MessageRole::Assistant | MessageRole::System => theme.bg_surface,
+        MessageRole::Assistant | MessageRole::System | MessageRole::Tool => theme.bg_surface,
         MessageRole::Error => theme.accent_red,
     };
 
@@ -651,12 +723,13 @@ fn render_message_bubble(msg: &DisplayMessage, theme: &HiveTheme) -> AnyElement 
         MessageRole::Assistant => "Hive",
         MessageRole::System => "System",
         MessageRole::Error => "Error",
+        MessageRole::Tool => "Tool",
     };
 
     let role_color = match msg.role {
         MessageRole::User => theme.accent_powder,
         MessageRole::Assistant => theme.accent_cyan,
-        MessageRole::System => theme.accent_yellow,
+        MessageRole::System | MessageRole::Tool => theme.accent_yellow,
         MessageRole::Error => theme.text_on_accent,
     };
 
@@ -727,6 +800,11 @@ fn render_message_bubble(msg: &DisplayMessage, theme: &HiveTheme) -> AnyElement 
     };
     bubble = bubble.child(content_el);
 
+    // Tool calls (shown on assistant messages that triggered tool use)
+    if !msg.tool_calls.is_empty() {
+        bubble = bubble.child(render_tool_calls(&msg.tool_calls, theme));
+    }
+
     // Row alignment: user right-aligned, others left-aligned
     let row = div().flex().w_full();
     let row = if is_user {
@@ -748,7 +826,7 @@ fn render_message_bubble_cached(
 
     let bg = match msg.role {
         MessageRole::User => theme.bg_tertiary,
-        MessageRole::Assistant | MessageRole::System => theme.bg_surface,
+        MessageRole::Assistant | MessageRole::System | MessageRole::Tool => theme.bg_surface,
         MessageRole::Error => theme.accent_red,
     };
 
@@ -757,12 +835,13 @@ fn render_message_bubble_cached(
         MessageRole::Assistant => "Hive",
         MessageRole::System => "System",
         MessageRole::Error => "Error",
+        MessageRole::Tool => "Tool",
     };
 
     let role_color = match msg.role {
         MessageRole::User => theme.accent_powder,
         MessageRole::Assistant => theme.accent_cyan,
-        MessageRole::System => theme.accent_yellow,
+        MessageRole::System | MessageRole::Tool => theme.accent_yellow,
         MessageRole::Error => theme.text_on_accent,
     };
 
@@ -826,6 +905,11 @@ fn render_message_bubble_cached(
         render_markdown_cached(&msg.content, md_cache, theme)
     };
     bubble = bubble.child(content_el);
+
+    // Tool calls (shown on assistant messages that triggered tool use)
+    if !msg.tool_calls.is_empty() {
+        bubble = bubble.child(render_tool_calls(&msg.tool_calls, theme));
+    }
 
     let row = div().flex().w_full();
     let row = if is_user {

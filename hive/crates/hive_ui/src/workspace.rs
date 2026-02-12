@@ -6,7 +6,7 @@ use std::sync::Arc;
 use tracing::{error, info, warn};
 
 use hive_ai::providers::AiProvider;
-use hive_ai::types::ChatRequest;
+use hive_ai::types::{ChatRequest, ToolDefinition as AiToolDefinition};
 use hive_core::session::SessionState;
 
 use crate::chat_input::{ChatInputView, SubmitMessage};
@@ -680,12 +680,23 @@ impl HiveWorkspace {
         // 2. Build the AI wire-format messages.
         let ai_messages = self.chat_service.read(cx).build_ai_messages();
 
-        // 3. Extract provider + request from the global (sync — no await).
+        // 3. Build tool definitions from the built-in tool registry.
+        let agent_defs = hive_agents::tool_use::builtin_tool_definitions();
+        let tool_defs: Vec<AiToolDefinition> = agent_defs
+            .into_iter()
+            .map(|d| AiToolDefinition {
+                name: d.name,
+                description: d.description,
+                input_schema: d.input_schema,
+            })
+            .collect();
+
+        // 4. Extract provider + request from the global (sync — no await).
         let stream_setup: Option<(Arc<dyn AiProvider>, ChatRequest)> =
             if cx.has_global::<AppAiService>() {
                 cx.global::<AppAiService>()
                     .0
-                    .prepare_stream(ai_messages, &model, None)
+                    .prepare_stream(ai_messages, &model, None, Some(tool_defs))
             } else {
                 None
             };
@@ -700,15 +711,23 @@ impl HiveWorkspace {
             return;
         };
 
-        // 4. Spawn async: call provider.stream_chat, then attach to service.
+        // 5. Spawn async: call provider.stream_chat, then attach with tool loop.
         let chat_svc = self.chat_service.downgrade();
         let model_for_attach = model.clone();
+        let provider_for_loop = provider.clone();
+        let request_for_loop = request.clone();
 
         let task = cx.spawn(async move |_this, app: &mut AsyncApp| {
             match provider.stream_chat(&request).await {
                 Ok(rx) => {
                     let _ = chat_svc.update(app, |svc, cx| {
-                        svc.attach_stream(rx, model_for_attach, cx);
+                        svc.attach_tool_stream(
+                            rx,
+                            model_for_attach,
+                            provider_for_loop,
+                            request_for_loop,
+                            cx,
+                        );
                     });
                 }
                 Err(e) => {

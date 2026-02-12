@@ -11,6 +11,25 @@ pub struct ChatMessage {
     pub role: MessageRole,
     pub content: String,
     pub timestamp: chrono::DateTime<chrono::Utc>,
+    /// For tool result messages: the ID of the tool call this is responding to.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_call_id: Option<String>,
+    /// For assistant messages: tool calls the model wants to make.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_calls: Option<Vec<ToolCall>>,
+}
+
+impl ChatMessage {
+    /// Create a simple text message (no tool fields).
+    pub fn text(role: MessageRole, content: impl Into<String>) -> Self {
+        Self {
+            role,
+            content: content.into(),
+            timestamp: chrono::Utc::now(),
+            tool_call_id: None,
+            tool_calls: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -20,6 +39,37 @@ pub enum MessageRole {
     Assistant,
     System,
     Error,
+    Tool,
+}
+
+// ---------------------------------------------------------------------------
+// Tool types
+// ---------------------------------------------------------------------------
+
+/// Definition of a tool that can be called by the AI.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolDefinition {
+    pub name: String,
+    pub description: String,
+    pub input_schema: serde_json::Value,
+}
+
+/// A tool call made by the AI during streaming.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolCall {
+    pub id: String,
+    pub name: String,
+    pub input: serde_json::Value,
+}
+
+/// Why the model stopped generating during streaming.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StopReason {
+    EndTurn,
+    ToolUse,
+    MaxTokens,
+    StopSequence,
 }
 
 // ---------------------------------------------------------------------------
@@ -170,6 +220,9 @@ pub struct ChatRequest {
     pub temperature: Option<f32>,
     #[serde(default)]
     pub system_prompt: Option<String>,
+    /// Tool definitions the model can call.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tools: Option<Vec<ToolDefinition>>,
 }
 
 fn default_max_tokens() -> u32 {
@@ -204,6 +257,9 @@ pub struct ChatResponse {
     /// Extended thinking / chain-of-thought output, if any.
     #[serde(default)]
     pub thinking: Option<String>,
+    /// Tool calls requested by the model (non-streaming).
+    #[serde(default)]
+    pub tool_calls: Option<Vec<ToolCall>>,
 }
 
 /// A single chunk from a streaming response.
@@ -216,4 +272,10 @@ pub struct StreamChunk {
     /// Usage is typically only present on the final chunk.
     #[serde(default)]
     pub usage: Option<TokenUsage>,
+    /// Tool calls the model wants to make (populated on the final chunk when stop_reason is ToolUse).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_calls: Option<Vec<ToolCall>>,
+    /// Why the model stopped generating.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stop_reason: Option<StopReason>,
 }
