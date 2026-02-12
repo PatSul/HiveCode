@@ -53,6 +53,24 @@ pub struct ModelSelectorView {
     fetched_or_models: Vec<ModelInfo>,
     or_fetch_status: FetchStatus,
     openrouter_api_key: Option<String>,
+
+    // OpenAI live catalog
+    fetched_openai_models: Vec<ModelInfo>,
+    openai_fetch_status: FetchStatus,
+    openai_api_key: Option<String>,
+
+    // Anthropic live catalog
+    fetched_anthropic_models: Vec<ModelInfo>,
+    anthropic_fetch_status: FetchStatus,
+    anthropic_api_key: Option<String>,
+
+    // Google live catalog
+    fetched_google_models: Vec<ModelInfo>,
+    google_fetch_status: FetchStatus,
+    google_api_key: Option<String>,
+
+    // Discovered local models (from auto-detection)
+    discovered_local_models: Vec<ModelInfo>,
 }
 
 impl EventEmitter<ModelSelected> for ModelSelectorView {}
@@ -83,6 +101,16 @@ impl ModelSelectorView {
             fetched_or_models: Vec::new(),
             or_fetch_status: FetchStatus::Idle,
             openrouter_api_key: None,
+            fetched_openai_models: Vec::new(),
+            openai_fetch_status: FetchStatus::Idle,
+            openai_api_key: None,
+            fetched_anthropic_models: Vec::new(),
+            anthropic_fetch_status: FetchStatus::Idle,
+            anthropic_api_key: None,
+            fetched_google_models: Vec::new(),
+            google_fetch_status: FetchStatus::Idle,
+            google_api_key: None,
+            discovered_local_models: Vec::new(),
         }
     }
 
@@ -114,6 +142,50 @@ impl ModelSelectorView {
         }
     }
 
+    /// Store the OpenAI API key; invalidate cached catalog on change.
+    pub fn set_openai_api_key(&mut self, key: Option<String>, cx: &mut Context<Self>) {
+        let changed = self.openai_api_key != key;
+        self.openai_api_key = key;
+        if changed {
+            hive_ai::providers::openai_catalog::invalidate_cache();
+            self.fetched_openai_models.clear();
+            self.openai_fetch_status = FetchStatus::Idle;
+            cx.notify();
+        }
+    }
+
+    /// Store the Anthropic API key; invalidate cached catalog on change.
+    pub fn set_anthropic_api_key(&mut self, key: Option<String>, cx: &mut Context<Self>) {
+        let changed = self.anthropic_api_key != key;
+        self.anthropic_api_key = key;
+        if changed {
+            hive_ai::providers::anthropic_catalog::invalidate_cache();
+            self.fetched_anthropic_models.clear();
+            self.anthropic_fetch_status = FetchStatus::Idle;
+            cx.notify();
+        }
+    }
+
+    /// Store the Google API key; invalidate cached catalog on change.
+    pub fn set_google_api_key(&mut self, key: Option<String>, cx: &mut Context<Self>) {
+        let changed = self.google_api_key != key;
+        self.google_api_key = key;
+        if changed {
+            hive_ai::providers::google_catalog::invalidate_cache();
+            self.fetched_google_models.clear();
+            self.google_fetch_status = FetchStatus::Idle;
+            cx.notify();
+        }
+    }
+
+    /// Update discovered local models (from auto-detection scan).
+    pub fn set_local_models(&mut self, models: Vec<ModelInfo>, cx: &mut Context<Self>) {
+        if self.discovered_local_models != models {
+            self.discovered_local_models = models;
+            cx.notify();
+        }
+    }
+
     fn toggle(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.is_open = !self.is_open;
         if !self.is_open {
@@ -123,8 +195,11 @@ impl ModelSelectorView {
                 state.set_value(String::new(), window, cx);
             });
         } else {
-            // Trigger OpenRouter catalog fetch if needed
+            // Trigger live catalog fetches when dropdown opens
             self.maybe_fetch_openrouter(cx);
+            self.maybe_fetch_openai(cx);
+            self.maybe_fetch_anthropic(cx);
+            self.maybe_fetch_google(cx);
         }
         cx.notify();
     }
@@ -178,19 +253,152 @@ impl ModelSelectorView {
         .detach();
     }
 
-    fn is_provider_enabled(&self, provider: ProviderType) -> bool {
-        self.enabled_providers.contains(&provider)
+    fn maybe_fetch_openai(&mut self, cx: &mut Context<Self>) {
+        if !self.enabled_providers.contains(&ProviderType::OpenAI) {
+            return;
+        }
+        if self.openai_fetch_status == FetchStatus::Loading
+            || self.openai_fetch_status == FetchStatus::Done
+        {
+            return;
+        }
+        let Some(api_key) = self.openai_api_key.clone() else {
+            return;
+        };
+        if api_key.is_empty() {
+            return;
+        }
+
+        self.openai_fetch_status = FetchStatus::Loading;
+        cx.notify();
+
+        cx.spawn(async move |this, app: &mut AsyncApp| {
+            let result =
+                hive_ai::providers::openai_catalog::fetch_openai_models(&api_key).await;
+
+            let _ = this.update(app, |this, cx| match result {
+                Ok(models) => {
+                    this.fetched_openai_models = models;
+                    this.openai_fetch_status = FetchStatus::Done;
+                    cx.notify();
+                }
+                Err(_) => {
+                    this.openai_fetch_status = FetchStatus::Failed;
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
     }
 
-    /// Collect all models: static registry + fetched OpenRouter catalog (deduplicated).
+    fn maybe_fetch_anthropic(&mut self, cx: &mut Context<Self>) {
+        if !self.enabled_providers.contains(&ProviderType::Anthropic) {
+            return;
+        }
+        if self.anthropic_fetch_status == FetchStatus::Loading
+            || self.anthropic_fetch_status == FetchStatus::Done
+        {
+            return;
+        }
+        let Some(api_key) = self.anthropic_api_key.clone() else {
+            return;
+        };
+        if api_key.is_empty() {
+            return;
+        }
+
+        self.anthropic_fetch_status = FetchStatus::Loading;
+        cx.notify();
+
+        cx.spawn(async move |this, app: &mut AsyncApp| {
+            let result =
+                hive_ai::providers::anthropic_catalog::fetch_anthropic_models(&api_key).await;
+
+            let _ = this.update(app, |this, cx| match result {
+                Ok(models) => {
+                    this.fetched_anthropic_models = models;
+                    this.anthropic_fetch_status = FetchStatus::Done;
+                    cx.notify();
+                }
+                Err(_) => {
+                    this.anthropic_fetch_status = FetchStatus::Failed;
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
+    }
+
+    fn maybe_fetch_google(&mut self, cx: &mut Context<Self>) {
+        if !self.enabled_providers.contains(&ProviderType::Google) {
+            return;
+        }
+        if self.google_fetch_status == FetchStatus::Loading
+            || self.google_fetch_status == FetchStatus::Done
+        {
+            return;
+        }
+        let Some(api_key) = self.google_api_key.clone() else {
+            return;
+        };
+        if api_key.is_empty() {
+            return;
+        }
+
+        self.google_fetch_status = FetchStatus::Loading;
+        cx.notify();
+
+        cx.spawn(async move |this, app: &mut AsyncApp| {
+            let result =
+                hive_ai::providers::google_catalog::fetch_google_models(&api_key).await;
+
+            let _ = this.update(app, |this, cx| match result {
+                Ok(models) => {
+                    this.fetched_google_models = models;
+                    this.google_fetch_status = FetchStatus::Done;
+                    cx.notify();
+                }
+                Err(_) => {
+                    this.google_fetch_status = FetchStatus::Failed;
+                    cx.notify();
+                }
+            });
+        })
+        .detach();
+    }
+
+    fn is_provider_enabled(&self, provider: ProviderType) -> bool {
+        match provider {
+            // Local providers don't need API keys — always enabled.
+            ProviderType::Ollama | ProviderType::LMStudio | ProviderType::GenericLocal => true,
+            _ => self.enabled_providers.contains(&provider),
+        }
+    }
+
+    /// Collect all models: static registry + cloud catalogs + local (deduplicated).
     fn all_models(&self) -> Vec<ModelInfo> {
         let mut models: Vec<ModelInfo> = MODEL_REGISTRY.iter().cloned().collect();
+        let mut seen_ids: HashSet<String> = models.iter().map(|m| m.id.clone()).collect();
 
-        // Merge fetched OpenRouter models, deduplicating by id
-        let existing_ids: HashSet<String> = models.iter().map(|m| m.id.clone()).collect();
-        for m in &self.fetched_or_models {
-            if !existing_ids.contains(&m.id) {
+        // Merge discovered local models
+        for m in &self.discovered_local_models {
+            if seen_ids.insert(m.id.clone()) {
                 models.push(m.clone());
+            }
+        }
+
+        // Merge fetched cloud catalog models
+        let catalogs: [&Vec<ModelInfo>; 4] = [
+            &self.fetched_or_models,
+            &self.fetched_openai_models,
+            &self.fetched_anthropic_models,
+            &self.fetched_google_models,
+        ];
+        for catalog in catalogs {
+            for m in catalog {
+                if seen_ids.insert(m.id.clone()) {
+                    models.push(m.clone());
+                }
             }
         }
 
@@ -303,10 +511,14 @@ impl ModelSelectorView {
         let provider_order = [
             (ProviderType::Anthropic, "Anthropic"),
             (ProviderType::OpenAI, "OpenAI"),
+            (ProviderType::Google, "Google"),
             (ProviderType::OpenRouter, "OpenRouter"),
             (ProviderType::Groq, "Groq"),
             (ProviderType::HuggingFace, "Hugging Face"),
             (ProviderType::LiteLLM, "LiteLLM"),
+            (ProviderType::Ollama, "Ollama (Local)"),
+            (ProviderType::LMStudio, "LM Studio (Local)"),
+            (ProviderType::GenericLocal, "Local AI"),
         ];
 
         let all_models = self.all_models();
@@ -332,21 +544,30 @@ impl ModelSelectorView {
             );
         }
 
-        // "OpenRouter Catalog" group for fetched models not in static registry
-        if self.or_fetch_status == FetchStatus::Loading {
-            groups.push(
-                div()
-                    .px(theme.space_3)
-                    .py(theme.space_2)
-                    .text_size(theme.font_size_xs)
-                    .text_color(theme.text_muted)
-                    .child("Loading OpenRouter catalog\u{2026}")
-                    .into_any_element(),
-            );
+        // Show loading indicators for any catalogs still fetching
+        let loading_statuses = [
+            (self.or_fetch_status, "OpenRouter"),
+            (self.openai_fetch_status, "OpenAI"),
+            (self.anthropic_fetch_status, "Anthropic"),
+            (self.google_fetch_status, "Google"),
+        ];
+        for (status, name) in &loading_statuses {
+            if *status == FetchStatus::Loading {
+                groups.push(
+                    div()
+                        .px(theme.space_3)
+                        .py(theme.space_2)
+                        .text_size(theme.font_size_xs)
+                        .text_color(theme.text_muted)
+                        .child(format!("Loading {name} catalog\u{2026}"))
+                        .into_any_element(),
+                );
+            }
         }
+        let any_loading = loading_statuses.iter().any(|(s, _)| *s == FetchStatus::Loading);
 
         // Empty state
-        if total_visible == 0 && self.or_fetch_status != FetchStatus::Loading {
+        if total_visible == 0 && !any_loading {
             groups.push(
                 div()
                     .px(theme.space_3)

@@ -211,7 +211,7 @@ fn default_fallback_chain() -> Vec<FallbackChainEntry> {
         // Budget tier
         FallbackChainEntry {
             provider: ProviderType::Anthropic,
-            model: "claude-3-5-haiku-20241022".into(),
+            model: "claude-haiku-4-5-20251001".into(),
             priority: 20,
             cost_tier: ModelTier::Budget,
         },

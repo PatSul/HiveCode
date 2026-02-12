@@ -41,7 +41,7 @@ pub enum ModelCapability {
 }
 
 /// Set of capabilities for a model.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct ModelCapabilities {
     caps: HashSet<ModelCapability>,
 }
@@ -75,7 +75,7 @@ impl ModelCapabilities {
 }
 
 /// Model information for display in the UI and cost tracking.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ModelInfo {
     pub id: String,
     pub name: String,

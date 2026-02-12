@@ -186,7 +186,7 @@ impl RoutingData {
                 },
                 TaskMapping {
                     task_type: "Documentation".into(),
-                    model_id: "claude-3-5-haiku-20241022".into(),
+                    model_id: "claude-haiku-4-5-20251001".into(),
                     tier: "Budget".into(),
                     performance_score: 0.88,
                 },
@@ -222,7 +222,7 @@ impl RoutingData {
                 },
                 TaskMapping {
                     task_type: "Code Explanation".into(),
-                    model_id: "claude-3-5-haiku-20241022".into(),
+                    model_id: "claude-haiku-4-5-20251001".into(),
                     tier: "Budget".into(),
                     performance_score: 0.87,
                 },

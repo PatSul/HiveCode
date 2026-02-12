@@ -206,6 +206,12 @@ pub struct HiveWorkspace {
     /// `ChatService` generation counter changes, avoiding per-frame string
     /// cloning and enabling markdown parse caching.
     cached_chat_data: CachedChatData,
+    /// Timestamp of the last discovery scan (for 30s cadence).
+    last_discovery_scan: Option<std::time::Instant>,
+    /// Whether a discovery scan is currently in-flight.
+    discovery_scan_pending: bool,
+    /// Set to `true` by the background scan thread when done.
+    discovery_done_flag: Option<Arc<std::sync::atomic::AtomicBool>>,
 }
 
 impl HiveWorkspace {
@@ -369,6 +375,9 @@ impl HiveWorkspace {
             session_dirty: false,
             last_saved_conversation_id: session.active_conversation_id.clone(),
             cached_chat_data: CachedChatData::new(),
+            last_discovery_scan: None,
+            discovery_scan_pending: false,
+            discovery_done_flag: None,
         }
     }
 
@@ -752,6 +761,95 @@ impl HiveWorkspace {
             // Save session on actual state change — not every frame.
             self.save_session(cx);
         }
+
+        // -- Discovery: periodic scan + connectivity update --
+        self.maybe_trigger_discovery_scan(cx);
+        self.sync_connectivity(cx);
+    }
+
+    /// Trigger a discovery scan every 30 seconds (non-blocking).
+    ///
+    /// Runs the actual HTTP probing on a background OS thread with its own Tokio
+    /// runtime (reqwest requires Tokio, but GPUI uses a smol-based executor).
+    /// On the next `sync_status_bar()` tick the completion flag is checked and
+    /// the UI is updated with any newly discovered models.
+    fn maybe_trigger_discovery_scan(&mut self, cx: &mut Context<Self>) {
+        // Check if a previous scan just finished.
+        if self.discovery_scan_pending {
+            if let Some(flag) = &self.discovery_done_flag {
+                if flag.load(std::sync::atomic::Ordering::Acquire) {
+                    self.discovery_scan_pending = false;
+                    self.discovery_done_flag = None;
+                    // Refresh UI with discovered models.
+                    if cx.has_global::<AppAiService>() {
+                        if let Some(d) = cx.global::<AppAiService>().0.discovery() {
+                            let models = d.snapshot().all_models();
+                            self.settings_view.update(cx, |settings, cx| {
+                                settings.refresh_local_models(models, cx);
+                            });
+                        }
+                    }
+                    cx.notify();
+                }
+            }
+            return;
+        }
+
+        let should_scan = match self.last_discovery_scan {
+            None => true,
+            Some(t) => t.elapsed() >= std::time::Duration::from_secs(30),
+        };
+        if !should_scan {
+            return;
+        }
+
+        let discovery = if cx.has_global::<AppAiService>() {
+            cx.global::<AppAiService>().0.discovery().cloned()
+        } else {
+            None
+        };
+
+        let Some(discovery) = discovery else { return };
+
+        self.discovery_scan_pending = true;
+        self.last_discovery_scan = Some(std::time::Instant::now());
+
+        let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        self.discovery_done_flag = Some(Arc::clone(&done));
+
+        std::thread::spawn(move || {
+            discovery.scan_all_blocking();
+            done.store(true, std::sync::atomic::Ordering::Release);
+        });
+    }
+
+    /// Update status bar connectivity based on registered + discovered providers.
+    fn sync_connectivity(&mut self, cx: &App) {
+        if !cx.has_global::<AppAiService>() {
+            return;
+        }
+        let ai = &cx.global::<AppAiService>().0;
+        let has_cloud = ai.available_providers().iter().any(|p| {
+            matches!(
+                p,
+                hive_ai::types::ProviderType::Anthropic
+                    | hive_ai::types::ProviderType::OpenAI
+                    | hive_ai::types::ProviderType::OpenRouter
+                    | hive_ai::types::ProviderType::Google
+                    | hive_ai::types::ProviderType::Groq
+                    | hive_ai::types::ProviderType::HuggingFace
+            )
+        });
+        let has_local = ai
+            .discovery()
+            .map(|d| d.snapshot().any_online())
+            .unwrap_or(false);
+
+        self.status_bar.connectivity = match (has_cloud, has_local) {
+            (true, _) => ConnectivityDisplay::Online,
+            (false, true) => ConnectivityDisplay::LocalOnly,
+            (false, false) => ConnectivityDisplay::Offline,
+        };
     }
 
     // -- Rendering -----------------------------------------------------------
@@ -1512,6 +1610,7 @@ impl HiveWorkspace {
             if let Err(e) = config_mgr.update(|cfg| {
                 cfg.ollama_url = snapshot.ollama_url.clone();
                 cfg.lmstudio_url = snapshot.lmstudio_url.clone();
+                cfg.litellm_url = snapshot.litellm_url.clone();
                 cfg.local_provider_url = snapshot.custom_url.clone();
                 cfg.default_model = snapshot.default_model.clone();
                 cfg.daily_budget_usd = snapshot.daily_budget;
@@ -1528,23 +1627,23 @@ impl HiveWorkspace {
             }
 
             // Persist API keys only when user entered a new value
-            if let Some(ref key) = snapshot.anthropic_key {
-                let _ = config_mgr.set_api_key("anthropic", Some(key.clone()));
-            }
-            if let Some(ref key) = snapshot.openai_key {
-                let _ = config_mgr.set_api_key("openai", Some(key.clone()));
-            }
-            if let Some(ref key) = snapshot.openrouter_key {
-                let _ = config_mgr.set_api_key("openrouter", Some(key.clone()));
-            }
-            if let Some(ref key) = snapshot.google_key {
-                let _ = config_mgr.set_api_key("google", Some(key.clone()));
-            }
-            if let Some(ref key) = snapshot.elevenlabs_key {
-                let _ = config_mgr.set_api_key("elevenlabs", Some(key.clone()));
-            }
-            if let Some(ref key) = snapshot.telnyx_key {
-                let _ = config_mgr.set_api_key("telnyx", Some(key.clone()));
+            let key_pairs: &[(&str, &Option<String>)] = &[
+                ("anthropic", &snapshot.anthropic_key),
+                ("openai", &snapshot.openai_key),
+                ("openrouter", &snapshot.openrouter_key),
+                ("google", &snapshot.google_key),
+                ("groq", &snapshot.groq_key),
+                ("huggingface", &snapshot.huggingface_key),
+                ("litellm", &snapshot.litellm_key),
+                ("elevenlabs", &snapshot.elevenlabs_key),
+                ("telnyx", &snapshot.telnyx_key),
+            ];
+            for (provider, key) in key_pairs {
+                if let Some(k) = key {
+                    if let Err(e) = config_mgr.set_api_key(provider, Some(k.clone())) {
+                        warn!("Settings: failed to save {provider} API key: {e}");
+                    }
+                }
             }
 
             // Sync status bar with potentially changed model/privacy

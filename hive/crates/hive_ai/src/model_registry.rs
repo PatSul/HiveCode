@@ -52,8 +52,42 @@ pub static MODEL_REGISTRY: Lazy<Vec<ModelInfo>> = Lazy::new(|| {
     vec![
         // ---- Anthropic ----
         ModelInfo {
-            id: "claude-opus-4-6-20250219".into(),
+            id: "claude-opus-4-6".into(),
             name: "Claude Opus 4.6".into(),
+            provider: "anthropic".into(),
+            provider_type: ProviderType::Anthropic,
+            tier: ModelTier::Premium,
+            context_window: 200_000,
+            input_price_per_mtok: 5.0,
+            output_price_per_mtok: 25.0,
+            capabilities: caps(&[
+                ModelCapability::ToolUse,
+                ModelCapability::Vision,
+                ModelCapability::ExtendedThinking,
+                ModelCapability::StructuredOutput,
+                ModelCapability::LongContext,
+            ]),
+        },
+        ModelInfo {
+            id: "claude-opus-4-5-20251101".into(),
+            name: "Claude Opus 4.5".into(),
+            provider: "anthropic".into(),
+            provider_type: ProviderType::Anthropic,
+            tier: ModelTier::Premium,
+            context_window: 200_000,
+            input_price_per_mtok: 5.0,
+            output_price_per_mtok: 25.0,
+            capabilities: caps(&[
+                ModelCapability::ToolUse,
+                ModelCapability::Vision,
+                ModelCapability::ExtendedThinking,
+                ModelCapability::StructuredOutput,
+                ModelCapability::LongContext,
+            ]),
+        },
+        ModelInfo {
+            id: "claude-opus-4-1-20250805".into(),
+            name: "Claude Opus 4.1".into(),
             provider: "anthropic".into(),
             provider_type: ProviderType::Anthropic,
             tier: ModelTier::Premium,
@@ -125,26 +159,11 @@ pub static MODEL_REGISTRY: Lazy<Vec<ModelInfo>> = Lazy::new(|| {
             provider_type: ProviderType::Anthropic,
             tier: ModelTier::Budget,
             context_window: 200_000,
-            input_price_per_mtok: 0.8,
-            output_price_per_mtok: 4.0,
+            input_price_per_mtok: 1.0,
+            output_price_per_mtok: 5.0,
             capabilities: caps(&[
                 ModelCapability::ToolUse,
                 ModelCapability::Vision,
-                ModelCapability::StructuredOutput,
-                ModelCapability::LongContext,
-            ]),
-        },
-        ModelInfo {
-            id: "claude-3-5-haiku-20241022".into(),
-            name: "Claude 3.5 Haiku".into(),
-            provider: "anthropic".into(),
-            provider_type: ProviderType::Anthropic,
-            tier: ModelTier::Budget,
-            context_window: 200_000,
-            input_price_per_mtok: 0.8,
-            output_price_per_mtok: 4.0,
-            capabilities: caps(&[
-                ModelCapability::ToolUse,
                 ModelCapability::StructuredOutput,
                 ModelCapability::LongContext,
             ]),
@@ -176,6 +195,168 @@ pub static MODEL_REGISTRY: Lazy<Vec<ModelInfo>> = Lazy::new(|| {
             context_window: 128_000,
             input_price_per_mtok: 0.15,
             output_price_per_mtok: 0.6,
+            capabilities: caps(&[
+                ModelCapability::ToolUse,
+                ModelCapability::Vision,
+                ModelCapability::StructuredOutput,
+                ModelCapability::LongContext,
+            ]),
+        },
+        ModelInfo {
+            id: "gpt-5".into(),
+            name: "GPT-5".into(),
+            provider: "openai".into(),
+            provider_type: ProviderType::OpenAI,
+            tier: ModelTier::Mid,
+            context_window: 400_000,
+            input_price_per_mtok: 1.25,
+            output_price_per_mtok: 10.0,
+            capabilities: caps(&[
+                ModelCapability::ToolUse,
+                ModelCapability::NativeAgents,
+                ModelCapability::Vision,
+                ModelCapability::StructuredOutput,
+                ModelCapability::LongContext,
+            ]),
+        },
+        ModelInfo {
+            id: "gpt-5-mini".into(),
+            name: "GPT-5 Mini".into(),
+            provider: "openai".into(),
+            provider_type: ProviderType::OpenAI,
+            tier: ModelTier::Budget,
+            context_window: 400_000,
+            input_price_per_mtok: 0.25,
+            output_price_per_mtok: 2.0,
+            capabilities: caps(&[
+                ModelCapability::ToolUse,
+                ModelCapability::Vision,
+                ModelCapability::StructuredOutput,
+                ModelCapability::LongContext,
+            ]),
+        },
+        ModelInfo {
+            id: "gpt-5-nano".into(),
+            name: "GPT-5 Nano".into(),
+            provider: "openai".into(),
+            provider_type: ProviderType::OpenAI,
+            tier: ModelTier::Budget,
+            context_window: 400_000,
+            input_price_per_mtok: 0.05,
+            output_price_per_mtok: 0.40,
+            capabilities: caps(&[
+                ModelCapability::ToolUse,
+                ModelCapability::Vision,
+                ModelCapability::StructuredOutput,
+                ModelCapability::LongContext,
+            ]),
+        },
+        ModelInfo {
+            id: "gpt-5.1".into(),
+            name: "GPT-5.1".into(),
+            provider: "openai".into(),
+            provider_type: ProviderType::OpenAI,
+            tier: ModelTier::Mid,
+            context_window: 400_000,
+            input_price_per_mtok: 1.25,
+            output_price_per_mtok: 10.0,
+            capabilities: caps(&[
+                ModelCapability::ToolUse,
+                ModelCapability::NativeAgents,
+                ModelCapability::Vision,
+                ModelCapability::StructuredOutput,
+                ModelCapability::LongContext,
+            ]),
+        },
+        ModelInfo {
+            id: "gpt-5.2".into(),
+            name: "GPT-5.2".into(),
+            provider: "openai".into(),
+            provider_type: ProviderType::OpenAI,
+            tier: ModelTier::Mid,
+            context_window: 400_000,
+            input_price_per_mtok: 1.75,
+            output_price_per_mtok: 14.0,
+            capabilities: caps(&[
+                ModelCapability::ToolUse,
+                ModelCapability::NativeAgents,
+                ModelCapability::Vision,
+                ModelCapability::StructuredOutput,
+                ModelCapability::LongContext,
+            ]),
+        },
+        ModelInfo {
+            id: "o3".into(),
+            name: "o3".into(),
+            provider: "openai".into(),
+            provider_type: ProviderType::OpenAI,
+            tier: ModelTier::Mid,
+            context_window: 200_000,
+            input_price_per_mtok: 2.0,
+            output_price_per_mtok: 8.0,
+            capabilities: caps(&[
+                ModelCapability::ToolUse,
+                ModelCapability::ExtendedThinking,
+                ModelCapability::StructuredOutput,
+                ModelCapability::LongContext,
+            ]),
+        },
+        ModelInfo {
+            id: "o3-mini".into(),
+            name: "o3 Mini".into(),
+            provider: "openai".into(),
+            provider_type: ProviderType::OpenAI,
+            tier: ModelTier::Mid,
+            context_window: 200_000,
+            input_price_per_mtok: 1.10,
+            output_price_per_mtok: 4.40,
+            capabilities: caps(&[
+                ModelCapability::ExtendedThinking,
+                ModelCapability::StructuredOutput,
+                ModelCapability::LongContext,
+            ]),
+        },
+        ModelInfo {
+            id: "o4-mini".into(),
+            name: "o4 Mini".into(),
+            provider: "openai".into(),
+            provider_type: ProviderType::OpenAI,
+            tier: ModelTier::Mid,
+            context_window: 200_000,
+            input_price_per_mtok: 1.10,
+            output_price_per_mtok: 4.40,
+            capabilities: caps(&[
+                ModelCapability::ExtendedThinking,
+                ModelCapability::StructuredOutput,
+                ModelCapability::LongContext,
+            ]),
+        },
+        ModelInfo {
+            id: "gpt-4.1".into(),
+            name: "GPT-4.1".into(),
+            provider: "openai".into(),
+            provider_type: ProviderType::OpenAI,
+            tier: ModelTier::Mid,
+            context_window: 1_048_576,
+            input_price_per_mtok: 2.0,
+            output_price_per_mtok: 8.0,
+            capabilities: caps(&[
+                ModelCapability::ToolUse,
+                ModelCapability::NativeAgents,
+                ModelCapability::Vision,
+                ModelCapability::StructuredOutput,
+                ModelCapability::LongContext,
+            ]),
+        },
+        ModelInfo {
+            id: "gpt-4.1-mini".into(),
+            name: "GPT-4.1 Mini".into(),
+            provider: "openai".into(),
+            provider_type: ProviderType::OpenAI,
+            tier: ModelTier::Budget,
+            context_window: 1_048_576,
+            input_price_per_mtok: 0.40,
+            output_price_per_mtok: 1.60,
             capabilities: caps(&[
                 ModelCapability::ToolUse,
                 ModelCapability::Vision,
@@ -376,6 +557,57 @@ pub static MODEL_REGISTRY: Lazy<Vec<ModelInfo>> = Lazy::new(|| {
         },
         // ---- Google Gemini (direct API) ----
         ModelInfo {
+            id: "gemini-3-pro-preview".into(),
+            name: "Gemini 3 Pro".into(),
+            provider: "google".into(),
+            provider_type: ProviderType::Google,
+            tier: ModelTier::Premium,
+            context_window: 1_048_576,
+            input_price_per_mtok: 2.0,
+            output_price_per_mtok: 12.0,
+            capabilities: caps(&[
+                ModelCapability::ToolUse,
+                ModelCapability::Vision,
+                ModelCapability::ExtendedThinking,
+                ModelCapability::CodeExecution,
+                ModelCapability::StructuredOutput,
+                ModelCapability::LongContext,
+            ]),
+        },
+        ModelInfo {
+            id: "gemini-3-flash-preview".into(),
+            name: "Gemini 3 Flash".into(),
+            provider: "google".into(),
+            provider_type: ProviderType::Google,
+            tier: ModelTier::Mid,
+            context_window: 1_048_576,
+            input_price_per_mtok: 0.50,
+            output_price_per_mtok: 3.0,
+            capabilities: caps(&[
+                ModelCapability::ToolUse,
+                ModelCapability::Vision,
+                ModelCapability::CodeExecution,
+                ModelCapability::StructuredOutput,
+                ModelCapability::LongContext,
+            ]),
+        },
+        ModelInfo {
+            id: "gemini-2.5-flash-lite".into(),
+            name: "Gemini 2.5 Flash Lite".into(),
+            provider: "google".into(),
+            provider_type: ProviderType::Google,
+            tier: ModelTier::Budget,
+            context_window: 1_048_576,
+            input_price_per_mtok: 0.075,
+            output_price_per_mtok: 0.30,
+            capabilities: caps(&[
+                ModelCapability::ToolUse,
+                ModelCapability::Vision,
+                ModelCapability::StructuredOutput,
+                ModelCapability::LongContext,
+            ]),
+        },
+        ModelInfo {
             id: "gemini-2.5-pro".into(),
             name: "Gemini 2.5 Pro".into(),
             provider: "google".into(),
@@ -567,7 +799,7 @@ mod tests {
 
     #[test]
     fn exact_id_lookup() {
-        let m = resolve_model("claude-opus-4-6-20250219").unwrap();
+        let m = resolve_model("claude-opus-4-6").unwrap();
         assert_eq!(m.name, "Claude Opus 4.6");
     }
 
@@ -586,15 +818,19 @@ mod tests {
     #[test]
     fn provider_filter() {
         let anthropic = models_for_provider(ProviderType::Anthropic);
-        assert!(anthropic.len() >= 4);
+        assert_eq!(anthropic.len(), 7);
         assert!(anthropic.iter().all(|m| m.provider_type == ProviderType::Anthropic));
+
+        let openai = models_for_provider(ProviderType::OpenAI);
+        assert_eq!(openai.len(), 12);
+        assert!(openai.iter().all(|m| m.provider_type == ProviderType::OpenAI));
 
         let openrouter = models_for_provider(ProviderType::OpenRouter);
         assert_eq!(openrouter.len(), 12);
         assert!(openrouter.iter().all(|m| m.provider_type == ProviderType::OpenRouter));
 
         let google = models_for_provider(ProviderType::Google);
-        assert_eq!(google.len(), 3);
+        assert_eq!(google.len(), 6);
         assert!(google.iter().all(|m| m.provider_type == ProviderType::Google));
 
         let groq = models_for_provider(ProviderType::Groq);
@@ -615,7 +851,7 @@ mod tests {
 
     #[test]
     fn capabilities_on_models() {
-        let opus = resolve_model("claude-opus-4-6-20250219").unwrap();
+        let opus = resolve_model("claude-opus-4-6").unwrap();
         assert!(opus.capabilities.has(ModelCapability::ToolUse));
         assert!(opus.capabilities.has(ModelCapability::Vision));
         assert!(opus.capabilities.has(ModelCapability::ExtendedThinking));

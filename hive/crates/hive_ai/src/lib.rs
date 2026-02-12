@@ -1,5 +1,6 @@
 pub mod context_engine;
 pub mod cost;
+pub mod discovery;
 pub mod fleet_learning;
 pub mod model_registry;
 pub mod providers;
@@ -13,6 +14,7 @@ pub mod types;
 // Re-export core types at crate root for convenience.
 pub use context_engine::{ContextEngine, ContextSource, SourceType, ContextBudget, CuratedContext, RelevanceScore, ContextStats};
 pub use cost::{CostBreakdown, CostTracker, BudgetLimits};
+pub use discovery::{LocalDiscovery, DiscoveryState, DiscoveredProvider};
 pub use fleet_learning::{FleetInsight, FleetLearningService, InstanceMetrics, LearningPattern, ModelPerformance, PatternType};
 pub use providers::{AiProvider, ProviderError};
 pub use rag::{RagService, RagQuery, RagResult, DocumentChunk, ScoredChunk, IndexStats};

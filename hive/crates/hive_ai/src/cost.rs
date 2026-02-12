@@ -402,8 +402,8 @@ mod tests {
             monthly_limit: Some(0.001),
         };
         let mut tracker = CostTracker::new(budget);
-        // Claude Opus: $15/Mtok input = $0.015 for 1000 tokens
-        tracker.record("claude-opus-4-6-20250219", 1000, 0);
+        // Claude Opus 4.6: $5/Mtok input = $0.005 for 1000 tokens
+        tracker.record("claude-opus-4-6", 1000, 0);
 
         assert!(tracker.is_daily_budget_exceeded());
         assert!(tracker.is_monthly_budget_exceeded());

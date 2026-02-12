@@ -3,14 +3,17 @@
 //! Each provider module exposes a struct that implements [`AiProvider`].
 
 pub mod anthropic;
+pub mod anthropic_catalog;
 pub mod gemini;
 pub mod generic_local;
+pub mod google_catalog;
 pub mod groq;
 pub mod huggingface;
 pub mod litellm;
 pub mod lmstudio;
 pub mod ollama;
 pub mod openai;
+pub mod openai_catalog;
 pub(crate) mod openai_sse;
 pub mod openrouter;
 pub mod openrouter_catalog;

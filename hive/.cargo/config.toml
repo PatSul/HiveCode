@@ -3,4 +3,4 @@
 # Increase stack size for rustc threads (GPUI's deeply-nested builder types
 # exhaust the default 8MB stack during test compilation).
 [env]
-RUST_MIN_STACK = "33554432"
+RUST_MIN_STACK = "134217728"

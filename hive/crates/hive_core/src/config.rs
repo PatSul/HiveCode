@@ -18,6 +18,9 @@ const KEY_ANTHROPIC: &str = "api_key_anthropic";
 const KEY_OPENAI: &str = "api_key_openai";
 const KEY_OPENROUTER: &str = "api_key_openrouter";
 const KEY_GOOGLE: &str = "api_key_google";
+const KEY_GROQ: &str = "api_key_groq";
+const KEY_HUGGINGFACE: &str = "api_key_huggingface";
+const KEY_LITELLM: &str = "api_key_litellm";
 const KEY_ELEVENLABS: &str = "api_key_elevenlabs";
 const KEY_TELNYX: &str = "api_key_telnyx";
 
@@ -451,6 +454,9 @@ impl ConfigManager {
             config.openai_api_key = get_secure_key(ss, &key_map, KEY_OPENAI);
             config.openrouter_api_key = get_secure_key(ss, &key_map, KEY_OPENROUTER);
             config.google_api_key = get_secure_key(ss, &key_map, KEY_GOOGLE);
+            config.groq_api_key = get_secure_key(ss, &key_map, KEY_GROQ);
+            config.huggingface_api_key = get_secure_key(ss, &key_map, KEY_HUGGINGFACE);
+            config.litellm_api_key = get_secure_key(ss, &key_map, KEY_LITELLM);
             config.elevenlabs_api_key = get_secure_key(ss, &key_map, KEY_ELEVENLABS);
             config.telnyx_api_key = get_secure_key(ss, &key_map, KEY_TELNYX);
         }
@@ -480,6 +486,9 @@ impl ConfigManager {
             "openai" => config.openai_api_key.clone(),
             "openrouter" => config.openrouter_api_key.clone(),
             "google" => config.google_api_key.clone(),
+            "groq" => config.groq_api_key.clone(),
+            "huggingface" => config.huggingface_api_key.clone(),
+            "litellm" => config.litellm_api_key.clone(),
             "elevenlabs" => config.elevenlabs_api_key.clone(),
             "telnyx" => config.telnyx_api_key.clone(),
             _ => None,
@@ -496,6 +505,9 @@ impl ConfigManager {
                 "openai" => config.openai_api_key = key.clone(),
                 "openrouter" => config.openrouter_api_key = key.clone(),
                 "google" => config.google_api_key = key.clone(),
+                "groq" => config.groq_api_key = key.clone(),
+                "huggingface" => config.huggingface_api_key = key.clone(),
+                "litellm" => config.litellm_api_key = key.clone(),
                 "elevenlabs" => config.elevenlabs_api_key = key.clone(),
                 "telnyx" => config.telnyx_api_key = key.clone(),
                 _ => anyhow::bail!("Unknown provider: {provider}"),
@@ -510,13 +522,16 @@ impl ConfigManager {
     fn save_api_keys(&self, config: &HiveConfig) -> Result<()> {
         let Some(ss) = &self.secure_storage else {
             warn!("SecureStorage unavailable; API keys not persisted");
-            return Ok(());
+            anyhow::bail!("SecureStorage unavailable; API keys cannot be saved");
         };
         let mut key_map = load_key_map(&self.keys_path);
         set_secure_key(ss, &mut key_map, KEY_ANTHROPIC, &config.anthropic_api_key)?;
         set_secure_key(ss, &mut key_map, KEY_OPENAI, &config.openai_api_key)?;
         set_secure_key(ss, &mut key_map, KEY_OPENROUTER, &config.openrouter_api_key)?;
         set_secure_key(ss, &mut key_map, KEY_GOOGLE, &config.google_api_key)?;
+        set_secure_key(ss, &mut key_map, KEY_GROQ, &config.groq_api_key)?;
+        set_secure_key(ss, &mut key_map, KEY_HUGGINGFACE, &config.huggingface_api_key)?;
+        set_secure_key(ss, &mut key_map, KEY_LITELLM, &config.litellm_api_key)?;
         set_secure_key(ss, &mut key_map, KEY_ELEVENLABS, &config.elevenlabs_api_key)?;
         set_secure_key(ss, &mut key_map, KEY_TELNYX, &config.telnyx_api_key)?;
         save_key_map(&self.keys_path, &key_map)

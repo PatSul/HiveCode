@@ -46,6 +46,9 @@ pub struct SettingsData {
     pub has_openai_key: bool,
     pub has_openrouter_key: bool,
     pub has_google_key: bool,
+    pub has_groq_key: bool,
+    pub has_huggingface_key: bool,
+    pub has_litellm_key: bool,
     pub ollama_url: String,
     pub lmstudio_url: String,
     pub local_provider_url: Option<String>,
@@ -76,6 +79,9 @@ impl Default for SettingsData {
             has_openai_key: false,
             has_openrouter_key: false,
             has_google_key: false,
+            has_groq_key: false,
+            has_huggingface_key: false,
+            has_litellm_key: false,
             ollama_url: "http://localhost:11434".into(),
             lmstudio_url: "http://localhost:1234".into(),
             local_provider_url: None,
@@ -112,6 +118,12 @@ impl SettingsData {
                 .as_ref()
                 .map_or(false, |k| !k.is_empty()),
             has_google_key: cfg.google_api_key.as_ref().map_or(false, |k| !k.is_empty()),
+            has_groq_key: cfg.groq_api_key.as_ref().map_or(false, |k| !k.is_empty()),
+            has_huggingface_key: cfg
+                .huggingface_api_key
+                .as_ref()
+                .map_or(false, |k| !k.is_empty()),
+            has_litellm_key: cfg.litellm_api_key.as_ref().map_or(false, |k| !k.is_empty()),
             ollama_url: cfg.ollama_url.clone(),
             lmstudio_url: cfg.lmstudio_url.clone(),
             local_provider_url: cfg.local_provider_url.clone(),
@@ -141,6 +153,8 @@ impl SettingsData {
             self.has_openai_key,
             self.has_openrouter_key,
             self.has_google_key,
+            self.has_groq_key,
+            self.has_huggingface_key,
         ]
         .iter()
         .filter(|&&v| v)
@@ -172,6 +186,12 @@ pub struct SettingsView {
     openai_key_input: Entity<InputState>,
     openrouter_key_input: Entity<InputState>,
     google_key_input: Entity<InputState>,
+    groq_key_input: Entity<InputState>,
+    huggingface_key_input: Entity<InputState>,
+
+    // LiteLLM inputs
+    litellm_key_input: Entity<InputState>,
+    litellm_url_input: Entity<InputState>,
 
     // URL inputs
     ollama_url_input: Entity<InputState>,
@@ -205,8 +225,14 @@ pub struct SettingsView {
     had_openai_key: bool,
     had_openrouter_key: bool,
     had_google_key: bool,
+    had_groq_key: bool,
+    had_huggingface_key: bool,
+    had_litellm_key: bool,
     had_elevenlabs_key: bool,
     had_telnyx_key: bool,
+
+    // Discovery status
+    discovered_model_count: usize,
 }
 
 impl EventEmitter<SettingsSaved> for SettingsView {}
@@ -224,6 +250,9 @@ impl SettingsView {
         let had_openai = cfg.openai_api_key.as_ref().map_or(false, |k| !k.is_empty());
         let had_openrouter = cfg.openrouter_api_key.as_ref().map_or(false, |k| !k.is_empty());
         let had_google = cfg.google_api_key.as_ref().map_or(false, |k| !k.is_empty());
+        let had_groq = cfg.groq_api_key.as_ref().map_or(false, |k| !k.is_empty());
+        let had_huggingface = cfg.huggingface_api_key.as_ref().map_or(false, |k| !k.is_empty());
+        let had_litellm = cfg.litellm_api_key.as_ref().map_or(false, |k| !k.is_empty());
         let had_elevenlabs = cfg.elevenlabs_api_key.as_ref().map_or(false, |k| !k.is_empty());
         let had_telnyx = cfg.telnyx_api_key.as_ref().map_or(false, |k| !k.is_empty());
 
@@ -246,6 +275,33 @@ impl SettingsView {
         let google_key_input = cx.new(|cx| {
             let mut state = InputState::new(window, cx);
             state.set_placeholder(key_placeholder(had_google), window, cx);
+            state
+        });
+
+        // Groq + HuggingFace key inputs
+        let groq_key_input = cx.new(|cx| {
+            let mut state = InputState::new(window, cx);
+            state.set_placeholder(key_placeholder(had_groq), window, cx);
+            state
+        });
+        let huggingface_key_input = cx.new(|cx| {
+            let mut state = InputState::new(window, cx);
+            state.set_placeholder(key_placeholder(had_huggingface), window, cx);
+            state
+        });
+
+        // LiteLLM inputs
+        let litellm_key_input = cx.new(|cx| {
+            let mut state = InputState::new(window, cx);
+            state.set_placeholder(key_placeholder(had_litellm), window, cx);
+            state
+        });
+        let litellm_url_input = cx.new(|cx| {
+            let mut state = InputState::new(window, cx);
+            state.set_placeholder("http://localhost:4000", window, cx);
+            if let Some(ref url) = cfg.litellm_url {
+                state.set_value(url.clone(), window, cx);
+            }
             state
         });
 
@@ -308,6 +364,10 @@ impl SettingsView {
             &openai_key_input,
             &openrouter_key_input,
             &google_key_input,
+            &groq_key_input,
+            &huggingface_key_input,
+            &litellm_key_input,
+            &litellm_url_input,
             &elevenlabs_key_input,
             &telnyx_key_input,
             &ollama_url_input,
@@ -329,6 +389,10 @@ impl SettingsView {
             openai_key_input,
             openrouter_key_input,
             google_key_input,
+            groq_key_input,
+            huggingface_key_input,
+            litellm_key_input,
+            litellm_url_input,
             ollama_url_input,
             lmstudio_url_input,
             custom_url_input,
@@ -348,8 +412,12 @@ impl SettingsView {
             had_openai_key: had_openai,
             had_openrouter_key: had_openrouter,
             had_google_key: had_google,
+            had_groq_key: had_groq,
+            had_huggingface_key: had_huggingface,
+            had_litellm_key: had_litellm,
             had_elevenlabs_key: had_elevenlabs,
             had_telnyx_key: had_telnyx,
+            discovered_model_count: 0,
         };
 
         // Initialize model selector with current provider availability
@@ -397,6 +465,9 @@ impl SettingsView {
         let openai_val = self.openai_key_input.read(cx).value().to_string();
         let openrouter_val = self.openrouter_key_input.read(cx).value().to_string();
         let google_val = self.google_key_input.read(cx).value().to_string();
+        let groq_val = self.groq_key_input.read(cx).value().to_string();
+        let huggingface_val = self.huggingface_key_input.read(cx).value().to_string();
+        let litellm_val = self.litellm_key_input.read(cx).value().to_string();
 
         let elevenlabs_val = self.elevenlabs_key_input.read(cx).value().to_string();
         let telnyx_val = self.telnyx_key_input.read(cx).value().to_string();
@@ -407,11 +478,18 @@ impl SettingsView {
             openai_key: non_empty_trimmed(&openai_val),
             openrouter_key: non_empty_trimmed(&openrouter_val),
             google_key: non_empty_trimmed(&google_val),
+            groq_key: non_empty_trimmed(&groq_val),
+            huggingface_key: non_empty_trimmed(&huggingface_val),
+            litellm_key: non_empty_trimmed(&litellm_val),
             elevenlabs_key: non_empty_trimmed(&elevenlabs_val),
             telnyx_key: non_empty_trimmed(&telnyx_val),
 
             ollama_url: self.ollama_url_input.read(cx).value().to_string(),
             lmstudio_url: self.lmstudio_url_input.read(cx).value().to_string(),
+            litellm_url: {
+                let v = self.litellm_url_input.read(cx).value().to_string();
+                non_empty_trimmed(&v)
+            },
             custom_url: {
                 let v = self.custom_url_input.read(cx).value().to_string();
                 non_empty_trimmed(&v)
@@ -447,7 +525,7 @@ impl SettingsView {
         had_key || !input.read(cx).value().is_empty()
     }
 
-    /// Sync the model selector's enabled-provider set and OpenRouter API key
+    /// Sync the model selector's enabled-provider set and API keys
     /// based on current input field values.
     fn sync_enabled_providers(&self, cx: &mut Context<Self>) {
         let anthropic_set =
@@ -455,6 +533,10 @@ impl SettingsView {
         let openai_set = self.key_is_set(self.had_openai_key, &self.openai_key_input, cx);
         let openrouter_set =
             self.key_is_set(self.had_openrouter_key, &self.openrouter_key_input, cx);
+        let google_set = self.key_is_set(self.had_google_key, &self.google_key_input, cx);
+        let groq_set = self.key_is_set(self.had_groq_key, &self.groq_key_input, cx);
+        let huggingface_set =
+            self.key_is_set(self.had_huggingface_key, &self.huggingface_key_input, cx);
 
         let mut providers = HashSet::new();
         if anthropic_set {
@@ -466,30 +548,70 @@ impl SettingsView {
         if openrouter_set {
             providers.insert(ProviderType::OpenRouter);
         }
+        if google_set {
+            providers.insert(ProviderType::Google);
+        }
+        if groq_set {
+            providers.insert(ProviderType::Groq);
+        }
+        if huggingface_set {
+            providers.insert(ProviderType::HuggingFace);
+        }
 
-        // Read the OpenRouter key value (newly entered or from config)
-        let or_key_input = self.openrouter_key_input.read(cx).value().to_string();
-        let or_key = if !or_key_input.trim().is_empty() {
-            Some(or_key_input.trim().to_string())
-        } else if self.had_openrouter_key {
-            // Key exists in config but not re-entered — read from config
-            if cx.has_global::<AppConfig>() {
-                cx.global::<AppConfig>()
-                    .0
-                    .get()
-                    .openrouter_api_key
-                    .clone()
+        // Helper: resolve an API key from input field or saved config
+        let resolve_key = |input: &Entity<InputState>, had_key: bool, cx: &Context<Self>,
+            config_field: fn(&hive_core::HiveConfig) -> &Option<String>| -> Option<String> {
+            let val = input.read(cx).value().to_string();
+            if !val.trim().is_empty() {
+                Some(val.trim().to_string())
+            } else if had_key {
+                if cx.has_global::<AppConfig>() {
+                    config_field(&cx.global::<AppConfig>().0.get()).clone()
+                } else {
+                    None
+                }
             } else {
                 None
             }
-        } else {
-            None
         };
+
+        let or_key = resolve_key(
+            &self.openrouter_key_input, self.had_openrouter_key, cx,
+            |cfg| &cfg.openrouter_api_key,
+        );
+        let openai_key = resolve_key(
+            &self.openai_key_input, self.had_openai_key, cx,
+            |cfg| &cfg.openai_api_key,
+        );
+        let anthropic_key = resolve_key(
+            &self.anthropic_key_input, self.had_anthropic_key, cx,
+            |cfg| &cfg.anthropic_api_key,
+        );
+        let google_key = resolve_key(
+            &self.google_key_input, self.had_google_key, cx,
+            |cfg| &cfg.google_api_key,
+        );
 
         self.model_selector.update(cx, |selector, cx| {
             selector.set_enabled_providers(providers, cx);
             selector.set_openrouter_api_key(or_key, cx);
+            selector.set_openai_api_key(openai_key, cx);
+            selector.set_anthropic_api_key(anthropic_key, cx);
+            selector.set_google_api_key(google_key, cx);
         });
+    }
+
+    /// Feed discovered local models into the model selector.
+    pub fn refresh_local_models(
+        &mut self,
+        models: Vec<hive_ai::types::ModelInfo>,
+        cx: &mut Context<Self>,
+    ) {
+        self.discovered_model_count = models.len();
+        self.model_selector.update(cx, |selector, cx| {
+            selector.set_local_models(models, cx);
+        });
+        cx.notify();
     }
 }
 
@@ -499,10 +621,14 @@ pub struct SettingsSnapshot {
     pub openai_key: Option<String>,
     pub openrouter_key: Option<String>,
     pub google_key: Option<String>,
+    pub groq_key: Option<String>,
+    pub huggingface_key: Option<String>,
+    pub litellm_key: Option<String>,
     pub elevenlabs_key: Option<String>,
     pub telnyx_key: Option<String>,
     pub ollama_url: String,
     pub lmstudio_url: String,
+    pub litellm_url: Option<String>,
     pub custom_url: Option<String>,
     pub default_model: String,
     pub daily_budget: f64,
@@ -542,7 +668,9 @@ impl Render for SettingsView {
         let openai_set = self.key_is_set(self.had_openai_key, &self.openai_key_input, cx);
         let openrouter_set = self.key_is_set(self.had_openrouter_key, &self.openrouter_key_input, cx);
         let google_set = self.key_is_set(self.had_google_key, &self.google_key_input, cx);
-        let key_count = [anthropic_set, openai_set, openrouter_set, google_set]
+        let groq_set = self.key_is_set(self.had_groq_key, &self.groq_key_input, cx);
+        let huggingface_set = self.key_is_set(self.had_huggingface_key, &self.huggingface_key_input, cx);
+        let key_count = [anthropic_set, openai_set, openrouter_set, google_set, groq_set, huggingface_set]
             .iter()
             .filter(|&&v| v)
             .count();
@@ -600,6 +728,8 @@ impl Render for SettingsView {
                 openai_set, &self.openai_key_input,
                 openrouter_set, &self.openrouter_key_input,
                 google_set, &self.google_key_input,
+                groq_set, &self.groq_key_input,
+                huggingface_set, &self.huggingface_key_input,
                 theme,
             ))
             // Local AI
@@ -616,8 +746,15 @@ impl Render for SettingsView {
 }
 
 impl SettingsView {
-    fn render_local_ai_section(&self, _cx: &Context<Self>) -> AnyElement {
+    fn render_local_ai_section(&self, cx: &Context<Self>) -> AnyElement {
         let theme = &self.theme;
+        let litellm_set = self.key_is_set(self.had_litellm_key, &self.litellm_key_input, cx);
+
+        let discovery_text = if self.discovered_model_count > 0 {
+            format!("{} local model{} discovered", self.discovered_model_count, if self.discovered_model_count == 1 { "" } else { "s" })
+        } else {
+            "No local models found".to_string()
+        };
 
         card(theme)
             .child(section_title("\u{1F4BB}", "Local AI", theme))
@@ -629,6 +766,37 @@ impl SettingsView {
             .child(input_row("Ollama URL", &self.ollama_url_input, theme))
             .child(input_row("LM Studio URL", &self.lmstudio_url_input, theme))
             .child(input_row("Custom Local URL", &self.custom_url_input, theme))
+            .child(separator(theme))
+            .child(input_row("LiteLLM Proxy URL", &self.litellm_url_input, theme))
+            .child(api_key_row("LiteLLM API Key", litellm_set, &self.litellm_key_input, theme))
+            .child(separator(theme))
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap(theme.space_2)
+                    .px(theme.space_3)
+                    .py(theme.space_2)
+                    .rounded(theme.radius_sm)
+                    .bg(theme.bg_primary)
+                    .child(
+                        div()
+                            .w(px(8.0))
+                            .h(px(8.0))
+                            .rounded(theme.radius_full)
+                            .bg(if self.discovered_model_count > 0 {
+                                theme.accent_green
+                            } else {
+                                theme.text_muted
+                            }),
+                    )
+                    .child(
+                        div()
+                            .text_size(theme.font_size_xs)
+                            .text_color(theme.text_muted)
+                            .child(discovery_text),
+                    ),
+            )
             .child(separator(theme))
             .child(switch_row(
                 "Privacy Mode",
@@ -897,6 +1065,8 @@ fn render_api_keys_section(
     openai_set: bool, openai_input: &Entity<InputState>,
     openrouter_set: bool, openrouter_input: &Entity<InputState>,
     google_set: bool, google_input: &Entity<InputState>,
+    groq_set: bool, groq_input: &Entity<InputState>,
+    huggingface_set: bool, huggingface_input: &Entity<InputState>,
     theme: &HiveTheme,
 ) -> AnyElement {
     card(theme)
@@ -919,7 +1089,7 @@ fn render_api_keys_section(
                         } else {
                             theme.accent_red
                         })
-                        .child(format!("{}/4 configured", key_count)),
+                        .child(format!("{}/6 configured", key_count)),
                 ),
         )
         .child(section_desc(
@@ -931,6 +1101,8 @@ fn render_api_keys_section(
         .child(api_key_row("OpenAI API Key", openai_set, openai_input, theme))
         .child(api_key_row("OpenRouter API Key", openrouter_set, openrouter_input, theme))
         .child(api_key_row("Google API Key", google_set, google_input, theme))
+        .child(api_key_row("Groq API Key", groq_set, groq_input, theme))
+        .child(api_key_row("Hugging Face API Key", huggingface_set, huggingface_input, theme))
         .into_any_element()
 }
 

@@ -10,6 +10,7 @@ use tokio::sync::mpsc;
 use tracing::{debug, info};
 
 use crate::cost::{calculate_cost, CostBreakdown, CostTracker};
+use crate::discovery::LocalDiscovery;
 use crate::providers::anthropic::AnthropicProvider;
 use crate::providers::generic_local::GenericLocalProvider;
 use crate::providers::gemini::GeminiProvider;
@@ -59,6 +60,7 @@ pub struct AiService {
     router: ModelRouter,
     cost_tracker: CostTracker,
     config: AiServiceConfig,
+    discovery: Option<Arc<LocalDiscovery>>,
 }
 
 impl AiService {
@@ -169,6 +171,7 @@ impl AiService {
             router: ModelRouter::new(),
             cost_tracker: CostTracker::new(crate::cost::BudgetLimits::default()),
             config,
+            discovery: None,
         }
     }
 
@@ -340,6 +343,45 @@ impl AiService {
         // Assume 2x output tokens for estimation
         let output_tokens = input_tokens * 2;
         calculate_cost(model, input_tokens, output_tokens)
+    }
+
+    // -- Local discovery -----------------------------------------------------
+
+    /// Initialize local AI discovery from config URLs.
+    ///
+    /// Creates the `LocalDiscovery` engine but does **not** run a scan yet.
+    /// The caller should spawn a scan via `discovery.scan_all().await`.
+    pub fn start_discovery(&mut self) -> Arc<LocalDiscovery> {
+        let mut config_urls = Vec::new();
+        if !self.config.ollama_url.is_empty() {
+            config_urls.push((ProviderType::Ollama, self.config.ollama_url.clone()));
+        }
+        if !self.config.lmstudio_url.is_empty() {
+            config_urls.push((ProviderType::LMStudio, self.config.lmstudio_url.clone()));
+        }
+        if let Some(ref url) = self.config.local_provider_url {
+            if !url.is_empty() {
+                config_urls.push((ProviderType::GenericLocal, url.clone()));
+            }
+        }
+
+        let discovery = Arc::new(LocalDiscovery::new(config_urls));
+        self.discovery = Some(Arc::clone(&discovery));
+        info!("Local AI discovery initialized");
+        discovery
+    }
+
+    /// Access the discovery engine, if initialized.
+    pub fn discovery(&self) -> Option<&Arc<LocalDiscovery>> {
+        self.discovery.as_ref()
+    }
+
+    /// All models discovered from local AI servers.
+    pub fn all_available_models(&self) -> Vec<crate::types::ModelInfo> {
+        self.discovery
+            .as_ref()
+            .map(|d| d.snapshot().all_models())
+            .unwrap_or_default()
     }
 }
 

@@ -91,10 +91,10 @@ impl OpenAIProvider {
     // Helpers
     // -----------------------------------------------------------------------
 
-    /// Returns `true` for reasoning models (o1, o3) that don't accept
+    /// Returns `true` for reasoning models (o1, o3, o4) that don't accept
     /// `temperature` or standard `max_tokens`.
     fn is_reasoning_model(model: &str) -> bool {
-        model.starts_with("o1") || model.starts_with("o3")
+        model.starts_with("o1") || model.starts_with("o3") || model.starts_with("o4")
     }
 
     /// Convert generic messages to the OpenAI wire format.
@@ -389,6 +389,7 @@ mod tests {
         assert!(OpenAIProvider::is_reasoning_model("o1-preview"));
         assert!(OpenAIProvider::is_reasoning_model("o3"));
         assert!(OpenAIProvider::is_reasoning_model("o3-mini"));
+        assert!(OpenAIProvider::is_reasoning_model("o4-mini"));
         assert!(!OpenAIProvider::is_reasoning_model("gpt-4o"));
         assert!(!OpenAIProvider::is_reasoning_model("gpt-4o-mini"));
     }

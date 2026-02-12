@@ -100,6 +100,7 @@ fn init_services(cx: &mut App) -> anyhow::Result<()> {
         auto_routing: config.auto_routing,
     };
     cx.set_global(AppAiService(hive_ai::AiService::new(ai_config)));
+    cx.global_mut::<AppAiService>().0.start_discovery();
     info!("AiService initialized");
 
     // Compute DB paths before the parallel section (HiveConfig::base_dir is cheap).
