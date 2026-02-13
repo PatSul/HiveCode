@@ -2,5 +2,7 @@
 
 # Increase stack size for rustc threads (GPUI's deeply-nested builder types
 # exhaust the default 8MB stack during test compilation).
+# RUST_MIN_STACK sets the stack for child processes cargo spawns (including rustc).
 [env]
 RUST_MIN_STACK = "134217728"
+

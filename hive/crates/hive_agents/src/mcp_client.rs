@@ -4,6 +4,7 @@
 //! stdio or SSE transports, discovering their tools, and invoking them.
 
 use anyhow::Context;
+use hive_core::SecurityGateway;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -270,14 +271,27 @@ impl StdioTransport {
             .as_deref()
             .ok_or_else(|| anyhow::anyhow!("Stdio transport requires a 'command' in config"))?;
 
-        // Validate MCP server command is not a dangerous executable.
-        let cmd_lower = command.to_lowercase();
-        let blocked = ["rm", "del", "format", "mkfs", "dd", "shutdown", "reboot"];
-        for b in &blocked {
-            if cmd_lower.contains(b) {
-                return Err(anyhow::anyhow!("Blocked MCP server command: {command}"));
-            }
+        // Block dangerous bare executables regardless of args/casing.
+        // This is intentionally stricter than SecurityGateway patterns.
+        const BLOCKED_EXECUTABLES: &[&str] = &[
+            "rm", "del", "format", "mkfs", "dd", "shutdown", "reboot",
+        ];
+        let command_basename = command
+            .trim()
+            .rsplit(['\\', '/'])
+            .next()
+            .unwrap_or(command)
+            .trim_end_matches(".exe")
+            .to_ascii_lowercase();
+        if BLOCKED_EXECUTABLES.contains(&command_basename.as_str()) {
+            return Err(anyhow::anyhow!("Blocked MCP server command: {command}"));
         }
+
+        // Validate MCP server command with the shared security policy.
+        let gateway = SecurityGateway::new();
+        gateway
+            .check_command(command)
+            .map_err(|e| anyhow::anyhow!("Blocked MCP server command: {e}"))?;
 
         // Warn if config overrides sensitive environment variables.
         let dangerous_env = ["LD_PRELOAD", "DYLD_INSERT_LIBRARIES", "PATH"];

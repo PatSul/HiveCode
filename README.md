@@ -11,7 +11,7 @@
 <p align="center">
   <a href="https://github.com/PatSul/Hive/releases"><img src="https://img.shields.io/github/v/release/PatSul/Hive?label=download&color=brightgreen&cache=1" alt="Download" /></a>
   <img src="https://img.shields.io/badge/language-Rust-orange?logo=rust" alt="Rust" />
-  <img src="https://img.shields.io/badge/tests-2%2C171-brightgreen" alt="Tests" />
+  <img src="https://img.shields.io/badge/tests-2k%2B-brightgreen" alt="Tests" />
   <img src="https://img.shields.io/badge/crates-13-blue" alt="Crates" />
   <img src="https://img.shields.io/badge/warnings-0-brightgreen" alt="Warnings" />
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20(Apple%20Silicon)%20%7C%20Linux-informational" alt="Windows | macOS (Apple Silicon) | Linux" />
@@ -22,7 +22,7 @@
 
 ## What Is Hive?
 
-Hive is a **native Rust desktop AI platform** built on [GPUI](https://gpui.rs) — no Electron, no web wrappers. It unifies a world-class development environment, a comprehensive personal assistant, and a security-first architecture into a single application. Instead of one chatbot, Hive runs a **multi-agent swarm** that can plan, build, test, deploy, triage your email, manage your calendar, and learn your preferences over time — all while ensuring no secret or PII ever leaves your machine without approval.
+Hive is a **native Rust desktop AI platform** built on [GPUI](https://gpui.rs) — no Electron, no web wrappers. It unifies a development environment, a personal assistant framework, and a security-first architecture into a single application. Instead of one chatbot, Hive runs a **multi-agent swarm** that can plan, build, test, and orchestrate workflows while learning your preferences over time — all while ensuring no secret or PII ever leaves your machine without approval.
 
 ---
 
@@ -45,8 +45,8 @@ Hive is a **native Rust desktop AI platform** built on [GPUI](https://gpui.rs) �
 <td width="33%" valign="top">
 
 ### Assistant Excellence
-- Email triage & AI drafting
-- Calendar with conflict detection
+- Email triage & drafting workflows
+- Calendar planning workflows
 - Smart scheduling & daily briefings
 - Reminders with OS notifications
 - Approval workflows
@@ -124,8 +124,8 @@ The assistant uses the same AI infrastructure as the development platform — sa
 
 | Capability | Details |
 |---|---|
-| **Email** | Gmail + Outlook. Inbox polling, AI composition, classification, subscription management, digest generation. All outgoing content shield-scanned. |
-| **Calendar** | Google + Outlook. Conflict detection (FreeBusy), smart scheduling (find available slots), daily briefing generator. |
+| **Email** | Assistant email workflows with shield-scanned outbound content. Gmail/Outlook integration clients are included in `hive_integrations`; direct provider wiring in `hive_assistant` is in progress. |
+| **Calendar** | Assistant calendar workflows with conflict detection and scheduling logic. Google/Outlook integration clients are included in `hive_integrations`; direct provider wiring in `hive_assistant` is in progress. |
 | **Reminders** | Time-based and recurring. Snooze/dismiss. Native OS notifications. SQLite persistence. |
 | **Approvals** | Multi-level workflows (Low / Medium / High / Critical). Submit, approve, reject with severity tracking. |
 | **Documents** | Generate CSV, DOCX, XLSX, HTML, Markdown, PDF, and PPTX from templates or AI. |
@@ -149,7 +149,7 @@ Security is the **foundation**, not a feature bolted on. Every outgoing message 
 
 ### SecurityGateway
 
-Every shell command passes through `SecurityGateway` — the architecture makes bypass impossible. Blocks destructive filesystem ops, credential theft, privilege escalation, and network exfiltration.
+Hive routes command execution paths through `SecurityGateway` checks and blocks destructive filesystem ops, credential theft, privilege escalation, and common exfiltration patterns.
 
 ### Local-First
 
@@ -209,8 +209,8 @@ All learning data stored locally in SQLite (`~/.hive/learning.db`). Every prefer
 
 | Chain | Features |
 |---|---|
-| **EVM** (Ethereum, Polygon, Arbitrum, BSC, Avalanche, Optimism, Base) | Wallet management, ERC-20 token deployment, multi-chain RPC config |
-| **Solana** | Wallet management, SPL token deployment |
+| **EVM** (Ethereum, Polygon, Arbitrum, BSC, Avalanche, Optimism, Base) | Wallet management and RPC configuration; ERC-20 deployment backend is scaffolded and currently disabled in this build |
+| **Solana** | Wallet management; SPL token deployment backend is scaffolded and currently disabled in this build |
 | **Security** | Encrypted private key storage (AES-256-GCM), no keys ever sent to AI providers |
 
 ---
@@ -230,7 +230,7 @@ hive/crates/
 ├── hive_fs            File operations, git integration, file watchers, search
 ├── hive_terminal      Command execution, Docker sandbox, browser automation, local AI detection
 ├── hive_docs          Document generation — CSV, DOCX, XLSX, HTML, Markdown, PDF, PPTX
-├── hive_blockchain    EVM + Solana wallets, ERC-20 + SPL token deployment
+├── hive_blockchain    EVM + Solana wallets, RPC config, deployment scaffolding
 └── hive_integrations  Google, Microsoft, GitHub, messaging, OAuth2, smart home, cloud, webhooks
 ```
 
@@ -255,7 +255,7 @@ hive/crates/
 | Learning | Self-improvement dashboard |
 | Shield | Security scanning status |
 | Assistant | Personal assistant dashboard |
-| Token Launch | Blockchain token deployment |
+| Token Launch | Token launch workflow and deployment validation |
 | Settings | Application configuration |
 | Help | Documentation and guides |
 
@@ -273,11 +273,11 @@ Grab the latest release for your platform from [**GitHub Releases**](https://git
 | **macOS** (Apple Silicon) | `hive-macos-arm64.tar.gz` | macOS 12+, Metal-capable GPU |
 | **Linux** (x64) | `hive-linux-x64.tar.gz` | Vulkan-capable GPU + drivers (see below) |
 
-**Windows:** Extract the zip, run `hive_app.exe`. No installer needed.
+**Windows:** Extract the zip, run `hive.exe`. No installer needed.
 
-**macOS:** Extract, then `chmod +x hive_app && ./hive_app` (or move to `/usr/local/bin/`).
+**macOS:** Extract, then `chmod +x hive && ./hive` (or move to `/usr/local/bin/`).
 
-**Linux:** Extract, then `chmod +x hive_app && ./hive_app`. You need Vulkan drivers installed:
+**Linux:** Extract, then `chmod +x hive && ./hive`. You need Vulkan drivers installed:
 ```bash
 # Ubuntu/Debian
 sudo apt install mesa-vulkan-drivers vulkan-tools
@@ -359,8 +359,8 @@ cargo test
 |---|---|
 | Crates | 13 |
 | Rust source files | 210+ |
-| Lines of Rust | 94,000+ |
-| Tests | 2,171 |
+| Lines of Rust | 100,000+ |
+| Tests | 2,300+ |
 | Compiler warnings | 0 |
 | Memory footprint | < 50 MB |
 | Startup time | < 1 second |

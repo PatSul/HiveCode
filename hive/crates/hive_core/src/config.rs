@@ -171,7 +171,7 @@ impl Default for HiveConfig {
             litellm_url: None,
             local_provider_url: None,
             privacy_mode: false,
-            default_model: String::new(),
+            default_model: "gpt-4o-mini".into(),
             auto_routing: true,
             daily_budget_usd: 10.0,
             monthly_budget_usd: 100.0,
@@ -243,8 +243,8 @@ impl HiveConfig {
         if path.exists() {
             let content = std::fs::read_to_string(path)
                 .with_context(|| format!("Failed to read config: {}", path.display()))?;
-            let config: Self = serde_json::from_str(&content)
-                .with_context(|| "Failed to parse config.json")?;
+            let config: Self =
+                serde_json::from_str(&content).with_context(|| "Failed to parse config.json")?;
             info!("Loaded config from {}", path.display());
             Ok(config)
         } else {
@@ -320,8 +320,7 @@ impl LegacyKeys {
 /// Detect and migrate plaintext API keys from a raw JSON config string.
 /// Returns the extracted keys and a cleaned JSON string with key fields removed.
 fn migrate_plaintext_keys(raw_json: &str) -> Result<(LegacyKeys, String)> {
-    let legacy: LegacyKeys =
-        serde_json::from_str(raw_json).unwrap_or_default();
+    let legacy: LegacyKeys = serde_json::from_str(raw_json).unwrap_or_default();
 
     if legacy.has_any() {
         // Parse as a mutable JSON value and strip the key fields
@@ -409,9 +408,15 @@ impl ConfigManager {
                 if let Some(ss) = secure_storage {
                     // Load existing encrypted keys (if any), then merge legacy keys
                     let mut key_map = load_key_map(keys_path);
-                    let _ = set_secure_key(ss, &mut key_map, KEY_ANTHROPIC, &legacy.anthropic_api_key);
+                    let _ =
+                        set_secure_key(ss, &mut key_map, KEY_ANTHROPIC, &legacy.anthropic_api_key);
                     let _ = set_secure_key(ss, &mut key_map, KEY_OPENAI, &legacy.openai_api_key);
-                    let _ = set_secure_key(ss, &mut key_map, KEY_OPENROUTER, &legacy.openrouter_api_key);
+                    let _ = set_secure_key(
+                        ss,
+                        &mut key_map,
+                        KEY_OPENROUTER,
+                        &legacy.openrouter_api_key,
+                    );
                     let _ = set_secure_key(ss, &mut key_map, KEY_GOOGLE, &legacy.google_api_key);
                     save_key_map(keys_path, &key_map)?;
                     info!("Plaintext keys migrated to SecureStorage");
@@ -530,7 +535,12 @@ impl ConfigManager {
         set_secure_key(ss, &mut key_map, KEY_OPENROUTER, &config.openrouter_api_key)?;
         set_secure_key(ss, &mut key_map, KEY_GOOGLE, &config.google_api_key)?;
         set_secure_key(ss, &mut key_map, KEY_GROQ, &config.groq_api_key)?;
-        set_secure_key(ss, &mut key_map, KEY_HUGGINGFACE, &config.huggingface_api_key)?;
+        set_secure_key(
+            ss,
+            &mut key_map,
+            KEY_HUGGINGFACE,
+            &config.huggingface_api_key,
+        )?;
         set_secure_key(ss, &mut key_map, KEY_LITELLM, &config.litellm_api_key)?;
         set_secure_key(ss, &mut key_map, KEY_ELEVENLABS, &config.elevenlabs_api_key)?;
         set_secure_key(ss, &mut key_map, KEY_TELNYX, &config.telnyx_api_key)?;
@@ -606,10 +616,22 @@ mod tests {
 
         // Reload and decrypt
         let loaded_map = load_key_map(&keys_path);
-        assert_eq!(get_secure_key(&ss, &loaded_map, KEY_ANTHROPIC).unwrap(), "sk-ant-secret");
-        assert_eq!(get_secure_key(&ss, &loaded_map, KEY_OPENAI).unwrap(), "sk-openai-123");
-        assert_eq!(get_secure_key(&ss, &loaded_map, KEY_OPENROUTER).unwrap(), "sk-or-456");
-        assert_eq!(get_secure_key(&ss, &loaded_map, KEY_GOOGLE).unwrap(), "AIza-google");
+        assert_eq!(
+            get_secure_key(&ss, &loaded_map, KEY_ANTHROPIC).unwrap(),
+            "sk-ant-secret"
+        );
+        assert_eq!(
+            get_secure_key(&ss, &loaded_map, KEY_OPENAI).unwrap(),
+            "sk-openai-123"
+        );
+        assert_eq!(
+            get_secure_key(&ss, &loaded_map, KEY_OPENROUTER).unwrap(),
+            "sk-or-456"
+        );
+        assert_eq!(
+            get_secure_key(&ss, &loaded_map, KEY_GOOGLE).unwrap(),
+            "AIza-google"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -633,10 +655,15 @@ mod tests {
             "default_model": "claude-sonnet-4-5-20250929",
             "theme": "dark"
         });
-        std::fs::write(&config_path, serde_json::to_string_pretty(&legacy_json).unwrap()).unwrap();
+        std::fs::write(
+            &config_path,
+            serde_json::to_string_pretty(&legacy_json).unwrap(),
+        )
+        .unwrap();
 
         // Load with migration
-        let config = ConfigManager::load_with_migration(&config_path, &keys_path, &secure_storage).unwrap();
+        let config =
+            ConfigManager::load_with_migration(&config_path, &keys_path, &secure_storage).unwrap();
 
         // Keys should be populated in memory
         assert_eq!(config.anthropic_api_key.as_deref(), Some("sk-ant-legacy"));
@@ -680,9 +707,18 @@ mod tests {
         config.save_to_path(&config_path).unwrap();
 
         let raw = std::fs::read_to_string(&config_path).unwrap();
-        assert!(!raw.contains("should-not-appear"), "API key leaked to config.json");
-        assert!(!raw.contains("also-secret"), "API key leaked to config.json");
-        assert!(!raw.contains("anthropic_api_key"), "Key field present in JSON");
+        assert!(
+            !raw.contains("should-not-appear"),
+            "API key leaked to config.json"
+        );
+        assert!(
+            !raw.contains("also-secret"),
+            "API key leaked to config.json"
+        );
+        assert!(
+            !raw.contains("anthropic_api_key"),
+            "Key field present in JSON"
+        );
         assert!(!raw.contains("openai_api_key"), "Key field present in JSON");
 
         // Non-secret fields should be present
@@ -826,11 +862,18 @@ mod tests {
 
         // Pre-populate some encrypted keys
         let mut map = HashMap::new();
-        set_secure_key(&ss, &mut map, KEY_ANTHROPIC, &Some("sk-from-storage".into())).unwrap();
+        set_secure_key(
+            &ss,
+            &mut map,
+            KEY_ANTHROPIC,
+            &Some("sk-from-storage".into()),
+        )
+        .unwrap();
         save_key_map(&keys_path, &map).unwrap();
 
         let secure_storage = Some(SecureStorage::new().unwrap());
-        let loaded = ConfigManager::load_with_migration(&config_path, &keys_path, &secure_storage).unwrap();
+        let loaded =
+            ConfigManager::load_with_migration(&config_path, &keys_path, &secure_storage).unwrap();
 
         // Should pick up the key from SecureStorage
         assert_eq!(loaded.anthropic_api_key.as_deref(), Some("sk-from-storage"));
@@ -850,15 +893,27 @@ mod tests {
         let mut key_map = HashMap::new();
         set_secure_key(&ss, &mut key_map, KEY_ANTHROPIC, &config.anthropic_api_key).unwrap();
         set_secure_key(&ss, &mut key_map, KEY_OPENAI, &config.openai_api_key).unwrap();
-        set_secure_key(&ss, &mut key_map, KEY_OPENROUTER, &config.openrouter_api_key).unwrap();
+        set_secure_key(
+            &ss,
+            &mut key_map,
+            KEY_OPENROUTER,
+            &config.openrouter_api_key,
+        )
+        .unwrap();
         set_secure_key(&ss, &mut key_map, KEY_GOOGLE, &config.google_api_key).unwrap();
         save_key_map(&keys_path, &key_map).unwrap();
 
         // Re-read and verify
         let ss2 = SecureStorage::new().unwrap();
         let loaded_map = load_key_map(&keys_path);
-        assert_eq!(get_secure_key(&ss2, &loaded_map, KEY_ANTHROPIC).unwrap(), "sk-save-test");
-        assert_eq!(get_secure_key(&ss2, &loaded_map, KEY_GOOGLE).unwrap(), "AIza-save");
+        assert_eq!(
+            get_secure_key(&ss2, &loaded_map, KEY_ANTHROPIC).unwrap(),
+            "sk-save-test"
+        );
+        assert_eq!(
+            get_secure_key(&ss2, &loaded_map, KEY_GOOGLE).unwrap(),
+            "AIza-save"
+        );
         assert!(get_secure_key(&ss2, &loaded_map, KEY_OPENAI).is_none());
         assert!(get_secure_key(&ss2, &loaded_map, KEY_OPENROUTER).is_none());
     }
