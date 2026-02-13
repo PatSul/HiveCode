@@ -175,11 +175,7 @@ impl EmailClassifier {
 
     // ── Layer 1: Label-based scoring ──────────────────────────────
 
-    fn score_labels(
-        &self,
-        labels: &[String],
-        scores: &mut Vec<(EmailCategory, f32, String)>,
-    ) {
+    fn score_labels(&self, labels: &[String], scores: &mut Vec<(EmailCategory, f32, String)>) {
         for label in labels {
             let upper = label.to_uppercase();
             match upper.as_str() {
@@ -226,11 +222,7 @@ impl EmailClassifier {
                     ));
                 }
                 "SPAM" => {
-                    scores.push((
-                        EmailCategory::Spam,
-                        0.9,
-                        "Gmail label: SPAM".into(),
-                    ));
+                    scores.push((EmailCategory::Spam, 0.9, "Gmail label: SPAM".into()));
                 }
                 _ => {}
             }
@@ -239,11 +231,7 @@ impl EmailClassifier {
 
     // ── Layer 2: Sender analysis ──────────────────────────────────
 
-    fn score_sender(
-        &self,
-        from: &str,
-        scores: &mut Vec<(EmailCategory, f32, String)>,
-    ) {
+    fn score_sender(&self, from: &str, scores: &mut Vec<(EmailCategory, f32, String)>) {
         let lower = from.to_lowercase();
 
         // Known newsletter senders / domains
@@ -339,11 +327,7 @@ impl EmailClassifier {
 
     // ── Layer 3: Subject patterns ─────────────────────────────────
 
-    fn score_subject(
-        &self,
-        subject: &str,
-        scores: &mut Vec<(EmailCategory, f32, String)>,
-    ) {
+    fn score_subject(&self, subject: &str, scores: &mut Vec<(EmailCategory, f32, String)>) {
         if self.newsletter_re.is_match(subject) {
             scores.push((
                 EmailCategory::Newsletter,
@@ -393,11 +377,7 @@ impl EmailClassifier {
 
     // ── Layer 4: Body analysis ────────────────────────────────────
 
-    fn score_body(
-        &self,
-        body: &str,
-        scores: &mut Vec<(EmailCategory, f32, String)>,
-    ) {
+    fn score_body(&self, body: &str, scores: &mut Vec<(EmailCategory, f32, String)>) {
         let lower = body.to_lowercase();
 
         // Unsubscribe link -- strong newsletter / marketing signal
@@ -431,11 +411,7 @@ impl EmailClassifier {
 
         // Spam body patterns
         if self.spam_re.is_match(body) {
-            scores.push((
-                EmailCategory::Spam,
-                0.5,
-                "body matches spam pattern".into(),
-            ));
+            scores.push((EmailCategory::Spam, 0.5, "body matches spam pattern".into()));
         }
 
         // Marketing body patterns
@@ -450,10 +426,7 @@ impl EmailClassifier {
 
     // ── Layer 5: Combine scores ───────────────────────────────────
 
-    fn combine(
-        &self,
-        scores: Vec<(EmailCategory, f32, String)>,
-    ) -> ClassificationResult {
+    fn combine(&self, scores: Vec<(EmailCategory, f32, String)>) -> ClassificationResult {
         if scores.is_empty() {
             return ClassificationResult {
                 category: EmailCategory::Personal,
@@ -541,12 +514,7 @@ mod tests {
     #[test]
     fn test_classify_spam_label() {
         let c = classifier();
-        let res = c.classify(
-            "spammer@bad.com",
-            "You won!",
-            "",
-            &["SPAM".to_string()],
-        );
+        let res = c.classify("spammer@bad.com", "You won!", "", &["SPAM".to_string()]);
         assert_eq!(res.category, EmailCategory::Spam);
         assert!(res.confidence >= 0.8);
     }
@@ -666,7 +634,12 @@ mod tests {
         let labels_empty: Vec<String> = vec![];
         let spam_labels = vec!["SPAM".to_string()];
         let emails: Vec<(&str, &str, &str, &[String])> = vec![
-            ("friend@gmail.com", "Hey", "How are you?", labels_empty.as_slice()),
+            (
+                "friend@gmail.com",
+                "Hey",
+                "How are you?",
+                labels_empty.as_slice(),
+            ),
             ("spammer@bad.com", "Win now", "", spam_labels.as_slice()),
         ];
         let results = c.classify_batch(&emails);

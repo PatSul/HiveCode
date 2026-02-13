@@ -9,9 +9,7 @@ use std::collections::HashMap;
 use anyhow::{Context, Result};
 use tracing::debug;
 
-use super::provider::{
-    Channel, IncomingMessage, MessagingProvider, Platform, SentMessage,
-};
+use super::provider::{Channel, IncomingMessage, MessagingProvider, Platform, SentMessage};
 
 /// Central hub that manages and dispatches to messaging providers.
 pub struct MessagingHub {
@@ -147,9 +145,7 @@ impl MessagingHub {
                         );
                         provider.send_message(channel, text).await
                     }
-                    None => Err(anyhow::anyhow!(
-                        "no provider registered for {platform}"
-                    ))
+                    None => Err(anyhow::anyhow!("no provider registered for {platform}")),
                 };
                 results.push((*platform, channel.clone(), result));
             }
@@ -228,7 +224,12 @@ mod tests {
             Ok(msgs)
         }
 
-        async fn add_reaction(&self, _channel: &str, _message_id: &str, _emoji: &str) -> Result<()> {
+        async fn add_reaction(
+            &self,
+            _channel: &str,
+            _message_id: &str,
+            _emoji: &str,
+        ) -> Result<()> {
             Ok(())
         }
 

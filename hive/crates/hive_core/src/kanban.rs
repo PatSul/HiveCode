@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -368,7 +368,8 @@ impl KanbanBoard {
     /// Returns references to all tasks in a given column, ordered by priority
     /// descending then creation time ascending.
     pub fn tasks_in_column(&self, column: KanbanColumn) -> Vec<&KanbanTask> {
-        let mut tasks: Vec<&KanbanTask> = self.tasks.iter().filter(|t| t.column == column).collect();
+        let mut tasks: Vec<&KanbanTask> =
+            self.tasks.iter().filter(|t| t.column == column).collect();
         tasks.sort_by(|a, b| {
             b.priority
                 .cmp(&a.priority)
@@ -433,8 +434,7 @@ impl KanbanBoard {
         self.tasks
             .iter()
             .filter(|t| {
-                t.column != KanbanColumn::Done
-                    && t.due_date.map(|d| d < now).unwrap_or(false)
+                t.column != KanbanColumn::Done && t.due_date.map(|d| d < now).unwrap_or(false)
             })
             .collect()
     }
@@ -483,7 +483,10 @@ mod tests {
         let id = task.id.clone();
 
         board.move_task(&id, KanbanColumn::InProgress).unwrap();
-        assert_eq!(board.get_task(&id).unwrap().column, KanbanColumn::InProgress);
+        assert_eq!(
+            board.get_task(&id).unwrap().column,
+            KanbanColumn::InProgress
+        );
 
         board.move_task(&id, KanbanColumn::Done).unwrap();
         assert_eq!(board.get_task(&id).unwrap().column, KanbanColumn::Done);
@@ -511,10 +514,12 @@ mod tests {
         board.move_task(&t1.id, KanbanColumn::InProgress).unwrap();
         let result = board.move_task(&t2.id, KanbanColumn::InProgress);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("WIP limit reached"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("WIP limit reached")
+        );
     }
 
     #[test]
@@ -640,9 +645,7 @@ mod tests {
         let task = board.add_task("Commentable", None, Priority::Low);
         let task_id = task.id.clone();
 
-        let comment_id = board
-            .add_comment(&task_id, "Bob", "Looks good!")
-            .unwrap();
+        let comment_id = board.add_comment(&task_id, "Bob", "Looks good!").unwrap();
         assert!(!comment_id.is_empty());
 
         let t = board.get_task(&task_id).unwrap();
@@ -674,7 +677,12 @@ mod tests {
         let t = board.add_task("Self", None, Priority::Low);
         let result = board.add_dependency(&t.id, &t.id);
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("cannot depend on itself"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("cannot depend on itself")
+        );
     }
 
     #[test]

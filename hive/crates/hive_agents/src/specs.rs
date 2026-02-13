@@ -36,12 +36,7 @@ pub enum SpecSection {
 }
 
 impl SpecSection {
-    pub const ALL: [SpecSection; 4] = [
-        Self::Requirements,
-        Self::Plan,
-        Self::Progress,
-        Self::Notes,
-    ];
+    pub const ALL: [SpecSection; 4] = [Self::Requirements, Self::Plan, Self::Progress, Self::Notes];
 
     pub fn label(self) -> &'static str {
         match self {
@@ -68,7 +63,11 @@ pub struct SpecEntry {
 }
 
 impl SpecEntry {
-    pub fn new(id: impl Into<String>, title: impl Into<String>, content: impl Into<String>) -> Self {
+    pub fn new(
+        id: impl Into<String>,
+        title: impl Into<String>,
+        content: impl Into<String>,
+    ) -> Self {
         Self {
             id: id.into(),
             title: title.into(),
@@ -199,7 +198,10 @@ impl SpecManager {
         title: impl Into<String>,
         description: impl Into<String>,
     ) -> Result<(), String> {
-        let spec = self.specs.get_mut(id).ok_or_else(|| format!("Spec not found: {id}"))?;
+        let spec = self
+            .specs
+            .get_mut(id)
+            .ok_or_else(|| format!("Spec not found: {id}"))?;
         spec.title = title.into();
         spec.description = description.into();
         spec.bump_version();
@@ -217,10 +219,7 @@ impl SpecManager {
             .specs
             .get_mut(spec_id)
             .ok_or_else(|| format!("Spec not found: {spec_id}"))?;
-        spec.sections
-            .entry(section)
-            .or_default()
-            .push(entry);
+        spec.sections.entry(section).or_default().push(entry);
         spec.bump_version();
         Ok(())
     }
@@ -272,10 +271,19 @@ impl SpecManager {
 
         // Match keywords to sections and add progress entries.
         let section_keywords: &[(SpecSection, &[&str])] = &[
-            (SpecSection::Requirements, &["requirement", "must", "shall", "need"]),
+            (
+                SpecSection::Requirements,
+                &["requirement", "must", "shall", "need"],
+            ),
             (SpecSection::Plan, &["plan", "step", "phase", "approach"]),
-            (SpecSection::Progress, &["completed", "done", "implemented", "fixed", "progress"]),
-            (SpecSection::Notes, &["note", "caveat", "warning", "observation"]),
+            (
+                SpecSection::Progress,
+                &["completed", "done", "implemented", "fixed", "progress"],
+            ),
+            (
+                SpecSection::Notes,
+                &["note", "caveat", "warning", "observation"],
+            ),
         ];
 
         for (section, keywords) in section_keywords {
@@ -309,7 +317,10 @@ impl SpecManager {
 
     /// Archive a spec by setting its status to `Archived`.
     pub fn archive_spec(&mut self, id: &str) -> Result<(), String> {
-        let spec = self.specs.get_mut(id).ok_or_else(|| format!("Spec not found: {id}"))?;
+        let spec = self
+            .specs
+            .get_mut(id)
+            .ok_or_else(|| format!("Spec not found: {id}"))?;
         spec.status = SpecStatus::Archived;
         spec.bump_version();
         Ok(())
@@ -317,11 +328,17 @@ impl SpecManager {
 
     /// Export a spec as a Markdown document.
     pub fn export_markdown(&self, id: &str) -> Result<String, String> {
-        let spec = self.specs.get(id).ok_or_else(|| format!("Spec not found: {id}"))?;
+        let spec = self
+            .specs
+            .get(id)
+            .ok_or_else(|| format!("Spec not found: {id}"))?;
 
         let mut md = String::new();
         md.push_str(&format!("# {}\n\n", spec.title));
-        md.push_str(&format!("**Status:** {:?} | **Version:** {} | **Auto-update:** {}\n\n", spec.status, spec.version, spec.auto_update));
+        md.push_str(&format!(
+            "**Status:** {:?} | **Version:** {} | **Auto-update:** {}\n\n",
+            spec.status, spec.version, spec.auto_update
+        ));
         md.push_str(&format!("{}\n\n", spec.description));
 
         for section in SpecSection::ALL {
@@ -333,7 +350,10 @@ impl SpecManager {
             } else {
                 for entry in &entries {
                     let check = if entry.checked { "x" } else { " " };
-                    md.push_str(&format!("- [{}] **{}** — {}\n", check, entry.title, entry.content));
+                    md.push_str(&format!(
+                        "- [{}] **{}** — {}\n",
+                        check, entry.title, entry.content
+                    ));
                 }
                 md.push('\n');
             }
@@ -399,7 +419,8 @@ mod tests {
     #[test]
     fn update_spec_changes_title_and_bumps_version() {
         let (mut mgr, id) = make_manager_with_spec();
-        mgr.update_spec(&id, "Updated Title", "Updated Desc").unwrap();
+        mgr.update_spec(&id, "Updated Title", "Updated Desc")
+            .unwrap();
         let spec = mgr.get_spec(&id).unwrap();
         assert_eq!(spec.title, "Updated Title");
         assert_eq!(spec.description, "Updated Desc");
@@ -419,7 +440,8 @@ mod tests {
         let (mut mgr, id) = make_manager_with_spec();
 
         let entry = SpecEntry::new("e1", "Requirement 1", "Must support X");
-        mgr.add_entry(&id, SpecSection::Requirements, entry).unwrap();
+        mgr.add_entry(&id, SpecSection::Requirements, entry)
+            .unwrap();
 
         let spec = mgr.get_spec(&id).unwrap();
         assert_eq!(spec.entry_count(), 1);
@@ -446,7 +468,10 @@ mod tests {
 
         // Activate auto_update (it's on by default).
         let updated = mgr
-            .apply_agent_update(&id, "I have completed the implementation and fixed the bug.")
+            .apply_agent_update(
+                &id,
+                "I have completed the implementation and fixed the bug.",
+            )
             .unwrap();
 
         // Should match Progress section ("completed").
@@ -513,7 +538,8 @@ mod tests {
     fn export_markdown_contains_all_sections() {
         let (mut mgr, id) = make_manager_with_spec();
         let entry = SpecEntry::new("r1", "Auth", "Must support OAuth");
-        mgr.add_entry(&id, SpecSection::Requirements, entry).unwrap();
+        mgr.add_entry(&id, SpecSection::Requirements, entry)
+            .unwrap();
 
         let md = mgr.export_markdown(&id).unwrap();
         assert!(md.contains("# Test Spec"));
@@ -529,7 +555,8 @@ mod tests {
     fn export_markdown_shows_checked_state() {
         let (mut mgr, id) = make_manager_with_spec();
         let entry = SpecEntry::new("r1", "Done item", "content");
-        mgr.add_entry(&id, SpecSection::Requirements, entry).unwrap();
+        mgr.add_entry(&id, SpecSection::Requirements, entry)
+            .unwrap();
         mgr.check_entry(&id, "r1", true).unwrap();
 
         let md = mgr.export_markdown(&id).unwrap();

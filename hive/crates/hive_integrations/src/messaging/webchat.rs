@@ -7,8 +7,8 @@
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use chrono::Utc;
-use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
 use reqwest::Client;
+use reqwest::header::{CONTENT_TYPE, HeaderMap, HeaderValue};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use tracing::debug;
@@ -121,10 +121,7 @@ impl WebChatProvider {
 
     /// Push an incoming payload (from a webhook callback) into the inbox.
     pub fn receive_webhook(&self, incoming: &WebChatIncoming) {
-        let timestamp = incoming
-            .timestamp
-            .parse()
-            .unwrap_or_else(|_| Utc::now());
+        let timestamp = incoming.timestamp.parse().unwrap_or_else(|_| Utc::now());
 
         let msg = IncomingMessage {
             id: incoming.id.clone(),
@@ -324,8 +321,7 @@ mod tests {
 
     #[test]
     fn test_webchat_provider_custom_base_url_strips_slash() {
-        let provider =
-            WebChatProvider::with_base_url("tok", "https://webhooks.test/api/").unwrap();
+        let provider = WebChatProvider::with_base_url("tok", "https://webhooks.test/api/").unwrap();
         assert_eq!(provider.base_url(), "https://webhooks.test/api");
     }
 

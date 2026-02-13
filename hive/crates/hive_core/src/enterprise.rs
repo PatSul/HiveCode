@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use tracing::debug;
@@ -169,7 +169,10 @@ impl EnterpriseService {
 
         // Check for duplicate email
         if team.members.iter().any(|m| m.email == email) {
-            bail!("A member with email '{}' already exists in this team", email);
+            bail!(
+                "A member with email '{}' already exists in this team",
+                email
+            );
         }
 
         let member = TeamMember {
@@ -206,7 +209,10 @@ impl EnterpriseService {
             bail!("Cannot remove the team Owner");
         }
 
-        debug!("Removed member {} from team {}", team.members[idx].name, team.name);
+        debug!(
+            "Removed member {} from team {}",
+            team.members[idx].name, team.name
+        );
         team.members.remove(idx);
         Ok(())
     }
@@ -270,7 +276,10 @@ impl EnterpriseService {
             ip_address,
         };
 
-        debug!("Audit: {:?} by {} on {}", entry.action, entry.user_name, entry.resource_id);
+        debug!(
+            "Audit: {:?} by {} on {}",
+            entry.action, entry.user_name, entry.resource_id
+        );
 
         let clone = entry.clone();
         self.audit_log.push(entry);
@@ -320,7 +329,10 @@ impl EnterpriseService {
             model: model.into(),
         };
 
-        debug!("Usage: {} tokens, ${:.4} for {}", metric.tokens_used, metric.cost_usd, metric.user_id);
+        debug!(
+            "Usage: {} tokens, ${:.4} for {}",
+            metric.tokens_used, metric.cost_usd, metric.user_id
+        );
 
         let clone = metric.clone();
         self.usage_metrics.push(metric);
@@ -454,10 +466,7 @@ mod tests {
         // alice@acme.com already exists (Owner)
         let result = svc.add_member(&team_id, "Alice Clone", "alice@acme.com", TeamRole::Member);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("already exists"));
+        assert!(result.unwrap_err().to_string().contains("already exists"));
     }
 
     // -----------------------------------------------------------------------
@@ -629,11 +638,51 @@ mod tests {
     fn test_get_audit_by_user() {
         let mut svc = EnterpriseService::new();
 
-        svc.log_audit("user-1", "Alice", AuditAction::Login, "session", "s1", None, None);
-        svc.log_audit("user-2", "Bob", AuditAction::Login, "session", "s2", None, None);
-        svc.log_audit("user-1", "Alice", AuditAction::Logout, "session", "s1", None, None);
-        svc.log_audit("user-2", "Bob", AuditAction::DataExport, "report", "r1", None, None);
-        svc.log_audit("user-1", "Alice", AuditAction::ApiKeyAccess, "key", "k1", None, None);
+        svc.log_audit(
+            "user-1",
+            "Alice",
+            AuditAction::Login,
+            "session",
+            "s1",
+            None,
+            None,
+        );
+        svc.log_audit(
+            "user-2",
+            "Bob",
+            AuditAction::Login,
+            "session",
+            "s2",
+            None,
+            None,
+        );
+        svc.log_audit(
+            "user-1",
+            "Alice",
+            AuditAction::Logout,
+            "session",
+            "s1",
+            None,
+            None,
+        );
+        svc.log_audit(
+            "user-2",
+            "Bob",
+            AuditAction::DataExport,
+            "report",
+            "r1",
+            None,
+            None,
+        );
+        svc.log_audit(
+            "user-1",
+            "Alice",
+            AuditAction::ApiKeyAccess,
+            "key",
+            "k1",
+            None,
+            None,
+        );
 
         let alice_log = svc.get_audit_by_user("user-1", 10);
         assert_eq!(alice_log.len(), 3);

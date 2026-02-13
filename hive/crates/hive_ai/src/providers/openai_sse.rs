@@ -16,7 +16,7 @@ use serde::Deserialize;
 use tokio::sync::mpsc;
 use tracing::{debug, warn};
 
-use crate::types::{StopReason, StreamChunk, ToolCall, TokenUsage};
+use crate::types::{StopReason, StreamChunk, TokenUsage, ToolCall};
 
 // ---------------------------------------------------------------------------
 // Wire types (deserialization only)
@@ -112,10 +112,7 @@ struct ToolCallAccumulator {
     arguments: String,
 }
 
-pub(crate) async fn drive_sse_stream(
-    resp: reqwest::Response,
-    tx: mpsc::Sender<StreamChunk>,
-) {
+pub(crate) async fn drive_sse_stream(resp: reqwest::Response, tx: mpsc::Sender<StreamChunk>) {
     let mut stream = resp.bytes_stream();
     let mut buffer = String::new();
     let mut accumulated_usage: Option<TokenUsage> = None;
@@ -309,12 +306,7 @@ mod tests {
         let json = r#"{"id":"chatcmpl-abc","choices":[{"delta":{"content":"Hello"},"index":0,"finish_reason":null}]}"#;
         let frame: SseFrame = serde_json::from_str(json).unwrap();
         assert_eq!(frame.choices.len(), 1);
-        let content = frame.choices[0]
-            .delta
-            .as_ref()
-            .unwrap()
-            .content
-            .as_deref();
+        let content = frame.choices[0].delta.as_ref().unwrap().content.as_deref();
         assert_eq!(content, Some("Hello"));
     }
 
@@ -332,12 +324,7 @@ mod tests {
     fn parse_sse_frame_empty_delta() {
         let json = r#"{"id":"chatcmpl-abc","choices":[{"delta":{"role":"assistant"},"index":0,"finish_reason":null}]}"#;
         let frame: SseFrame = serde_json::from_str(json).unwrap();
-        let content = frame.choices[0]
-            .delta
-            .as_ref()
-            .unwrap()
-            .content
-            .as_deref();
+        let content = frame.choices[0].delta.as_ref().unwrap().content.as_deref();
         assert_eq!(content, None);
     }
 
@@ -375,8 +362,9 @@ mod tests {
         );
 
         // Build a mock response using a hand-crafted stream.
-        let body_stream =
-            futures::stream::once(async move { Ok::<_, reqwest::Error>(bytes::Bytes::from(sse_payload)) });
+        let body_stream = futures::stream::once(async move {
+            Ok::<_, reqwest::Error>(bytes::Bytes::from(sse_payload))
+        });
         let resp = http::Response::builder()
             .status(200)
             .body(reqwest::Body::wrap_stream(body_stream))
@@ -396,7 +384,11 @@ mod tests {
         }
 
         // Should have: "Hello", " world", done=true
-        assert!(chunks.len() >= 2, "expected at least 2 chunks, got {}", chunks.len());
+        assert!(
+            chunks.len() >= 2,
+            "expected at least 2 chunks, got {}",
+            chunks.len()
+        );
 
         // Content chunks.
         assert_eq!(chunks[0].content, "Hello");

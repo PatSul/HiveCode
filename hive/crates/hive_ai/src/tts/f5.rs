@@ -7,7 +7,9 @@ use reqwest::Client;
 use serde::Serialize;
 use tracing::debug;
 
-use super::{AudioData, AudioFormat, TtsError, TtsProvider, TtsProviderType, TtsRequest, VoiceInfo};
+use super::{
+    AudioData, AudioFormat, TtsError, TtsProvider, TtsProviderType, TtsRequest, VoiceInfo,
+};
 
 const HF_API_BASE: &str = "https://api-inference.huggingface.co/models/SWivid/F5-TTS";
 const DEFAULT_LOCAL_URL: &str = "http://localhost:8881";
@@ -163,13 +165,11 @@ impl TtsProvider for F5TtsProvider {
         true
     }
 
-    async fn clone_voice(
-        &self,
-        name: &str,
-        samples: &[Vec<u8>],
-    ) -> Result<VoiceInfo, TtsError> {
+    async fn clone_voice(&self, name: &str, samples: &[Vec<u8>]) -> Result<VoiceInfo, TtsError> {
         if samples.is_empty() {
-            return Err(TtsError::Other("At least one audio sample is required".into()));
+            return Err(TtsError::Other(
+                "At least one audio sample is required".into(),
+            ));
         }
         let voice_id = format!("cloned_{}", uuid::Uuid::new_v4());
         debug!(voice_id, name, "Created cloned voice reference for F5-TTS");

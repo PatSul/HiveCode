@@ -154,9 +154,7 @@ impl ReminderService {
     /// Mark a reminder as completed.
     pub fn complete(&self, id: &str) -> Result<(), String> {
         let now = Utc::now().to_rfc3339();
-        let updated = self
-            .storage
-            .update_reminder_status(id, "completed", &now)?;
+        let updated = self.storage.update_reminder_status(id, "completed", &now)?;
         if !updated {
             return Err(format!("Reminder '{id}' not found"));
         }
@@ -166,9 +164,7 @@ impl ReminderService {
     /// Dismiss a reminder.
     pub fn dismiss(&self, id: &str) -> Result<(), String> {
         let now = Utc::now().to_rfc3339();
-        let updated = self
-            .storage
-            .update_reminder_status(id, "dismissed", &now)?;
+        let updated = self.storage.update_reminder_status(id, "dismissed", &now)?;
         if !updated {
             return Err(format!("Reminder '{id}' not found"));
         }

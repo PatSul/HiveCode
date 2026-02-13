@@ -88,7 +88,7 @@ fn check_overlap(a: &UnifiedEvent, b: &UnifiedEvent) -> Option<ConflictSeverity>
 
 #[cfg(test)]
 mod tests {
-    use crate::calendar::conflict_detector::{detect_conflicts, ConflictSeverity};
+    use crate::calendar::conflict_detector::{ConflictSeverity, detect_conflicts};
     use crate::calendar::{CalendarProvider, UnifiedEvent};
 
     fn make_event(id: &str, start: &str, end: &str) -> UnifiedEvent {

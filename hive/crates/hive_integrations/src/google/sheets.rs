@@ -4,8 +4,8 @@
 //! using `reqwest` for HTTP and bearer-token authentication.
 
 use anyhow::{Context, Result};
-use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
 use reqwest::Client;
+use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderValue};
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
@@ -55,14 +55,12 @@ impl GoogleSheetsClient {
     }
 
     /// Read values from a spreadsheet range.
-    pub async fn get_values(
-        &self,
-        spreadsheet_id: &str,
-        range: &str,
-    ) -> Result<SheetValues> {
+    pub async fn get_values(&self, spreadsheet_id: &str, range: &str) -> Result<SheetValues> {
         let url = format!(
             "{}/{}/values/{}",
-            self.base_url, spreadsheet_id, urlencod(range)
+            self.base_url,
+            spreadsheet_id,
+            urlencod(range)
         );
         debug!(url = %url, "reading Sheets values");
 
@@ -91,7 +89,9 @@ impl GoogleSheetsClient {
     ) -> Result<()> {
         let url = format!(
             "{}/{}/values/{}?valueInputOption=USER_ENTERED",
-            self.base_url, spreadsheet_id, urlencod(range)
+            self.base_url,
+            spreadsheet_id,
+            urlencod(range)
         );
 
         let body = serde_json::json!({

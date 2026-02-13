@@ -232,52 +232,31 @@ impl VoiceAssistant {
         let lower = text.to_lowercase();
 
         // Order matters: more specific patterns first.
-        if lower.contains("send")
-            || lower.contains("message")
-            || lower.contains("email")
-        {
+        if lower.contains("send") || lower.contains("message") || lower.contains("email") {
             return VoiceIntent::SendMessage;
         }
 
-        if lower.contains("search")
-            || lower.contains("find")
-            || lower.contains("look for")
-        {
+        if lower.contains("search") || lower.contains("find") || lower.contains("look for") {
             return VoiceIntent::SearchFiles;
         }
 
-        if lower.contains("run")
-            || lower.contains("execute")
-            || lower.contains("terminal")
-        {
+        if lower.contains("run") || lower.contains("execute") || lower.contains("terminal") {
             return VoiceIntent::RunCommand;
         }
 
-        if lower.contains("open")
-            || lower.contains("show")
-            || lower.contains("switch to")
-        {
+        if lower.contains("open") || lower.contains("show") || lower.contains("switch to") {
             return VoiceIntent::OpenPanel;
         }
 
-        if lower.contains("create")
-            || lower.contains("add")
-            || lower.contains("new task")
-        {
+        if lower.contains("create") || lower.contains("add") || lower.contains("new task") {
             return VoiceIntent::CreateTask;
         }
 
-        if lower.contains("read")
-            || lower.contains("notifications")
-            || lower.contains("alerts")
-        {
+        if lower.contains("read") || lower.contains("notifications") || lower.contains("alerts") {
             return VoiceIntent::ReadNotifications;
         }
 
-        if lower.contains("schedule")
-            || lower.contains("calendar")
-            || lower.contains("meeting")
-        {
+        if lower.contains("schedule") || lower.contains("calendar") || lower.contains("meeting") {
             return VoiceIntent::CheckSchedule;
         }
 
@@ -298,10 +277,7 @@ impl VoiceAssistant {
             VoiceIntent::Unknown => return 0.0,
         };
 
-        let matched = keywords
-            .iter()
-            .filter(|kw| lower.contains(**kw))
-            .count();
+        let matched = keywords.iter().filter(|kw| lower.contains(**kw)).count();
 
         // Base confidence 0.6 for one match, up to 1.0 for all three.
         let score = 0.6 + (matched as f32 - 1.0) * 0.2;

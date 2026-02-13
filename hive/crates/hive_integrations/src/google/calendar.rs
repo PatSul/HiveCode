@@ -4,8 +4,8 @@
 //! using `reqwest` for HTTP and bearer-token authentication.
 
 use anyhow::{Context, Result};
-use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
 use reqwest::Client;
+use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderValue};
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
@@ -236,15 +236,13 @@ impl GoogleCalendarClient {
             anyhow::bail!("Calendar API error ({}): {}", status, body);
         }
 
-        resp.json().await.context("failed to parse Calendar event list")
+        resp.json()
+            .await
+            .context("failed to parse Calendar event list")
     }
 
     /// Get a single event by ID.
-    pub async fn get_event(
-        &self,
-        calendar_id: &str,
-        event_id: &str,
-    ) -> Result<CalendarEvent> {
+    pub async fn get_event(&self, calendar_id: &str, event_id: &str) -> Result<CalendarEvent> {
         let url = format!(
             "{}/calendars/{}/events/{}",
             self.base_url,
@@ -297,7 +295,9 @@ impl GoogleCalendarClient {
             anyhow::bail!("Calendar API error ({}): {}", status, body);
         }
 
-        resp.json().await.context("failed to parse created Calendar event")
+        resp.json()
+            .await
+            .context("failed to parse created Calendar event")
     }
 
     /// Update an existing event.
@@ -330,15 +330,13 @@ impl GoogleCalendarClient {
             anyhow::bail!("Calendar API error ({}): {}", status, body);
         }
 
-        resp.json().await.context("failed to parse updated Calendar event")
+        resp.json()
+            .await
+            .context("failed to parse updated Calendar event")
     }
 
     /// Delete an event by ID.
-    pub async fn delete_event(
-        &self,
-        calendar_id: &str,
-        event_id: &str,
-    ) -> Result<()> {
+    pub async fn delete_event(&self, calendar_id: &str, event_id: &str) -> Result<()> {
         let url = format!(
             "{}/calendars/{}/events/{}",
             self.base_url,
@@ -418,7 +416,9 @@ impl GoogleCalendarClient {
             anyhow::bail!("Calendar API error ({}): {}", status, body);
         }
 
-        resp.json().await.context("failed to parse free/busy response")
+        resp.json()
+            .await
+            .context("failed to parse free/busy response")
     }
 }
 
@@ -474,10 +474,7 @@ mod tests {
         assert_eq!(event.status.as_deref(), Some("confirmed"));
         assert_eq!(event.attendees.len(), 1);
         assert_eq!(event.attendees[0].email, "alice@example.com");
-        assert_eq!(
-            event.attendees[0].display_name.as_deref(),
-            Some("Alice")
-        );
+        assert_eq!(event.attendees[0].display_name.as_deref(), Some("Alice"));
     }
 
     #[test]
@@ -502,10 +499,7 @@ mod tests {
     fn test_event_date_time_with_datetime() {
         let json = r#"{ "dateTime": "2025-01-15T09:00:00-05:00", "timeZone": "America/New_York" }"#;
         let dt: EventDateTime = serde_json::from_str(json).unwrap();
-        assert_eq!(
-            dt.date_time.as_deref(),
-            Some("2025-01-15T09:00:00-05:00")
-        );
+        assert_eq!(dt.date_time.as_deref(), Some("2025-01-15T09:00:00-05:00"));
         assert_eq!(dt.time_zone.as_deref(), Some("America/New_York"));
         assert!(dt.date.is_none());
     }
@@ -621,8 +615,12 @@ mod tests {
             time_min: "2025-01-15T00:00:00Z".into(),
             time_max: "2025-01-16T00:00:00Z".into(),
             items: vec![
-                FreeBusyCalendar { id: "primary".into() },
-                FreeBusyCalendar { id: "work@example.com".into() },
+                FreeBusyCalendar {
+                    id: "primary".into(),
+                },
+                FreeBusyCalendar {
+                    id: "work@example.com".into(),
+                },
             ],
         };
         let json = serde_json::to_string(&req).unwrap();

@@ -9,11 +9,11 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 use tracing::{debug, info};
 
-use crate::cost::{calculate_cost, CostBreakdown, CostTracker};
+use crate::cost::{CostBreakdown, CostTracker, calculate_cost};
 use crate::discovery::LocalDiscovery;
 use crate::providers::anthropic::AnthropicProvider;
-use crate::providers::generic_local::GenericLocalProvider;
 use crate::providers::gemini::GeminiProvider;
+use crate::providers::generic_local::GenericLocalProvider;
 use crate::providers::groq::GroqProvider;
 use crate::providers::huggingface::HuggingFaceProvider;
 use crate::providers::litellm::LiteLLMProvider;
@@ -108,10 +108,7 @@ impl AiService {
             }
             if let Some(ref key) = config.groq_api_key {
                 if !key.is_empty() {
-                    providers.insert(
-                        ProviderType::Groq,
-                        Arc::new(GroqProvider::new(key.clone())),
-                    );
+                    providers.insert(ProviderType::Groq, Arc::new(GroqProvider::new(key.clone())));
                     info!("Groq provider registered");
                 }
             }
@@ -237,10 +234,9 @@ impl AiService {
         model: &str,
         tools: Option<Vec<ToolDefinition>>,
     ) -> Result<ChatResponse, ProviderError> {
-        let (provider_type, provider) =
-            self.resolve_provider(model).ok_or_else(|| {
-                ProviderError::Other("No providers available".into())
-            })?;
+        let (provider_type, provider) = self
+            .resolve_provider(model)
+            .ok_or_else(|| ProviderError::Other("No providers available".into()))?;
 
         let request = ChatRequest {
             messages,
@@ -251,7 +247,10 @@ impl AiService {
             tools,
         };
 
-        info!("Sending chat request to {:?} model={}", provider_type, model);
+        info!(
+            "Sending chat request to {:?} model={}",
+            provider_type, model
+        );
         let response = provider.chat(&request).await?;
 
         // Track cost
@@ -266,11 +265,8 @@ impl AiService {
             response.usage.completion_tokens as usize,
         );
 
-        self.router.record_result(
-            map_to_router_provider(provider_type),
-            true,
-            None,
-        );
+        self.router
+            .record_result(map_to_router_provider(provider_type), true, None);
 
         info!(
             "Chat response: {} tokens, ${:.6}",
@@ -288,10 +284,9 @@ impl AiService {
         system_prompt: Option<String>,
         tools: Option<Vec<ToolDefinition>>,
     ) -> Result<mpsc::Receiver<StreamChunk>, ProviderError> {
-        let (provider_type, provider) =
-            self.resolve_provider(model).ok_or_else(|| {
-                ProviderError::Other("No providers available".into())
-            })?;
+        let (provider_type, provider) = self
+            .resolve_provider(model)
+            .ok_or_else(|| ProviderError::Other("No providers available".into()))?;
 
         let request = ChatRequest {
             messages,
@@ -302,10 +297,7 @@ impl AiService {
             tools,
         };
 
-        info!(
-            "Starting stream to {:?} model={}",
-            provider_type, model
-        );
+        info!("Starting stream to {:?} model={}", provider_type, model);
         provider.stream_chat(&request).await
     }
 
@@ -495,7 +487,8 @@ mod tests {
     #[test]
     fn test_cost_tracker_accessible() {
         let mut svc = AiService::new(test_config());
-        svc.cost_tracker_mut().record("claude-sonnet-4-5-20250929", 100, 50);
+        svc.cost_tracker_mut()
+            .record("claude-sonnet-4-5-20250929", 100, 50);
         assert!(svc.cost_tracker().total_cost() > 0.0);
     }
 

@@ -4,8 +4,8 @@
 //! `reqwest` for HTTP and bearer-token authentication.
 
 use anyhow::{Context, Result};
-use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
 use reqwest::Client;
+use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderValue};
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
@@ -172,11 +172,7 @@ impl GoogleContactsClient {
     }
 
     /// Search contacts by a free-text query string.
-    pub async fn search_contacts(
-        &self,
-        query: &str,
-        page_size: u32,
-    ) -> Result<Vec<Contact>> {
+    pub async fn search_contacts(&self, query: &str, page_size: u32) -> Result<Vec<Contact>> {
         let url = format!(
             "{}/people:searchContacts?query={}&pageSize={}\
              &readMask=names,emailAddresses,phoneNumbers,organizations",
@@ -511,8 +507,7 @@ mod tests {
 
     #[test]
     fn test_client_custom_base_url_strips_slash() {
-        let client =
-            GoogleContactsClient::with_base_url("tok", "https://contacts.test/v1/");
+        let client = GoogleContactsClient::with_base_url("tok", "https://contacts.test/v1/");
         assert_eq!(client.base_url(), "https://contacts.test/v1");
     }
 

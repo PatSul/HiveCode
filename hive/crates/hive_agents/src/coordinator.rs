@@ -9,11 +9,9 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Instant;
 
-use hive_ai::types::{
-    ChatMessage, ChatRequest, MessageRole, ModelTier,
-};
+use hive_ai::types::{ChatMessage, ChatRequest, MessageRole, ModelTier};
 
-use crate::hivemind::{default_model_for_tier, AiExecutor};
+use crate::hivemind::{AiExecutor, default_model_for_tier};
 use crate::personas::{PersonaKind, PersonaRegistry, execute_with_persona};
 use crate::specs::Spec;
 
@@ -68,7 +66,10 @@ pub struct TaskPlan {
 impl TaskPlan {
     /// Return task IDs that have no dependencies (ready to run immediately).
     pub fn root_tasks(&self) -> Vec<&PlannedTask> {
-        self.tasks.iter().filter(|t| t.dependencies.is_empty()).collect()
+        self.tasks
+            .iter()
+            .filter(|t| t.dependencies.is_empty())
+            .collect()
     }
 
     /// Return task IDs that depend on the given completed task.
@@ -196,7 +197,11 @@ impl<E: AiExecutor + 'static> Coordinator<E> {
     }
 
     /// Create a coordinator with a custom persona registry.
-    pub fn with_registry(config: CoordinatorConfig, executor: E, registry: PersonaRegistry) -> Self {
+    pub fn with_registry(
+        config: CoordinatorConfig,
+        executor: E,
+        registry: PersonaRegistry,
+    ) -> Self {
         Self {
             config,
             executor: Arc::new(executor),
@@ -257,10 +262,9 @@ impl<E: AiExecutor + 'static> Coordinator<E> {
             }
 
             // Find tasks that are ready to execute (all deps satisfied).
-            let (ready, not_ready): (Vec<PlannedTask>, Vec<PlannedTask>) =
-                remaining.into_iter().partition(|t| {
-                    t.dependencies.iter().all(|d| completed.contains(d))
-                });
+            let (ready, not_ready): (Vec<PlannedTask>, Vec<PlannedTask>) = remaining
+                .into_iter()
+                .partition(|t| t.dependencies.iter().all(|d| completed.contains(d)));
 
             remaining = not_ready;
 
@@ -283,9 +287,7 @@ impl<E: AiExecutor + 'static> Coordinator<E> {
                     .registry
                     .get(&task.persona)
                     .cloned()
-                    .unwrap_or_else(|| {
-                        self.registry.get(&PersonaKind::Implement).unwrap().clone()
-                    });
+                    .unwrap_or_else(|| self.registry.get(&PersonaKind::Implement).unwrap().clone());
 
                 let output =
                     execute_with_persona(&persona, &task.description, self.executor.as_ref(), None)

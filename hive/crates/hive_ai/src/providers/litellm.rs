@@ -156,10 +156,7 @@ impl LiteLLMProvider {
     fn build_body(&self, request: &ChatRequest, stream: bool) -> LiteLLMChatRequest {
         LiteLLMChatRequest {
             model: request.model.clone(),
-            messages: Self::convert_messages(
-                &request.messages,
-                request.system_prompt.as_deref(),
-            ),
+            messages: Self::convert_messages(&request.messages, request.system_prompt.as_deref()),
             stream,
             max_tokens: Some(request.max_tokens),
             temperature: request.temperature,
@@ -199,9 +196,7 @@ impl LiteLLMProvider {
 
         // Map HTTP error codes to typed errors.
         let status = resp.status();
-        if status == reqwest::StatusCode::UNAUTHORIZED
-            || status == reqwest::StatusCode::FORBIDDEN
-        {
+        if status == reqwest::StatusCode::UNAUTHORIZED || status == reqwest::StatusCode::FORBIDDEN {
             return Err(ProviderError::InvalidKey);
         }
         if status == reqwest::StatusCode::TOO_MANY_REQUESTS {
@@ -240,10 +235,7 @@ impl LiteLLMProvider {
         };
 
         if !resp.status().is_success() {
-            debug!(
-                "LiteLLM /model/info returned status {}",
-                resp.status()
-            );
+            debug!("LiteLLM /model/info returned status {}", resp.status());
             return Vec::new();
         }
 
@@ -339,9 +331,10 @@ impl AiProvider for LiteLLMProvider {
             .await
             .map_err(|e| ProviderError::Other(format!("JSON parse error: {e}")))?;
 
-        let choice = data.choices.first().ok_or_else(|| {
-            ProviderError::Other("No choices in LiteLLM response".into())
-        })?;
+        let choice = data
+            .choices
+            .first()
+            .ok_or_else(|| ProviderError::Other("No choices in LiteLLM response".into()))?;
 
         let content = choice.message.content.clone().unwrap_or_default();
 
@@ -471,8 +464,7 @@ mod tests {
 
     #[test]
     fn custom_base_url() {
-        let provider =
-            LiteLLMProvider::new(Some("https://litellm.example.com".into()));
+        let provider = LiteLLMProvider::new(Some("https://litellm.example.com".into()));
         assert_eq!(provider.base_url, "https://litellm.example.com");
     }
 
@@ -547,8 +539,7 @@ mod tests {
 
     #[test]
     fn with_api_key_stores_key() {
-        let provider =
-            LiteLLMProvider::with_api_key("sk-litellm-key".into(), None);
+        let provider = LiteLLMProvider::with_api_key("sk-litellm-key".into(), None);
         assert_eq!(provider.api_key.as_deref(), Some("sk-litellm-key"));
         assert_eq!(provider.base_url, "http://localhost:4000");
     }

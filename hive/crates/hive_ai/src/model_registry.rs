@@ -18,12 +18,9 @@ fn caps(list: &[ModelCapability]) -> ModelCapabilities {
 /// Return provider-level capabilities that apply to all models from a provider.
 pub fn provider_capabilities(provider: ProviderType) -> HashSet<ModelCapability> {
     match provider {
-        ProviderType::Anthropic => [
-            ModelCapability::ToolUse,
-            ModelCapability::StructuredOutput,
-        ]
-        .into_iter()
-        .collect(),
+        ProviderType::Anthropic => [ModelCapability::ToolUse, ModelCapability::StructuredOutput]
+            .into_iter()
+            .collect(),
         ProviderType::OpenAI => [
             ModelCapability::ToolUse,
             ModelCapability::NativeAgents,
@@ -32,12 +29,9 @@ pub fn provider_capabilities(provider: ProviderType) -> HashSet<ModelCapability>
         .into_iter()
         .collect(),
         ProviderType::OpenRouter => [ModelCapability::ToolUse].into_iter().collect(),
-        ProviderType::Google => [
-            ModelCapability::ToolUse,
-            ModelCapability::StructuredOutput,
-        ]
-        .into_iter()
-        .collect(),
+        ProviderType::Google => [ModelCapability::ToolUse, ModelCapability::StructuredOutput]
+            .into_iter()
+            .collect(),
         ProviderType::Groq => [ModelCapability::ToolUse].into_iter().collect(),
         _ => HashSet::new(),
     }
@@ -374,10 +368,7 @@ pub static MODEL_REGISTRY: Lazy<Vec<ModelInfo>> = Lazy::new(|| {
             context_window: 128_000,
             input_price_per_mtok: 0.14,
             output_price_per_mtok: 0.28,
-            capabilities: caps(&[
-                ModelCapability::ToolUse,
-                ModelCapability::LongContext,
-            ]),
+            capabilities: caps(&[ModelCapability::ToolUse, ModelCapability::LongContext]),
         },
         ModelInfo {
             id: "deepseek/deepseek-r1".into(),
@@ -404,10 +395,7 @@ pub static MODEL_REGISTRY: Lazy<Vec<ModelInfo>> = Lazy::new(|| {
             context_window: 131_072,
             input_price_per_mtok: 0.39,
             output_price_per_mtok: 0.39,
-            capabilities: caps(&[
-                ModelCapability::ToolUse,
-                ModelCapability::LongContext,
-            ]),
+            capabilities: caps(&[ModelCapability::ToolUse, ModelCapability::LongContext]),
         },
         // Mistral
         ModelInfo {
@@ -435,10 +423,7 @@ pub static MODEL_REGISTRY: Lazy<Vec<ModelInfo>> = Lazy::new(|| {
             context_window: 32_000,
             input_price_per_mtok: 0.1,
             output_price_per_mtok: 0.3,
-            capabilities: caps(&[
-                ModelCapability::ToolUse,
-                ModelCapability::StructuredOutput,
-            ]),
+            capabilities: caps(&[ModelCapability::ToolUse, ModelCapability::StructuredOutput]),
         },
         // Google Gemini (via OpenRouter)
         ModelInfo {
@@ -486,10 +471,7 @@ pub static MODEL_REGISTRY: Lazy<Vec<ModelInfo>> = Lazy::new(|| {
             context_window: 131_072,
             input_price_per_mtok: 0.36,
             output_price_per_mtok: 0.36,
-            capabilities: caps(&[
-                ModelCapability::ToolUse,
-                ModelCapability::LongContext,
-            ]),
+            capabilities: caps(&[ModelCapability::ToolUse, ModelCapability::LongContext]),
         },
         // Anthropic via OpenRouter
         ModelInfo {
@@ -670,10 +652,7 @@ pub static MODEL_REGISTRY: Lazy<Vec<ModelInfo>> = Lazy::new(|| {
             context_window: 128_000,
             input_price_per_mtok: 0.59,
             output_price_per_mtok: 0.79,
-            capabilities: caps(&[
-                ModelCapability::ToolUse,
-                ModelCapability::LongContext,
-            ]),
+            capabilities: caps(&[ModelCapability::ToolUse, ModelCapability::LongContext]),
         },
         ModelInfo {
             id: "llama-3.1-8b-instant".into(),
@@ -684,10 +663,7 @@ pub static MODEL_REGISTRY: Lazy<Vec<ModelInfo>> = Lazy::new(|| {
             context_window: 128_000,
             input_price_per_mtok: 0.05,
             output_price_per_mtok: 0.08,
-            capabilities: caps(&[
-                ModelCapability::ToolUse,
-                ModelCapability::LongContext,
-            ]),
+            capabilities: caps(&[ModelCapability::ToolUse, ModelCapability::LongContext]),
         },
         ModelInfo {
             id: "mixtral-8x7b-32768".into(),
@@ -768,9 +744,10 @@ pub fn resolve_model(input: &str) -> Option<&'static ModelInfo> {
     }
 
     // 3. Substring match on id or display name
-    if let Some(m) = MODEL_REGISTRY.iter().find(|m| {
-        m.id.contains(&needle) || m.name.to_lowercase().contains(&needle)
-    }) {
+    if let Some(m) = MODEL_REGISTRY
+        .iter()
+        .find(|m| m.id.contains(&needle) || m.name.to_lowercase().contains(&needle))
+    {
         return Some(m);
     }
 
@@ -787,10 +764,7 @@ pub fn models_for_provider(provider: ProviderType) -> Vec<&'static ModelInfo> {
 
 /// Return all models at a given tier.
 pub fn models_for_tier(tier: ModelTier) -> Vec<&'static ModelInfo> {
-    MODEL_REGISTRY
-        .iter()
-        .filter(|m| m.tier == tier)
-        .collect()
+    MODEL_REGISTRY.iter().filter(|m| m.tier == tier).collect()
 }
 
 #[cfg(test)]
@@ -819,19 +793,35 @@ mod tests {
     fn provider_filter() {
         let anthropic = models_for_provider(ProviderType::Anthropic);
         assert_eq!(anthropic.len(), 7);
-        assert!(anthropic.iter().all(|m| m.provider_type == ProviderType::Anthropic));
+        assert!(
+            anthropic
+                .iter()
+                .all(|m| m.provider_type == ProviderType::Anthropic)
+        );
 
         let openai = models_for_provider(ProviderType::OpenAI);
         assert_eq!(openai.len(), 12);
-        assert!(openai.iter().all(|m| m.provider_type == ProviderType::OpenAI));
+        assert!(
+            openai
+                .iter()
+                .all(|m| m.provider_type == ProviderType::OpenAI)
+        );
 
         let openrouter = models_for_provider(ProviderType::OpenRouter);
         assert_eq!(openrouter.len(), 12);
-        assert!(openrouter.iter().all(|m| m.provider_type == ProviderType::OpenRouter));
+        assert!(
+            openrouter
+                .iter()
+                .all(|m| m.provider_type == ProviderType::OpenRouter)
+        );
 
         let google = models_for_provider(ProviderType::Google);
         assert_eq!(google.len(), 6);
-        assert!(google.iter().all(|m| m.provider_type == ProviderType::Google));
+        assert!(
+            google
+                .iter()
+                .all(|m| m.provider_type == ProviderType::Google)
+        );
 
         let groq = models_for_provider(ProviderType::Groq);
         assert_eq!(groq.len(), 4);
@@ -839,7 +829,10 @@ mod tests {
 
         let hf = models_for_provider(ProviderType::HuggingFace);
         assert_eq!(hf.len(), 3);
-        assert!(hf.iter().all(|m| m.provider_type == ProviderType::HuggingFace));
+        assert!(
+            hf.iter()
+                .all(|m| m.provider_type == ProviderType::HuggingFace)
+        );
     }
 
     #[test]

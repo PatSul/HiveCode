@@ -191,7 +191,12 @@ mod tests {
         let service = make_service();
 
         let request = service
-            .submit("send_email", "user@example.com", ApprovalLevel::Medium, "email_agent")
+            .submit(
+                "send_email",
+                "user@example.com",
+                ApprovalLevel::Medium,
+                "email_agent",
+            )
             .unwrap();
 
         assert!(!request.id.is_empty());

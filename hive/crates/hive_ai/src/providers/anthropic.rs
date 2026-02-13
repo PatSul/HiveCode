@@ -12,7 +12,7 @@ use tracing::{debug, warn};
 use super::{AiProvider, ProviderError};
 use crate::types::{
     ChatRequest, ChatResponse, FinishReason, ModelInfo, ProviderType, StopReason, StreamChunk,
-    ToolCall, TokenUsage,
+    TokenUsage, ToolCall,
 };
 
 // ---------------------------------------------------------------------------
@@ -395,9 +395,10 @@ impl AiProvider for AnthropicProvider {
                         tool_calls.push(ToolCall {
                             id: id.clone(),
                             name: name.clone(),
-                            input: block.input.clone().unwrap_or(serde_json::Value::Object(
-                                serde_json::Map::new(),
-                            )),
+                            input: block
+                                .input
+                                .clone()
+                                .unwrap_or(serde_json::Value::Object(serde_json::Map::new())),
                         });
                     }
                 }
@@ -508,13 +509,8 @@ impl AiProvider for AnthropicProvider {
                             continue;
                         }
 
-                        if let Err(send_err) = process_sse_event(
-                            &current_event_type,
-                            data,
-                            &mut state,
-                            &tx,
-                        )
-                        .await
+                        if let Err(send_err) =
+                            process_sse_event(&current_event_type, data, &mut state, &tx).await
                         {
                             if send_err {
                                 return;
@@ -768,15 +764,13 @@ mod tests {
     // Helper to create a minimal ChatRequest for testing.
     fn test_request() -> ChatRequest {
         ChatRequest {
-            messages: vec![
-                ChatMessage {
-                    role: MessageRole::User,
-                    content: "Hello".into(),
-                    timestamp: chrono::Utc::now(),
-                    tool_call_id: None,
-                    tool_calls: None,
-                },
-            ],
+            messages: vec![ChatMessage {
+                role: MessageRole::User,
+                content: "Hello".into(),
+                timestamp: chrono::Utc::now(),
+                tool_call_id: None,
+                tool_calls: None,
+            }],
             model: "claude-sonnet-4-20250514".into(),
             max_tokens: 1024,
             temperature: None,
@@ -799,7 +793,10 @@ mod tests {
         assert_eq!(body.system, Some("You are helpful.".into()));
         assert_eq!(body.messages.len(), 1);
         assert_eq!(body.messages[0].role, "user");
-        assert_eq!(body.messages[0].content, serde_json::Value::String("Hello".into()));
+        assert_eq!(
+            body.messages[0].content,
+            serde_json::Value::String("Hello".into())
+        );
     }
 
     #[test]
@@ -831,7 +828,10 @@ mod tests {
         assert_eq!(body.system, Some("Be concise.".into()));
         assert_eq!(body.messages.len(), 1);
         assert_eq!(body.messages[0].role, "user");
-        assert_eq!(body.messages[0].content, serde_json::Value::String("Hi".into()));
+        assert_eq!(
+            body.messages[0].content,
+            serde_json::Value::String("Hi".into())
+        );
         assert_eq!(body.temperature, Some(0.7));
     }
 
@@ -904,10 +904,7 @@ mod tests {
 
     #[test]
     fn map_status_403_to_invalid_key() {
-        let err = AnthropicProvider::map_status_error(
-            reqwest::StatusCode::FORBIDDEN,
-            "forbidden",
-        );
+        let err = AnthropicProvider::map_status_error(reqwest::StatusCode::FORBIDDEN, "forbidden");
         assert!(matches!(err, ProviderError::InvalidKey));
     }
 
@@ -952,7 +949,8 @@ mod tests {
         let (tx, _rx) = mpsc::channel(16);
         let mut state = SseParseState::new();
 
-        let data = r#"{"type":"message_start","message":{"usage":{"input_tokens":42,"output_tokens":0}}}"#;
+        let data =
+            r#"{"type":"message_start","message":{"usage":{"input_tokens":42,"output_tokens":0}}}"#;
         let result = process_sse_event("message_start", data, &mut state, &tx).await;
 
         assert!(result.is_ok());
@@ -964,7 +962,8 @@ mod tests {
         let (tx, _rx) = mpsc::channel(16);
         let mut state = SseParseState::new();
 
-        let data = r#"{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}"#;
+        let data =
+            r#"{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}"#;
         let result = process_sse_event("content_block_start", data, &mut state, &tx).await;
 
         assert!(result.is_ok());
@@ -1079,17 +1078,37 @@ mod tests {
         let mut state = SseParseState::new();
 
         let events = vec![
-            ("message_start", r#"{"type":"message_start","message":{"usage":{"input_tokens":25,"output_tokens":0}}}"#),
-            ("content_block_start", r#"{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}"#),
-            ("content_block_delta", r#"{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello"}}"#),
-            ("content_block_delta", r#"{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" there!"}}"#),
-            ("content_block_stop", r#"{"type":"content_block_stop","index":0}"#),
-            ("message_delta", r#"{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":8}}"#),
+            (
+                "message_start",
+                r#"{"type":"message_start","message":{"usage":{"input_tokens":25,"output_tokens":0}}}"#,
+            ),
+            (
+                "content_block_start",
+                r#"{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}"#,
+            ),
+            (
+                "content_block_delta",
+                r#"{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello"}}"#,
+            ),
+            (
+                "content_block_delta",
+                r#"{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" there!"}}"#,
+            ),
+            (
+                "content_block_stop",
+                r#"{"type":"content_block_stop","index":0}"#,
+            ),
+            (
+                "message_delta",
+                r#"{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":8}}"#,
+            ),
             ("message_stop", r#"{"type":"message_stop"}"#),
         ];
 
         for (event_type, data) in &events {
-            process_sse_event(event_type, data, &mut state, &tx).await.unwrap();
+            process_sse_event(event_type, data, &mut state, &tx)
+                .await
+                .unwrap();
         }
 
         let mut chunks = Vec::new();
@@ -1118,19 +1137,45 @@ mod tests {
         let mut state = SseParseState::new();
 
         let events = vec![
-            ("message_start", r#"{"type":"message_start","message":{"usage":{"input_tokens":30,"output_tokens":0}}}"#),
-            ("content_block_start", r#"{"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":""}}"#),
-            ("content_block_delta", r#"{"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"Analyzing the request..."}}"#),
-            ("content_block_stop", r#"{"type":"content_block_stop","index":0}"#),
-            ("content_block_start", r#"{"type":"content_block_start","index":1,"content_block":{"type":"text","text":""}}"#),
-            ("content_block_delta", r#"{"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"Here's my answer."}}"#),
-            ("content_block_stop", r#"{"type":"content_block_stop","index":1}"#),
-            ("message_delta", r#"{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":20}}"#),
+            (
+                "message_start",
+                r#"{"type":"message_start","message":{"usage":{"input_tokens":30,"output_tokens":0}}}"#,
+            ),
+            (
+                "content_block_start",
+                r#"{"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":""}}"#,
+            ),
+            (
+                "content_block_delta",
+                r#"{"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"Analyzing the request..."}}"#,
+            ),
+            (
+                "content_block_stop",
+                r#"{"type":"content_block_stop","index":0}"#,
+            ),
+            (
+                "content_block_start",
+                r#"{"type":"content_block_start","index":1,"content_block":{"type":"text","text":""}}"#,
+            ),
+            (
+                "content_block_delta",
+                r#"{"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"Here's my answer."}}"#,
+            ),
+            (
+                "content_block_stop",
+                r#"{"type":"content_block_stop","index":1}"#,
+            ),
+            (
+                "message_delta",
+                r#"{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":20}}"#,
+            ),
             ("message_stop", r#"{"type":"message_stop"}"#),
         ];
 
         for (event_type, data) in &events {
-            process_sse_event(event_type, data, &mut state, &tx).await.unwrap();
+            process_sse_event(event_type, data, &mut state, &tx)
+                .await
+                .unwrap();
         }
 
         let mut chunks = Vec::new();
@@ -1159,22 +1204,51 @@ mod tests {
         let mut state = SseParseState::new();
 
         let events = vec![
-            ("message_start", r#"{"type":"message_start","message":{"usage":{"input_tokens":50,"output_tokens":0}}}"#),
+            (
+                "message_start",
+                r#"{"type":"message_start","message":{"usage":{"input_tokens":50,"output_tokens":0}}}"#,
+            ),
             // Text block: "I'll read the file for you."
-            ("content_block_start", r#"{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}"#),
-            ("content_block_delta", r#"{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"I'll read the file."}}"#),
-            ("content_block_stop", r#"{"type":"content_block_stop","index":0}"#),
+            (
+                "content_block_start",
+                r#"{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}"#,
+            ),
+            (
+                "content_block_delta",
+                r#"{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"I'll read the file."}}"#,
+            ),
+            (
+                "content_block_stop",
+                r#"{"type":"content_block_stop","index":0}"#,
+            ),
             // Tool use block
-            ("content_block_start", r#"{"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"toolu_abc123","name":"read_file","input":{}}}"#),
-            ("content_block_delta", r#"{"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\"path\":"}}"#),
-            ("content_block_delta", r#"{"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"\"src/main.rs\"}"}}"#),
-            ("content_block_stop", r#"{"type":"content_block_stop","index":1}"#),
-            ("message_delta", r#"{"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":30}}"#),
+            (
+                "content_block_start",
+                r#"{"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"toolu_abc123","name":"read_file","input":{}}}"#,
+            ),
+            (
+                "content_block_delta",
+                r#"{"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\"path\":"}}"#,
+            ),
+            (
+                "content_block_delta",
+                r#"{"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"\"src/main.rs\"}"}}"#,
+            ),
+            (
+                "content_block_stop",
+                r#"{"type":"content_block_stop","index":1}"#,
+            ),
+            (
+                "message_delta",
+                r#"{"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":30}}"#,
+            ),
             ("message_stop", r#"{"type":"message_stop"}"#),
         ];
 
         for (event_type, data) in &events {
-            process_sse_event(event_type, data, &mut state, &tx).await.unwrap();
+            process_sse_event(event_type, data, &mut state, &tx)
+                .await
+                .unwrap();
         }
 
         let mut chunks = Vec::new();
@@ -1195,7 +1269,10 @@ mod tests {
         assert_eq!(tool_calls.len(), 1);
         assert_eq!(tool_calls[0].id, "toolu_abc123");
         assert_eq!(tool_calls[0].name, "read_file");
-        assert_eq!(tool_calls[0].input, serde_json::json!({"path": "src/main.rs"}));
+        assert_eq!(
+            tool_calls[0].input,
+            serde_json::json!({"path": "src/main.rs"})
+        );
 
         let usage = last.usage.as_ref().unwrap();
         assert_eq!(usage.prompt_tokens, 50);
@@ -1249,7 +1326,8 @@ mod tests {
 
     #[test]
     fn truncate_error_parses_json() {
-        let body = r#"{"error":{"type":"authentication_error","message":"Invalid API key provided"}}"#;
+        let body =
+            r#"{"error":{"type":"authentication_error","message":"Invalid API key provided"}}"#;
         let result = truncate_error(body);
         assert_eq!(result, "Invalid API key provided");
     }

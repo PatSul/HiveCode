@@ -148,14 +148,21 @@ mod tests {
 
     fn setup_search_dir() -> TempDir {
         let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("hello.rs"), "fn main() {\n    println!(\"Hello\");\n}\n")
-            .unwrap();
+        fs::write(
+            dir.path().join("hello.rs"),
+            "fn main() {\n    println!(\"Hello\");\n}\n",
+        )
+        .unwrap();
         fs::write(
             dir.path().join("world.rs"),
             "fn greet() {\n    println!(\"World\");\n}\n",
         )
         .unwrap();
-        fs::write(dir.path().join("notes.txt"), "This is a note\nWith multiple lines\n").unwrap();
+        fs::write(
+            dir.path().join("notes.txt"),
+            "This is a note\nWith multiple lines\n",
+        )
+        .unwrap();
         fs::create_dir(dir.path().join("sub")).unwrap();
         fs::write(
             dir.path().join("sub").join("deep.rs"),
@@ -168,7 +175,8 @@ mod tests {
     #[test]
     fn test_basic_search() {
         let dir = setup_search_dir();
-        let results = SearchService::search(dir.path(), "println", SearchOptions::default()).unwrap();
+        let results =
+            SearchService::search(dir.path(), "println", SearchOptions::default()).unwrap();
         assert_eq!(results.len(), 2);
     }
 
@@ -227,6 +235,10 @@ mod tests {
         let dir = setup_search_dir();
         let results = SearchService::search(dir.path(), "deep", SearchOptions::default()).unwrap();
         assert!(results.len() >= 1);
-        assert!(results.iter().any(|r| r.path.to_string_lossy().contains("deep.rs")));
+        assert!(
+            results
+                .iter()
+                .any(|r| r.path.to_string_lossy().contains("deep.rs"))
+        );
     }
 }

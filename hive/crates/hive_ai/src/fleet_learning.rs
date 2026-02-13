@@ -130,9 +130,10 @@ impl FleetLearningService {
         let now = Utc::now();
 
         // Look for an existing pattern with matching type + description.
-        let existing_idx = self.patterns.iter().position(|p| {
-            p.pattern_type == pattern_type && p.description == description
-        });
+        let existing_idx = self
+            .patterns
+            .iter()
+            .position(|p| p.pattern_type == pattern_type && p.description == description);
 
         if let Some(idx) = existing_idx {
             let pattern = &mut self.patterns[idx];
@@ -239,26 +240,22 @@ impl FleetLearningService {
     ///
     /// Returns `None` if no model performance data has been recorded.
     pub fn best_model_by_quality(&self) -> Option<&ModelPerformance> {
-        self.model_performance
-            .values()
-            .max_by(|a, b| {
-                a.avg_quality_score
-                    .partial_cmp(&b.avg_quality_score)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            })
+        self.model_performance.values().max_by(|a, b| {
+            a.avg_quality_score
+                .partial_cmp(&b.avg_quality_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
     }
 
     /// Find the model with the lowest average cost.
     ///
     /// Returns `None` if no model performance data has been recorded.
     pub fn best_model_by_cost(&self) -> Option<&ModelPerformance> {
-        self.model_performance
-            .values()
-            .min_by(|a, b| {
-                a.avg_cost
-                    .partial_cmp(&b.avg_cost)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            })
+        self.model_performance.values().min_by(|a, b| {
+            a.avg_cost
+                .partial_cmp(&b.avg_cost)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
     }
 
     // -- Insights --
@@ -385,11 +382,7 @@ mod tests {
     #[test]
     fn test_record_new_pattern() {
         let mut service = FleetLearningService::new();
-        let pattern = service.record_pattern(
-            PatternType::CodeStyle,
-            "prefer snake_case",
-            0.85,
-        );
+        let pattern = service.record_pattern(PatternType::CodeStyle, "prefer snake_case", 0.85);
         assert_eq!(pattern.pattern_type, PatternType::CodeStyle);
         assert_eq!(pattern.description, "prefer snake_case");
         assert_eq!(pattern.frequency, 1);

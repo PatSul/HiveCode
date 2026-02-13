@@ -7,7 +7,9 @@ use reqwest::Client;
 use serde::Serialize;
 use tracing::debug;
 
-use super::{AudioData, AudioFormat, TtsError, TtsProvider, TtsProviderType, TtsRequest, VoiceInfo};
+use super::{
+    AudioData, AudioFormat, TtsError, TtsProvider, TtsProviderType, TtsRequest, VoiceInfo,
+};
 
 const API_BASE: &str = "https://api.telnyx.com/v2/ai/generate/audio";
 
@@ -68,10 +70,7 @@ impl TtsProvider for TelnyxTtsProvider {
     }
 
     async fn synthesize(&self, request: &TtsRequest) -> Result<AudioData, TtsError> {
-        let api_key = self
-            .api_key
-            .as_ref()
-            .ok_or(TtsError::InvalidKey)?;
+        let api_key = self.api_key.as_ref().ok_or(TtsError::InvalidKey)?;
 
         let payload = TelnyxPayload {
             text: &request.text,

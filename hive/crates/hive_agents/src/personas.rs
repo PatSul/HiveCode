@@ -8,11 +8,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Instant;
 
-use hive_ai::types::{
-    ChatMessage, ChatRequest, MessageRole, ModelTier, TokenUsage,
-};
+use hive_ai::types::{ChatMessage, ChatRequest, MessageRole, ModelTier, TokenUsage};
 
-use crate::hivemind::{default_model_for_tier, AgentOutput, AgentRole, AiExecutor};
+use crate::hivemind::{AgentOutput, AgentRole, AiExecutor, default_model_for_tier};
 
 // ---------------------------------------------------------------------------
 // Persona Kind
@@ -90,7 +88,8 @@ fn investigate_persona() -> Persona {
             line numbers. Never guess — trace every claim to source."
             .into(),
         model_tier: ModelTier::Premium,
-        description: "Deep codebase analysis, dependency tracing, architecture understanding".into(),
+        description: "Deep codebase analysis, dependency tracing, architecture understanding"
+            .into(),
         tools: vec![
             "read_file".into(),
             "search_symbol".into(),
@@ -155,10 +154,7 @@ fn critique_persona() -> Persona {
             .into(),
         model_tier: ModelTier::Premium,
         description: "Reviews for quality, patterns, and potential issues".into(),
-        tools: vec![
-            "read_file".into(),
-            "search_symbol".into(),
-        ],
+        tools: vec!["read_file".into(), "search_symbol".into()],
         max_tokens: 4096,
     }
 }
@@ -198,10 +194,7 @@ fn code_review_persona() -> Persona {
             .into(),
         model_tier: ModelTier::Premium,
         description: "Style, security, and performance review".into(),
-        tools: vec![
-            "read_file".into(),
-            "search_symbol".into(),
-        ],
+        tools: vec!["read_file".into(), "search_symbol".into()],
         max_tokens: 4096,
     }
 }
@@ -504,7 +497,11 @@ mod tests {
     fn built_in_personas_have_nonempty_prompts() {
         let registry = PersonaRegistry::new();
         for persona in registry.all() {
-            assert!(!persona.system_prompt.is_empty(), "{} has empty prompt", persona.name);
+            assert!(
+                !persona.system_prompt.is_empty(),
+                "{} has empty prompt",
+                persona.name
+            );
             assert!(!persona.name.is_empty());
             assert!(!persona.description.is_empty());
             assert!(!persona.tools.is_empty());
@@ -593,12 +590,30 @@ mod tests {
 
     #[test]
     fn persona_kind_to_role_mapping() {
-        assert_eq!(persona_kind_to_role(&PersonaKind::Investigate), AgentRole::Architect);
-        assert_eq!(persona_kind_to_role(&PersonaKind::Implement), AgentRole::Coder);
-        assert_eq!(persona_kind_to_role(&PersonaKind::Verify), AgentRole::Tester);
-        assert_eq!(persona_kind_to_role(&PersonaKind::Critique), AgentRole::Reviewer);
-        assert_eq!(persona_kind_to_role(&PersonaKind::Debug), AgentRole::Debugger);
-        assert_eq!(persona_kind_to_role(&PersonaKind::CodeReview), AgentRole::Reviewer);
+        assert_eq!(
+            persona_kind_to_role(&PersonaKind::Investigate),
+            AgentRole::Architect
+        );
+        assert_eq!(
+            persona_kind_to_role(&PersonaKind::Implement),
+            AgentRole::Coder
+        );
+        assert_eq!(
+            persona_kind_to_role(&PersonaKind::Verify),
+            AgentRole::Tester
+        );
+        assert_eq!(
+            persona_kind_to_role(&PersonaKind::Critique),
+            AgentRole::Reviewer
+        );
+        assert_eq!(
+            persona_kind_to_role(&PersonaKind::Debug),
+            AgentRole::Debugger
+        );
+        assert_eq!(
+            persona_kind_to_role(&PersonaKind::CodeReview),
+            AgentRole::Reviewer
+        );
         assert_eq!(
             persona_kind_to_role(&PersonaKind::Custom("x".into())),
             AgentRole::Coder
@@ -611,7 +626,8 @@ mod tests {
         let persona = registry.get(&PersonaKind::Implement).unwrap();
         let executor = MockExecutor::new("Here is the implementation.");
 
-        let output = execute_with_persona(persona, "Write a sorting function", &executor, None).await;
+        let output =
+            execute_with_persona(persona, "Write a sorting function", &executor, None).await;
 
         assert!(output.success);
         assert_eq!(output.content, "Here is the implementation.");
@@ -670,7 +686,9 @@ mod tests {
         let deserialized: PersonaRegistry = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.count(), 7);
 
-        let found = deserialized.get(&PersonaKind::Custom("test".into())).unwrap();
+        let found = deserialized
+            .get(&PersonaKind::Custom("test".into()))
+            .unwrap();
         assert_eq!(found.name, "Test");
     }
 

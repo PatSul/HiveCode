@@ -283,9 +283,8 @@ static CODE_COMPLEXITY_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
 });
 
 /// Regex for extracting code blocks.
-static CODE_BLOCK_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"```[\s\S]*?```").expect("code block regex")
-});
+static CODE_BLOCK_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"```[\s\S]*?```").expect("code block regex"));
 
 /// Default model recommendations per tier.
 static BUDGET_MODELS: &[&str] = &[
@@ -298,12 +297,7 @@ static MID_MODELS: &[&str] = &[
     "gpt-4o-mini",
     "gemini-1.5-flash",
 ];
-static PREMIUM_MODELS: &[&str] = &[
-    "claude-opus-4-20250514",
-    "gpt-4o",
-    "o1",
-    "gemini-1.5-pro",
-];
+static PREMIUM_MODELS: &[&str] = &["claude-opus-4-20250514", "gpt-4o", "o1", "gemini-1.5-pro"];
 
 // ---------------------------------------------------------------------------
 // Helper
@@ -398,9 +392,7 @@ impl ComplexityClassifier {
 
         ComplexityFactors {
             token_count,
-            context_size: context
-                .and_then(|c| c.context_size)
-                .unwrap_or(token_count),
+            context_size: context.and_then(|c| c.context_size).unwrap_or(token_count),
             file_count,
             has_errors: self.detect_errors(user_message),
             reasoning_depth,
@@ -718,7 +710,10 @@ mod tests {
     #[test]
     fn architecture_always_premium() {
         let c = ComplexityClassifier::new();
-        let result = c.classify(&msgs("Design the system architecture for a microservice"), None);
+        let result = c.classify(
+            &msgs("Design the system architecture for a microservice"),
+            None,
+        );
         assert_eq!(result.tier, ModelTier::Premium);
     }
 
@@ -768,10 +763,7 @@ mod tests {
     fn expert_domain_detected() {
         let c = ComplexityClassifier::new();
         let result = c.classify(&msgs("Implement a neural network training loop"), None);
-        assert_eq!(
-            result.factors.domain_specificity,
-            DomainSpecificity::Expert
-        );
+        assert_eq!(result.factors.domain_specificity, DomainSpecificity::Expert);
     }
 
     #[test]

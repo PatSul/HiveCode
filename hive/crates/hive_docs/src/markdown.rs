@@ -82,10 +82,13 @@ mod tests {
 
     #[test]
     fn test_generate_markdown_document_basic() {
-        let doc = generate_markdown_document("My Report", &[
-            ("Introduction", "This is the intro."),
-            ("Results", "Here are the results."),
-        ]);
+        let doc = generate_markdown_document(
+            "My Report",
+            &[
+                ("Introduction", "This is the intro."),
+                ("Results", "Here are the results."),
+            ],
+        );
         assert!(doc.starts_with("# My Report"));
         assert!(doc.contains("## Introduction"));
         assert!(doc.contains("This is the intro."));

@@ -27,11 +27,7 @@ impl PromptEvolver {
     /// Update avg_quality for the active version of a persona using a running average.
     ///
     /// The running average is: `new_avg = (old_avg * sample_count + quality_score) / (sample_count + 1)`
-    pub fn record_quality(
-        &self,
-        persona: &str,
-        quality_score: f64,
-    ) -> Result<(), String> {
+    pub fn record_quality(&self, persona: &str, quality_score: f64) -> Result<(), String> {
         let active = match self.storage.get_active_prompt(persona)? {
             Some(pv) => pv,
             None => return Ok(()), // No active prompt to update
@@ -57,7 +53,8 @@ impl PromptEvolver {
 
         for pv in &active_prompts {
             if pv.sample_count >= 20 && pv.avg_quality < 0.6 {
-                let suggested_prompt = generate_refinement_suggestion(&pv.prompt_text, pv.avg_quality);
+                let suggested_prompt =
+                    generate_refinement_suggestion(&pv.prompt_text, pv.avg_quality);
                 let refinement = PromptRefinement {
                     persona: pv.persona.clone(),
                     current_version: pv.version,
@@ -92,11 +89,7 @@ impl PromptEvolver {
     ///
     /// Creates a new version with the given prompt text, activates it, and
     /// returns the new version number.
-    pub fn apply_refinement(
-        &self,
-        persona: &str,
-        new_prompt: &str,
-    ) -> Result<u32, String> {
+    pub fn apply_refinement(&self, persona: &str, new_prompt: &str) -> Result<u32, String> {
         let max_version = self.storage.max_prompt_version(persona)?;
         let new_version = max_version + 1;
 
@@ -134,11 +127,7 @@ impl PromptEvolver {
     /// Rollback to a specific prompt version.
     ///
     /// Activates the specified version and deactivates all others for the persona.
-    pub fn rollback(
-        &self,
-        persona: &str,
-        to_version: u32,
-    ) -> Result<(), String> {
+    pub fn rollback(&self, persona: &str, to_version: u32) -> Result<(), String> {
         // Verify the version exists
         let versions = self.storage.get_prompt_versions(persona)?;
         let exists = versions.iter().any(|pv| pv.version == to_version);
@@ -153,12 +142,8 @@ impl PromptEvolver {
         self.storage.log_learning(&LearningLogEntry {
             id: 0,
             event_type: "prompt_rollback".into(),
-            description: format!(
-                "Rolled back persona '{persona}' to version {to_version}"
-            ),
-            details: format!(
-                "{{\"persona\":\"{persona}\",\"to_version\":{to_version}}}"
-            ),
+            description: format!("Rolled back persona '{persona}' to version {to_version}"),
+            details: format!("{{\"persona\":\"{persona}\",\"to_version\":{to_version}}}"),
             reversible: true,
             timestamp: chrono::Utc::now().to_rfc3339(),
         })?;
@@ -340,9 +325,11 @@ mod tests {
 
         let suggestions = evolver.suggest_refinements().unwrap();
         assert_eq!(suggestions.len(), 1);
-        assert!(suggestions[0]
-            .suggested_prompt
-            .contains("frequently rejected"));
+        assert!(
+            suggestions[0]
+                .suggested_prompt
+                .contains("frequently rejected")
+        );
     }
 
     #[test]
@@ -356,9 +343,7 @@ mod tests {
         evolver.suggest_refinements().unwrap();
 
         let log = storage.get_learning_log(20).unwrap();
-        assert!(log
-            .iter()
-            .any(|e| e.event_type == "refinement_suggested"));
+        assert!(log.iter().any(|e| e.event_type == "refinement_suggested"));
     }
 
     // ── apply_refinement tests ───────────────────────────────────────
@@ -367,14 +352,10 @@ mod tests {
     fn test_apply_refinement_creates_version() {
         let (evolver, storage) = make_evolver_with_storage();
 
-        let v1 = evolver
-            .apply_refinement("coder", "Version 1")
-            .unwrap();
+        let v1 = evolver.apply_refinement("coder", "Version 1").unwrap();
         assert_eq!(v1, 1);
 
-        let v2 = evolver
-            .apply_refinement("coder", "Version 2")
-            .unwrap();
+        let v2 = evolver.apply_refinement("coder", "Version 2").unwrap();
         assert_eq!(v2, 2);
 
         let active = storage.get_active_prompt("coder").unwrap().unwrap();
@@ -406,9 +387,10 @@ mod tests {
         evolver.apply_refinement("coder", "V1").unwrap();
 
         let log = storage.get_learning_log(10).unwrap();
-        assert!(log
-            .iter()
-            .any(|e| e.event_type == "prompt_refinement_applied"));
+        assert!(
+            log.iter()
+                .any(|e| e.event_type == "prompt_refinement_applied")
+        );
     }
 
     // ── rollback tests ───────────────────────────────────────────────

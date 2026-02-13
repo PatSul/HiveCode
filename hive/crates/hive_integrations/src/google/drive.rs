@@ -4,8 +4,8 @@
 //! `reqwest` for HTTP and bearer-token authentication.
 
 use anyhow::{Context, Result};
-use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
 use reqwest::Client;
+use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderValue};
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
@@ -95,11 +95,7 @@ impl GoogleDriveClient {
     }
 
     /// List files, optionally filtered by a Drive query string.
-    pub async fn list_files(
-        &self,
-        query: Option<&str>,
-        page_size: u32,
-    ) -> Result<DriveFileList> {
+    pub async fn list_files(&self, query: Option<&str>, page_size: u32) -> Result<DriveFileList> {
         let mut url = format!(
             "{}/files?pageSize={}&fields=files(id,name,mimeType,size),nextPageToken",
             self.base_url, page_size
@@ -283,7 +279,10 @@ mod tests {
     #[test]
     fn test_get_file_url_construction() {
         let client = GoogleDriveClient::new("tok");
-        let url = build_url(client.base_url(), "/files/abc123?fields=id,name,mimeType,size");
+        let url = build_url(
+            client.base_url(),
+            "/files/abc123?fields=id,name,mimeType,size",
+        );
         assert!(url.contains("/files/abc123"));
     }
 

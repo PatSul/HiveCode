@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use tracing::debug;
@@ -436,12 +436,7 @@ impl LiveCanvas {
         let state: CanvasState =
             serde_json::from_str(json).context("Failed to deserialize canvas state")?;
 
-        let max_z = state
-            .elements
-            .iter()
-            .map(|e| e.z_index)
-            .max()
-            .unwrap_or(0);
+        let max_z = state.elements.iter().map(|e| e.z_index).max().unwrap_or(0);
 
         Ok(Self {
             id: state.id,
@@ -589,10 +584,8 @@ mod tests {
     fn remove_element_cascades_connections() {
         let mut canvas = make_canvas();
         let id1 = canvas.add_element(ElementType::Rectangle, Point::new(0.0, 0.0), default_size());
-        let id2 =
-            canvas.add_element(ElementType::Circle, Point::new(100.0, 0.0), default_size());
-        let id3 =
-            canvas.add_element(ElementType::Text, Point::new(200.0, 0.0), default_size());
+        let id2 = canvas.add_element(ElementType::Circle, Point::new(100.0, 0.0), default_size());
+        let id3 = canvas.add_element(ElementType::Text, Point::new(200.0, 0.0), default_size());
 
         canvas.add_connection(&id1, &id2, None).unwrap();
         canvas
@@ -686,9 +679,7 @@ mod tests {
         assert!(!canvas.get_element(&id).unwrap().locked);
 
         // After unlock, mutations should work again.
-        canvas
-            .move_element(&id, Point::new(999.0, 999.0))
-            .unwrap();
+        canvas.move_element(&id, Point::new(999.0, 999.0)).unwrap();
         assert_eq!(
             canvas.get_element(&id).unwrap().position,
             Point::new(999.0, 999.0)
@@ -703,8 +694,11 @@ mod tests {
     fn add_connection_between_elements() {
         let mut canvas = make_canvas();
         let id1 = canvas.add_element(ElementType::Rectangle, default_point(), default_size());
-        let id2 =
-            canvas.add_element(ElementType::Circle, Point::new(300.0, 200.0), default_size());
+        let id2 = canvas.add_element(
+            ElementType::Circle,
+            Point::new(300.0, 200.0),
+            default_size(),
+        );
 
         let conn_id = canvas
             .add_connection(&id1, &id2, Some("relates to".into()))
@@ -756,8 +750,7 @@ mod tests {
     fn remove_connection_by_id() {
         let mut canvas = make_canvas();
         let id1 = canvas.add_element(ElementType::Rectangle, default_point(), default_size());
-        let id2 =
-            canvas.add_element(ElementType::Circle, Point::new(300.0, 0.0), default_size());
+        let id2 = canvas.add_element(ElementType::Circle, Point::new(300.0, 0.0), default_size());
 
         let conn_id = canvas.add_connection(&id1, &id2, None).unwrap();
         assert_eq!(canvas.connection_count(), 1);
@@ -782,16 +775,25 @@ mod tests {
         let mut canvas = make_canvas();
 
         // Element at (10, 10) with size (100, 100) -> covers (10..110, 10..110)
-        let id1 =
-            canvas.add_element(ElementType::Rectangle, Point::new(10.0, 10.0), Size::new(100.0, 100.0));
+        let id1 = canvas.add_element(
+            ElementType::Rectangle,
+            Point::new(10.0, 10.0),
+            Size::new(100.0, 100.0),
+        );
 
         // Overlapping element at (50, 50) with size (100, 100) -> covers (50..150, 50..150)
-        let id2 =
-            canvas.add_element(ElementType::Circle, Point::new(50.0, 50.0), Size::new(100.0, 100.0));
+        let id2 = canvas.add_element(
+            ElementType::Circle,
+            Point::new(50.0, 50.0),
+            Size::new(100.0, 100.0),
+        );
 
         // Non-overlapping element at (500, 500)
-        let _id3 =
-            canvas.add_element(ElementType::Text, Point::new(500.0, 500.0), Size::new(20.0, 20.0));
+        let _id3 = canvas.add_element(
+            ElementType::Text,
+            Point::new(500.0, 500.0),
+            Size::new(20.0, 20.0),
+        );
 
         // Point in overlap region of id1 and id2.
         let hits = canvas.elements_at_point(Point::new(75.0, 75.0));
@@ -839,7 +841,11 @@ mod tests {
     #[test]
     fn json_round_trip() {
         let mut canvas = make_canvas();
-        let id1 = canvas.add_element(ElementType::Sticky, Point::new(10.0, 20.0), Size::new(80.0, 60.0));
+        let id1 = canvas.add_element(
+            ElementType::Sticky,
+            Point::new(10.0, 20.0),
+            Size::new(80.0, 60.0),
+        );
         canvas
             .update_element(
                 &id1,
@@ -850,8 +856,14 @@ mod tests {
             )
             .unwrap();
 
-        let id2 = canvas.add_element(ElementType::Arrow, Point::new(200.0, 300.0), Size::new(5.0, 100.0));
-        canvas.add_connection(&id1, &id2, Some("points to".into())).unwrap();
+        let id2 = canvas.add_element(
+            ElementType::Arrow,
+            Point::new(200.0, 300.0),
+            Size::new(5.0, 100.0),
+        );
+        canvas
+            .add_connection(&id1, &id2, Some("points to".into()))
+            .unwrap();
         canvas.lock_element(&id1).unwrap();
 
         let json = canvas.to_json().unwrap();

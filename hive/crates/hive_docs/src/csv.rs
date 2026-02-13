@@ -52,9 +52,7 @@ fn generate_delimited(headers: &[&str], rows: &[Vec<String>], delimiter: u8) -> 
             .context("Failed to write data record")?;
     }
 
-    let bytes = writer
-        .into_inner()
-        .context("Failed to flush CSV writer")?;
+    let bytes = writer.into_inner().context("Failed to flush CSV writer")?;
 
     String::from_utf8(bytes).context("CSV output contained invalid UTF-8")
 }

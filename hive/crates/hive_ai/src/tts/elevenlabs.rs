@@ -8,7 +8,9 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
-use super::{AudioData, AudioFormat, TtsError, TtsProvider, TtsProviderType, TtsRequest, VoiceInfo};
+use super::{
+    AudioData, AudioFormat, TtsError, TtsProvider, TtsProviderType, TtsRequest, VoiceInfo,
+};
 
 const API_BASE: &str = "https://api.elevenlabs.io/v1";
 
@@ -31,9 +33,7 @@ impl ElevenLabsProvider {
     }
 
     fn auth_header(&self) -> Result<String, TtsError> {
-        self.api_key
-            .clone()
-            .ok_or(TtsError::InvalidKey)
+        self.api_key.clone().ok_or(TtsError::InvalidKey)
     }
 }
 
@@ -155,13 +155,11 @@ impl TtsProvider for ElevenLabsProvider {
         true
     }
 
-    async fn clone_voice(
-        &self,
-        name: &str,
-        samples: &[Vec<u8>],
-    ) -> Result<VoiceInfo, TtsError> {
+    async fn clone_voice(&self, name: &str, samples: &[Vec<u8>]) -> Result<VoiceInfo, TtsError> {
         if samples.is_empty() {
-            return Err(TtsError::Other("At least one audio sample is required".into()));
+            return Err(TtsError::Other(
+                "At least one audio sample is required".into(),
+            ));
         }
 
         let api_key = self.auth_header()?;
@@ -177,7 +175,11 @@ impl TtsProvider for ElevenLabsProvider {
             form = form.part("files", part);
         }
 
-        debug!(name, sample_count = samples.len(), "ElevenLabs voice cloning");
+        debug!(
+            name,
+            sample_count = samples.len(),
+            "ElevenLabs voice cloning"
+        );
 
         let resp = self
             .client

@@ -252,7 +252,8 @@ mod tests {
 
     #[test]
     fn new_with_nonexistent_directory() {
-        let result = CommandExecutor::new(std::env::temp_dir().join("nonexistent_hive_test_dir_12345"));
+        let result =
+            CommandExecutor::new(std::env::temp_dir().join("nonexistent_hive_test_dir_12345"));
         assert!(result.is_err());
         let msg = result.unwrap_err().to_string();
         assert!(msg.contains("does not exist"), "got: {msg}");

@@ -124,11 +124,7 @@ impl WorktreeManager {
     ///
     /// The branch is named `swarm/{run_id}/{team_id}` and the worktree is
     /// placed at `.hive-worktrees/{team_id}/`.
-    pub fn create_worktree(
-        &self,
-        run_id: &str,
-        team_id: &str,
-    ) -> Result<TeamWorktree, String> {
+    pub fn create_worktree(&self, run_id: &str, team_id: &str) -> Result<TeamWorktree, String> {
         let safe_run_id = Self::sanitize_branch_component(run_id);
         let safe_team_id = Self::sanitize_branch_component(team_id);
 
@@ -187,10 +183,7 @@ impl WorktreeManager {
         repo.worktree(
             &safe_team_id,
             &validated_path,
-            Some(
-                git2::WorktreeAddOptions::new()
-                    .reference(Some(&reference)),
-            ),
+            Some(git2::WorktreeAddOptions::new().reference(Some(&reference))),
         )
         .map_err(|e| format!("Failed to add worktree: {e}"))?;
 
@@ -358,12 +351,11 @@ impl WorktreeManager {
                 .find_tree(tree_oid)
                 .map_err(|e| format!("Failed to find merged tree: {e}"))?;
 
-            let sig = repo.signature().unwrap_or_else(|_| {
-                git2::Signature::now("Hive Swarm", "hive@localhost").unwrap()
-            });
+            let sig = repo
+                .signature()
+                .unwrap_or_else(|_| git2::Signature::now("Hive Swarm", "hive@localhost").unwrap());
 
-            let message =
-                format!("hive: merge {team_branch} into {target_branch}");
+            let message = format!("hive: merge {team_branch} into {target_branch}");
 
             let merge_oid = repo
                 .commit(
@@ -393,11 +385,7 @@ impl WorktreeManager {
     ///
     /// This removes the worktree directory from disk, prunes stale worktree
     /// references, and optionally deletes the associated branch.
-    pub fn cleanup_worktree(
-        &self,
-        team_id: &str,
-        delete_branch: bool,
-    ) -> Result<(), String> {
+    pub fn cleanup_worktree(&self, team_id: &str, delete_branch: bool) -> Result<(), String> {
         let safe_team_id = Self::sanitize_branch_component(team_id);
         if safe_team_id.is_empty() {
             return Err("Invalid team_id".into());
@@ -707,7 +695,11 @@ mod tests {
 
         // Clean it up.
         let result = manager.cleanup_worktree("team-beta", true);
-        assert!(result.is_ok(), "cleanup_worktree failed: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "cleanup_worktree failed: {:?}",
+            result.err()
+        );
 
         // Directory should be gone.
         assert!(
@@ -758,28 +750,26 @@ mod tests {
         // Open the worktree repo and commit.
         let wt_repo = Repository::open(&wt.worktree_path).unwrap();
         let mut index = wt_repo.index().unwrap();
-        index
-            .add_path(Path::new("team_file.txt"))
-            .unwrap();
+        index.add_path(Path::new("team_file.txt")).unwrap();
         index.write().unwrap();
         let tree_id = index.write_tree().unwrap();
         let tree = wt_repo.find_tree(tree_id).unwrap();
         let sig = git2::Signature::now("Test", "test@test.com").unwrap();
-        let parent = wt_repo
-            .head()
-            .unwrap()
-            .peel_to_commit()
-            .unwrap();
+        let parent = wt_repo.head().unwrap().peel_to_commit().unwrap();
         wt_repo
-            .commit(Some("HEAD"), &sig, &sig, "Team delta work", &tree, &[&parent])
+            .commit(
+                Some("HEAD"),
+                &sig,
+                &sig,
+                "Team delta work",
+                &tree,
+                &[&parent],
+            )
             .unwrap();
 
         // Get the current HEAD branch name from the main repo.
         let head_ref = repo.head().unwrap();
-        let target_branch = head_ref
-            .shorthand()
-            .unwrap_or("master")
-            .to_string();
+        let target_branch = head_ref.shorthand().unwrap_or("master").to_string();
 
         // Merge team branch into the main branch (should fast-forward since
         // the main branch hasn't moved).

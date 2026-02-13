@@ -329,7 +329,10 @@ mod tests {
     #[test]
     fn parse_every_five_minutes() {
         let s = CronSchedule::parse("*/5 * * * *").unwrap();
-        assert_eq!(s.minutes, vec![0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]);
+        assert_eq!(
+            s.minutes,
+            vec![0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]
+        );
     }
 
     #[test]
@@ -569,7 +572,9 @@ mod tests {
     #[test]
     fn job_serde_roundtrip() {
         let mut scheduler = Scheduler::new();
-        let id = scheduler.add_job("serde-test", "*/15 9-17 * * 1-5").unwrap();
+        let id = scheduler
+            .add_job("serde-test", "*/15 9-17 * * 1-5")
+            .unwrap();
 
         let job = scheduler.get_job(&id).unwrap();
         let json = serde_json::to_string(job).unwrap();

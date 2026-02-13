@@ -45,7 +45,10 @@ impl SecureStorage {
     fn from_key_material(key_material: [u8; 32]) -> Self {
         let key = Key::<Aes256Gcm>::from_slice(&key_material);
         let cipher = Aes256Gcm::new(key);
-        Self { cipher, key_material }
+        Self {
+            cipher,
+            key_material,
+        }
     }
 
     /// Encrypt a plaintext string, returning hex-encoded ciphertext.
@@ -286,7 +289,10 @@ mod tests {
         let salt: [u8; SALT_LEN] = [42u8; SALT_LEN];
         let key_a = SecureStorage::derive_key_raw(b"password-a", &salt).unwrap();
         let key_b = SecureStorage::derive_key_raw(b"password-b", &salt).unwrap();
-        assert_ne!(key_a, key_b, "Different passwords must produce different keys");
+        assert_ne!(
+            key_a, key_b,
+            "Different passwords must produce different keys"
+        );
     }
 
     #[test]
@@ -326,7 +332,10 @@ mod tests {
         // Second use loads the same salt; decryption must succeed.
         let storage2 = SecureStorage::with_salt_path(&salt_path).unwrap();
         let salt_bytes_2 = fs::read(&salt_path).unwrap();
-        assert_eq!(salt_bytes_1, salt_bytes_2, "Salt must be stable across loads");
+        assert_eq!(
+            salt_bytes_1, salt_bytes_2,
+            "Salt must be stable across loads"
+        );
 
         let decrypted = storage2.decrypt(&encrypted).unwrap();
         assert_eq!(decrypted, "persisted secret");
@@ -369,12 +378,7 @@ mod tests {
         let salt_path = tmp.path().join(SALT_FILENAME);
         let storage = SecureStorage::with_salt_path(&salt_path).unwrap();
 
-        let secrets = [
-            "sk-ant-api03-very-secret",
-            "",
-            "short",
-            &"A".repeat(5_000),
-        ];
+        let secrets = ["sk-ant-api03-very-secret", "", "short", &"A".repeat(5_000)];
         for secret in &secrets {
             let enc = storage.encrypt(secret).unwrap();
             let dec = storage.decrypt(&enc).unwrap();
@@ -392,6 +396,9 @@ mod tests {
         let encrypted = storage_a.encrypt("only for A").unwrap();
         // storage_b has a different random salt, so decryption must fail.
         let result = storage_b.decrypt(&encrypted);
-        assert!(result.is_err(), "Different salts must prevent cross-decryption");
+        assert!(
+            result.is_err(),
+            "Different salts must prevent cross-decryption"
+        );
     }
 }

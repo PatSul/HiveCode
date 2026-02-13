@@ -178,12 +178,7 @@ impl PhilipsHueClient {
     /// Set the color of a light using hue and saturation values.
     ///
     /// `hue` ranges from 0 to 65535, `saturation` from 0 to 254.
-    pub async fn set_light_color(
-        &self,
-        light_id: &str,
-        hue: u16,
-        saturation: u8,
-    ) -> Result<()> {
+    pub async fn set_light_color(&self, light_id: &str, hue: u16, saturation: u8) -> Result<()> {
         let url = format!("{}/lights/{}/state", self.base_url, light_id);
         let payload = serde_json::json!({ "hue": hue, "sat": saturation });
 

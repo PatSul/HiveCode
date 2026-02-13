@@ -24,8 +24,8 @@ impl FileWatcher {
     /// deletions, and renames. The watcher stays active as long as this struct
     /// is alive.
     pub fn new(path: &Path, callback: impl Fn(WatchEvent) + Send + 'static) -> Result<Self> {
-        let mut watcher = notify::recommended_watcher(move |res: Result<Event, notify::Error>| {
-            match res {
+        let mut watcher =
+            notify::recommended_watcher(move |res: Result<Event, notify::Error>| match res {
                 Ok(event) => {
                     for watch_event in translate_event(&event) {
                         callback(watch_event);
@@ -34,9 +34,8 @@ impl FileWatcher {
                 Err(e) => {
                     warn!("File watcher error: {e}");
                 }
-            }
-        })
-        .context("Failed to create file watcher")?;
+            })
+            .context("Failed to create file watcher")?;
 
         watcher
             .watch(path, RecursiveMode::Recursive)
@@ -149,10 +148,7 @@ mod tests {
             kind: EventKind::Modify(notify::event::ModifyKind::Name(
                 notify::event::RenameMode::Both,
             )),
-            paths: vec![
-                old_path.clone(),
-                new_path.clone(),
-            ],
+            paths: vec![old_path.clone(), new_path.clone()],
             attrs: Default::default(),
         };
         let translated = translate_event(&event);

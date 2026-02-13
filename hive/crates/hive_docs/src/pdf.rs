@@ -194,9 +194,7 @@ impl PdfBuilder {
 
         // Obj 6: Font (Helvetica)
         offsets.push(pdf.len());
-        pdf.push_str(
-            "6 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n",
-        );
+        pdf.push_str("6 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n");
 
         // Obj 7: Info (title)
         offsets.push(pdf.len());
@@ -283,9 +281,7 @@ mod tests {
 
     #[test]
     fn test_generate_pdf_special_characters() {
-        let sections = vec![
-            ("Symbols & Signs", "Price: $100 @ 10% off (sale)"),
-        ];
+        let sections = vec![("Symbols & Signs", "Price: $100 @ 10% off (sale)")];
         let bytes = generate_pdf_document("Special Chars", &sections).unwrap();
         assert!(bytes.starts_with(b"%PDF"));
         // Parentheses should be escaped

@@ -153,10 +153,7 @@ impl GitService {
             .ok()
             .and_then(|h| h.peel(git2::ObjectType::Commit).ok());
 
-        let path_strings: Vec<&str> = paths
-            .iter()
-            .map(|p| p.to_str().unwrap_or(""))
-            .collect();
+        let path_strings: Vec<&str> = paths.iter().map(|p| p.to_str().unwrap_or("")).collect();
 
         self.repo
             .reset_default(head_obj.as_ref(), path_strings)
@@ -189,7 +186,14 @@ impl GitService {
 
         let oid = self
             .repo
-            .commit(Some("HEAD"), &signature, &signature, message, &tree, &parents)
+            .commit(
+                Some("HEAD"),
+                &signature,
+                &signature,
+                message,
+                &tree,
+                &parents,
+            )
             .context("Failed to create commit")?;
 
         let hash = oid.to_string();
@@ -214,7 +218,9 @@ impl GitService {
     /// Get the commit log, most recent first.
     pub fn log(&self, max_count: usize) -> Result<Vec<GitLogEntry>> {
         let mut revwalk = self.repo.revwalk().context("Failed to create revwalk")?;
-        revwalk.push_head().context("Failed to push HEAD to revwalk")?;
+        revwalk
+            .push_head()
+            .context("Failed to push HEAD to revwalk")?;
         revwalk
             .set_sorting(git2::Sort::TIME)
             .context("Failed to set sort order")?;
@@ -336,6 +342,10 @@ mod tests {
 
         fs::write(dir.path().join("file.txt"), "modified").unwrap();
         let statuses = git.status().unwrap();
-        assert!(statuses.iter().any(|s| s.status == FileStatusType::Modified));
+        assert!(
+            statuses
+                .iter()
+                .any(|s| s.status == FileStatusType::Modified)
+        );
     }
 }

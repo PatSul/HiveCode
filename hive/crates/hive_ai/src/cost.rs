@@ -3,7 +3,7 @@
 //! Provides token counting (heuristic), cost calculation from model pricing,
 //! budget tracking with daily/monthly limits, and cost history.
 
-use chrono::{Datelike, DateTime, NaiveDate, Utc};
+use chrono::{DateTime, Datelike, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

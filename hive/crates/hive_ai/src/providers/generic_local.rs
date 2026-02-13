@@ -139,10 +139,7 @@ impl GenericLocalProvider {
     fn build_body(&self, request: &ChatRequest, stream: bool) -> GenericLocalChatRequest {
         GenericLocalChatRequest {
             model: request.model.clone(),
-            messages: Self::convert_messages(
-                &request.messages,
-                request.system_prompt.as_deref(),
-            ),
+            messages: Self::convert_messages(&request.messages, request.system_prompt.as_deref()),
             stream,
             max_tokens: Some(request.max_tokens),
             temperature: request.temperature,
@@ -286,9 +283,10 @@ impl AiProvider for GenericLocalProvider {
             .await
             .map_err(|e| ProviderError::Other(format!("JSON parse error: {e}")))?;
 
-        let choice = data.choices.first().ok_or_else(|| {
-            ProviderError::Other("No choices in generic local response".into())
-        })?;
+        let choice = data
+            .choices
+            .first()
+            .ok_or_else(|| ProviderError::Other("No choices in generic local response".into()))?;
 
         let content = choice.message.content.clone().unwrap_or_default();
 
@@ -389,10 +387,8 @@ mod tests {
 
     #[test]
     fn with_default_model_empty_string_is_none() {
-        let provider = GenericLocalProvider::with_default_model(
-            "http://localhost:8080".into(),
-            String::new(),
-        );
+        let provider =
+            GenericLocalProvider::with_default_model("http://localhost:8080".into(), String::new());
         assert!(provider.default_model.is_none());
     }
 
@@ -519,7 +515,11 @@ mod tests {
             chunks.push(chunk);
         }
 
-        assert!(chunks.len() >= 2, "expected at least 2 chunks, got {}", chunks.len());
+        assert!(
+            chunks.len() >= 2,
+            "expected at least 2 chunks, got {}",
+            chunks.len()
+        );
         assert_eq!(chunks[0].content, "Hi");
         assert!(!chunks[0].done);
         assert_eq!(chunks[1].content, " there");

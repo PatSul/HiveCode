@@ -149,8 +149,9 @@ impl ConversationStore {
     pub fn new() -> Result<Self> {
         let dir = HiveConfig::conversations_dir()?;
         if !dir.exists() {
-            std::fs::create_dir_all(&dir)
-                .with_context(|| format!("Failed to create conversations dir: {}", dir.display()))?;
+            std::fs::create_dir_all(&dir).with_context(|| {
+                format!("Failed to create conversations dir: {}", dir.display())
+            })?;
         }
         Ok(Self { dir })
     }
@@ -176,8 +177,7 @@ impl ConversationStore {
         }
         let resolved = self.dir.join(format!("{safe_id}.json"));
         // Double-check it is still inside the conversations dir
-        let canonical_dir = std::fs::canonicalize(&self.dir)
-            .unwrap_or_else(|_| self.dir.clone());
+        let canonical_dir = std::fs::canonicalize(&self.dir).unwrap_or_else(|_| self.dir.clone());
         let canonical_file = if resolved.exists() {
             std::fs::canonicalize(&resolved).unwrap_or_else(|_| resolved.clone())
         } else {
@@ -389,13 +389,18 @@ mod tests {
     /// Helper: create a store in a temp directory.
     fn temp_store() -> (ConversationStore, tempfile::TempDir) {
         let tmp = tempfile::tempdir().expect("Failed to create tempdir");
-        let store = ConversationStore::new_at(tmp.path().to_path_buf())
-            .expect("Failed to create store");
+        let store =
+            ConversationStore::new_at(tmp.path().to_path_buf()).expect("Failed to create store");
         (store, tmp)
     }
 
     /// Helper: build a minimal conversation.
-    fn make_conversation(id: &str, title: &str, user_msg: &str, updated_at: DateTime<Utc>) -> Conversation {
+    fn make_conversation(
+        id: &str,
+        title: &str,
+        user_msg: &str,
+        updated_at: DateTime<Utc>,
+    ) -> Conversation {
         Conversation {
             id: id.to_string(),
             title: title.to_string(),
@@ -458,12 +463,7 @@ mod tests {
             "Middle message",
             Utc::now() - chrono::Duration::hours(1),
         );
-        let newest = make_conversation(
-            "conv-new",
-            "Newest",
-            "New message",
-            Utc::now(),
-        );
+        let newest = make_conversation("conv-new", "Newest", "New message", Utc::now());
 
         // Save in random order
         store.save(&middle).unwrap();

@@ -188,9 +188,18 @@ mod tests {
         });
         hive_loop.start();
 
-        assert_eq!(hive_loop.record_iteration("step 1", 0.01), LoopStatus::Running);
-        assert_eq!(hive_loop.record_iteration("step 2", 0.01), LoopStatus::Running);
-        assert_eq!(hive_loop.record_iteration("step 3", 0.01), LoopStatus::IterationLimitReached);
+        assert_eq!(
+            hive_loop.record_iteration("step 1", 0.01),
+            LoopStatus::Running
+        );
+        assert_eq!(
+            hive_loop.record_iteration("step 2", 0.01),
+            LoopStatus::Running
+        );
+        assert_eq!(
+            hive_loop.record_iteration("step 3", 0.01),
+            LoopStatus::IterationLimitReached
+        );
         assert!(!hive_loop.should_continue());
     }
 

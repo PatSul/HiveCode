@@ -20,12 +20,11 @@ use tracing::debug;
 
 /// Common English stopwords filtered during keyword extraction.
 const STOPWORDS: &[&str] = &[
-    "a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "from",
-    "had", "has", "have", "he", "her", "his", "how", "i", "if", "in", "into",
-    "is", "it", "its", "let", "my", "no", "not", "of", "on", "or", "our",
-    "she", "so", "than", "that", "the", "their", "them", "then", "there",
-    "these", "they", "this", "to", "us", "was", "we", "were", "what", "when",
-    "where", "which", "who", "will", "with", "you", "your",
+    "a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "from", "had", "has", "have",
+    "he", "her", "his", "how", "i", "if", "in", "into", "is", "it", "its", "let", "my", "no",
+    "not", "of", "on", "or", "our", "she", "so", "than", "that", "the", "their", "them", "then",
+    "there", "these", "they", "this", "to", "us", "was", "we", "were", "what", "when", "where",
+    "which", "who", "will", "with", "you", "your",
 ];
 
 // ---------------------------------------------------------------------------
@@ -394,9 +393,7 @@ impl ContextEngine {
         // Boost: filename/path contains a query term (+0.5).
         let path_lower = source.path.to_lowercase();
         let query_lower = query_raw.to_lowercase();
-        let has_filename_match = query_terms
-            .iter()
-            .any(|term| path_lower.contains(term));
+        let has_filename_match = query_terms.iter().any(|term| path_lower.contains(term));
         if has_filename_match {
             score += 0.5;
             reasons.push("filename match (+0.5)".to_string());
@@ -405,9 +402,7 @@ impl ContextEngine {
         // Boost: symbol name match (+0.3) — only for Symbol sources.
         if source.source_type == SourceType::Symbol {
             let name_lower = source.path.to_lowercase();
-            let has_symbol_match = query_terms
-                .iter()
-                .any(|term| name_lower.contains(term));
+            let has_symbol_match = query_terms.iter().any(|term| name_lower.contains(term));
             if has_symbol_match {
                 score += 0.3;
                 reasons.push("symbol name match (+0.3)".to_string());
@@ -724,8 +719,14 @@ mod tests {
     fn test_multiple_sources_ranking() {
         let mut engine = ContextEngine::new();
         engine.add_file("config.toml", "database_url = localhost");
-        engine.add_file("database.rs", "fn connect_database(url: &str) { /* connect */ }");
-        engine.add_file("utils.rs", "fn format_string(s: &str) -> String { s.to_string() }");
+        engine.add_file(
+            "database.rs",
+            "fn connect_database(url: &str) { /* connect */ }",
+        );
+        engine.add_file(
+            "utils.rs",
+            "fn format_string(s: &str) -> String { s.to_string() }",
+        );
 
         let result = engine.curate("database connect", &default_budget());
 
@@ -739,8 +740,16 @@ mod tests {
         let mut engine = ContextEngine::new();
         engine.add_source(make_source("a.rs", "fn a() {}", SourceType::File));
         engine.add_source(make_source("b.rs", "fn b() {}", SourceType::File));
-        engine.add_source(make_source("c_test.rs", "#[test] fn t() {}", SourceType::Test));
-        engine.add_source(make_source("readme.md", "# Title", SourceType::Documentation));
+        engine.add_source(make_source(
+            "c_test.rs",
+            "#[test] fn t() {}",
+            SourceType::Test,
+        ));
+        engine.add_source(make_source(
+            "readme.md",
+            "# Title",
+            SourceType::Documentation,
+        ));
 
         let stats = engine.summary_stats();
         assert_eq!(stats.total_sources, 4);

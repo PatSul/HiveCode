@@ -6,8 +6,8 @@
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use chrono::{DateTime, TimeZone, Utc};
-use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 use reqwest::Client;
+use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, HeaderMap, HeaderValue};
 use serde::Deserialize;
 use tracing::debug;
 
@@ -116,7 +116,10 @@ impl SlackProvider {
         let auth_value = HeaderValue::from_str(&format!("Bearer {bot_token}"))
             .context("invalid characters in Slack bot token")?;
         headers.insert(AUTHORIZATION, auth_value);
-        headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json; charset=utf-8"));
+        headers.insert(
+            CONTENT_TYPE,
+            HeaderValue::from_static("application/json; charset=utf-8"),
+        );
 
         let client = Client::builder()
             .default_headers(headers)
@@ -265,9 +268,9 @@ impl MessagingProvider for SlackProvider {
             );
         }
 
-        let data = envelope.data.unwrap_or(ConversationsListData {
-            channels: vec![],
-        });
+        let data = envelope
+            .data
+            .unwrap_or(ConversationsListData { channels: vec![] });
 
         Ok(data
             .channels
@@ -313,9 +316,9 @@ impl MessagingProvider for SlackProvider {
             );
         }
 
-        let data = envelope.data.unwrap_or(ConversationsHistoryData {
-            messages: vec![],
-        });
+        let data = envelope
+            .data
+            .unwrap_or(ConversationsHistoryData { messages: vec![] });
 
         Ok(data
             .messages
@@ -397,11 +400,10 @@ impl MessagingProvider for SlackProvider {
             );
         }
 
-        let data = envelope.data.unwrap_or(SearchMessagesData { messages: None });
-        let matches = data
-            .messages
-            .map(|m| m.matches)
-            .unwrap_or_default();
+        let data = envelope
+            .data
+            .unwrap_or(SearchMessagesData { messages: None });
+        let matches = data.messages.map(|m| m.matches).unwrap_or_default();
 
         Ok(matches
             .iter()
@@ -445,8 +447,7 @@ mod tests {
 
     #[test]
     fn test_slack_provider_custom_base_url_strips_slash() {
-        let provider =
-            SlackProvider::with_base_url("xoxb-tok", "https://slack.test/api/").unwrap();
+        let provider = SlackProvider::with_base_url("xoxb-tok", "https://slack.test/api/").unwrap();
         assert_eq!(provider.base_url(), "https://slack.test/api");
     }
 

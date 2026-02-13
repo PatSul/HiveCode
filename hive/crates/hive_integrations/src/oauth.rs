@@ -70,8 +70,7 @@ fn base64url_encode(data: &[u8]) -> String {
     use std::fmt::Write;
     let mut buf = String::with_capacity(data.len() * 4 / 3 + 4);
     // Standard base64 table
-    const TABLE: &[u8; 64] =
-        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
     let mut i = 0;
     while i + 2 < data.len() {
@@ -182,7 +181,10 @@ impl OAuthClient {
             anyhow::bail!("token exchange failed ({}): {}", status, body);
         }
 
-        let raw: TokenResponse = resp.json().await.context("failed to parse token response")?;
+        let raw: TokenResponse = resp
+            .json()
+            .await
+            .context("failed to parse token response")?;
         Ok(to_oauth_token(raw))
     }
 
@@ -217,7 +219,10 @@ impl OAuthClient {
             anyhow::bail!("token refresh failed ({}): {}", status, body);
         }
 
-        let raw: TokenResponse = resp.json().await.context("failed to parse refresh response")?;
+        let raw: TokenResponse = resp
+            .json()
+            .await
+            .context("failed to parse refresh response")?;
         Ok(to_oauth_token(raw))
     }
 

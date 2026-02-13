@@ -1,23 +1,23 @@
-pub mod types;
-pub mod storage;
 pub mod outcome_tracker;
-pub mod routing_learner;
+pub mod pattern_library;
 pub mod preference_model;
 pub mod prompt_evolver;
-pub mod pattern_library;
+pub mod routing_learner;
 pub mod self_evaluator;
+pub mod storage;
+pub mod types;
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tracing::info;
 
-use storage::LearningStorage;
 use outcome_tracker::OutcomeTracker;
-use routing_learner::RoutingLearner;
+use pattern_library::PatternLibrary;
 use preference_model::PreferenceModel;
 use prompt_evolver::PromptEvolver;
-use pattern_library::PatternLibrary;
+use routing_learner::RoutingLearner;
 use self_evaluator::SelfEvaluator;
+use storage::LearningStorage;
 pub use types::*;
 
 /// The central coordination point for all learning subsystems.
@@ -90,7 +90,9 @@ impl LearningService {
 
         // 3. Update prompt performance
         if let Some(ref persona) = record.persona {
-            let _ = self.prompt_evolver.record_quality(persona, record.quality_score);
+            let _ = self
+                .prompt_evolver
+                .record_quality(persona, record.quality_score);
         }
 
         // 4. Increment interaction count
@@ -166,7 +168,9 @@ impl LearnerTierAdjuster {
 
 impl hive_ai::routing::TierAdjuster for LearnerTierAdjuster {
     fn adjust_tier(&self, task_type: &str, classified_tier: &str) -> Option<String> {
-        self.learning.routing_learner.adjust_tier(task_type, classified_tier)
+        self.learning
+            .routing_learner
+            .adjust_tier(task_type, classified_tier)
     }
 }
 
@@ -174,11 +178,7 @@ impl hive_ai::routing::TierAdjuster for LearnerTierAdjuster {
 mod tests {
     use super::*;
 
-    fn make_outcome_record(
-        model: &str,
-        quality: f64,
-        outcome: Outcome,
-    ) -> OutcomeRecord {
+    fn make_outcome_record(model: &str, quality: f64, outcome: Outcome) -> OutcomeRecord {
         OutcomeRecord {
             conversation_id: "conv-1".into(),
             message_id: format!("msg-{}", uuid::Uuid::new_v4()),
@@ -220,10 +220,7 @@ mod tests {
         service.on_outcome(&record).unwrap();
 
         // Verify outcome was recorded via model quality
-        let quality = service
-            .outcome_tracker
-            .model_quality("gpt-4o", 30)
-            .unwrap();
+        let quality = service.outcome_tracker.model_quality("gpt-4o", 30).unwrap();
         assert!((quality - 0.85).abs() < f64::EPSILON);
     }
 
@@ -288,18 +285,10 @@ mod tests {
             .preference_model
             .observe("tone", "concise", 0.9)
             .unwrap();
-        assert!(service
-            .preference_model
-            .get("tone", 0.0)
-            .unwrap()
-            .is_some());
+        assert!(service.preference_model.get("tone", 0.0).unwrap().is_some());
 
         service.reject_preference("tone").unwrap();
-        assert!(service
-            .preference_model
-            .get("tone", 0.0)
-            .unwrap()
-            .is_none());
+        assert!(service.preference_model.get("tone", 0.0).unwrap().is_none());
     }
 
     #[test]
@@ -346,16 +335,14 @@ mod tests {
 
         service.reset_all().unwrap();
 
-        assert!(service
-            .preference_model
-            .get("tone", 0.0)
-            .unwrap()
-            .is_none());
-        assert!(service
-            .preference_model
-            .get("theme", 0.0)
-            .unwrap()
-            .is_none());
+        assert!(service.preference_model.get("tone", 0.0).unwrap().is_none());
+        assert!(
+            service
+                .preference_model
+                .get("theme", 0.0)
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[test]

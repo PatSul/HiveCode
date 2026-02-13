@@ -4,8 +4,8 @@
 //! using `reqwest` for HTTP and bearer-token authentication.
 
 use anyhow::{Context, Result};
-use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
 use reqwest::Client;
+use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderValue};
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
@@ -201,15 +201,8 @@ impl GmailClient {
     /// List email messages, optionally filtered by a Gmail search query.
     ///
     /// Returns minimal entries (id + threadId). Call `get_message` for full details.
-    pub async fn list_messages(
-        &self,
-        query: Option<&str>,
-        max_results: u32,
-    ) -> Result<EmailList> {
-        let mut url = format!(
-            "{}/messages?maxResults={}",
-            self.base_url, max_results
-        );
+    pub async fn list_messages(&self, query: Option<&str>, max_results: u32) -> Result<EmailList> {
+        let mut url = format!("{}/messages?maxResults={}", self.base_url, max_results);
 
         if let Some(q) = query {
             url.push_str(&format!("&q={}", urlencod(q)));
@@ -230,15 +223,14 @@ impl GmailClient {
             anyhow::bail!("Gmail API error ({}): {}", status, body);
         }
 
-        resp.json().await.context("failed to parse Gmail message list")
+        resp.json()
+            .await
+            .context("failed to parse Gmail message list")
     }
 
     /// Get a full email message by ID, including parsed headers and body.
     pub async fn get_message(&self, message_id: &str) -> Result<EmailMessage> {
-        let url = format!(
-            "{}/messages/{}?format=full",
-            self.base_url, message_id
-        );
+        let url = format!("{}/messages/{}?format=full", self.base_url, message_id);
         debug!(url = %url, "getting Gmail message");
 
         let resp = self
@@ -265,12 +257,7 @@ impl GmailClient {
     /// Send an email.
     ///
     /// Constructs an RFC 2822 message and sends it via the Gmail API.
-    pub async fn send_email(
-        &self,
-        to: &str,
-        subject: &str,
-        body: &str,
-    ) -> Result<EmailListEntry> {
+    pub async fn send_email(&self, to: &str, subject: &str, body: &str) -> Result<EmailListEntry> {
         let url = format!("{}/messages/send", self.base_url);
 
         let raw_message = build_rfc2822(to, subject, body);
@@ -294,16 +281,13 @@ impl GmailClient {
             anyhow::bail!("Gmail API error ({}): {}", status, body);
         }
 
-        resp.json().await.context("failed to parse Gmail send response")
+        resp.json()
+            .await
+            .context("failed to parse Gmail send response")
     }
 
     /// Create a draft email.
-    pub async fn create_draft(
-        &self,
-        to: &str,
-        subject: &str,
-        body: &str,
-    ) -> Result<GmailDraft> {
+    pub async fn create_draft(&self, to: &str, subject: &str, body: &str) -> Result<GmailDraft> {
         let url = format!("{}/drafts", self.base_url);
 
         let raw_message = build_rfc2822(to, subject, body);
@@ -329,17 +313,15 @@ impl GmailClient {
             anyhow::bail!("Gmail API error ({}): {}", status, body);
         }
 
-        resp.json().await.context("failed to parse Gmail draft response")
+        resp.json()
+            .await
+            .context("failed to parse Gmail draft response")
     }
 
     /// Search emails using a Gmail search query.
     ///
     /// This is a convenience wrapper around `list_messages` that returns full message details.
-    pub async fn search_emails(
-        &self,
-        query: &str,
-        max_results: u32,
-    ) -> Result<Vec<EmailMessage>> {
+    pub async fn search_emails(&self, query: &str, max_results: u32) -> Result<Vec<EmailMessage>> {
         let list = self.list_messages(Some(query), max_results).await?;
 
         let mut messages = Vec::with_capacity(list.messages.len());
@@ -460,7 +442,13 @@ fn parse_raw_message(raw: RawGmailMessage) -> EmailMessage {
 
         (from, to, subject, date, body)
     } else {
-        (String::new(), String::new(), String::new(), String::new(), String::new())
+        (
+            String::new(),
+            String::new(),
+            String::new(),
+            String::new(),
+            String::new(),
+        )
     };
 
     EmailMessage {
@@ -509,8 +497,7 @@ fn build_rfc2822(to: &str, subject: &str, body: &str) -> String {
 /// BASE64-URL encode without padding (for Gmail API raw messages).
 fn base64url_encode(data: &[u8]) -> String {
     use std::fmt::Write;
-    const TABLE: &[u8; 64] =
-        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
     let mut buf = String::with_capacity(data.len() * 4 / 3 + 4);
 
@@ -552,8 +539,7 @@ fn base64url_decode(input: &str) -> String {
     };
 
     // Build reverse lookup table
-    const TABLE: &[u8; 64] =
-        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut lookup = [255u8; 256];
     for (i, &b) in TABLE.iter().enumerate() {
         lookup[b as usize] = i as u8;
@@ -800,10 +786,7 @@ mod tests {
     fn test_labels_url_construction() {
         let client = GmailClient::new("tok");
         let url = build_url(client.base_url(), "/labels");
-        assert_eq!(
-            url,
-            "https://gmail.googleapis.com/gmail/v1/users/me/labels"
-        );
+        assert_eq!(url, "https://gmail.googleapis.com/gmail/v1/users/me/labels");
     }
 
     #[test]
@@ -871,10 +854,22 @@ mod tests {
             snippet: "Hello world".into(),
             payload: Some(RawPayload {
                 headers: vec![
-                    RawHeader { name: "From".into(), value: "sender@test.com".into() },
-                    RawHeader { name: "To".into(), value: "receiver@test.com".into() },
-                    RawHeader { name: "Subject".into(), value: "Test Subject".into() },
-                    RawHeader { name: "Date".into(), value: "Mon, 1 Jan 2026 00:00:00 +0000".into() },
+                    RawHeader {
+                        name: "From".into(),
+                        value: "sender@test.com".into(),
+                    },
+                    RawHeader {
+                        name: "To".into(),
+                        value: "receiver@test.com".into(),
+                    },
+                    RawHeader {
+                        name: "Subject".into(),
+                        value: "Test Subject".into(),
+                    },
+                    RawHeader {
+                        name: "Date".into(),
+                        value: "Mon, 1 Jan 2026 00:00:00 +0000".into(),
+                    },
                 ],
                 body: Some(RawBody {
                     data: Some(base64url_encode(b"Hello world")),
@@ -900,9 +895,10 @@ mod tests {
             label_ids: vec![],
             snippet: "".into(),
             payload: Some(RawPayload {
-                headers: vec![
-                    RawHeader { name: "Subject".into(), value: "Multipart".into() },
-                ],
+                headers: vec![RawHeader {
+                    name: "Subject".into(),
+                    value: "Multipart".into(),
+                }],
                 body: None,
                 parts: vec![
                     RawPart {
@@ -976,8 +972,14 @@ mod tests {
     #[test]
     fn test_get_header_case_insensitive() {
         let headers = vec![
-            RawHeader { name: "From".into(), value: "alice@test.com".into() },
-            RawHeader { name: "subject".into(), value: "Lower case".into() },
+            RawHeader {
+                name: "From".into(),
+                value: "alice@test.com".into(),
+            },
+            RawHeader {
+                name: "subject".into(),
+                value: "Lower case".into(),
+            },
         ];
         assert_eq!(get_header(&headers, "from"), "alice@test.com");
         assert_eq!(get_header(&headers, "Subject"), "Lower case");

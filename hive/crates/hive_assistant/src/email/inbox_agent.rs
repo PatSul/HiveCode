@@ -44,7 +44,11 @@ impl InboxAgent {
     /// updates the poll state in storage.
     ///
     /// TODO: implement with actual inbox polling via provider APIs
-    pub fn poll(&self, emails: &[UnifiedEmail], provider: &str) -> Result<Vec<EmailNotification>, String> {
+    pub fn poll(
+        &self,
+        emails: &[UnifiedEmail],
+        provider: &str,
+    ) -> Result<Vec<EmailNotification>, String> {
         let now = chrono::Utc::now().to_rfc3339();
         let last_message_id = emails.last().map(|e| e.id.as_str()).unwrap_or("");
 

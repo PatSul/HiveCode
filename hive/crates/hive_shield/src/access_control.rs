@@ -105,7 +105,13 @@ impl PolicyEngine {
     ) -> AccessDecision {
         let policy = match self.policies.get(provider) {
             Some(p) => p,
-            None => return self.check_against_policy(&Self::default_policy(), data_classification, contains_pii),
+            None => {
+                return self.check_against_policy(
+                    &Self::default_policy(),
+                    data_classification,
+                    contains_pii,
+                );
+            }
         };
         self.check_against_policy(policy, data_classification, contains_pii)
     }
@@ -187,29 +193,38 @@ mod tests {
     fn engine_with_policies() -> PolicyEngine {
         let mut engine = PolicyEngine::new();
 
-        engine.add_policy("ollama", AccessPolicy {
-            provider_trust: ProviderTrust::Local,
-            max_classification: DataClassification::Restricted,
-            require_pii_cloaking: false,
-            allowed_data_types: Vec::new(),
-            blocked_patterns: Vec::new(),
-        });
+        engine.add_policy(
+            "ollama",
+            AccessPolicy {
+                provider_trust: ProviderTrust::Local,
+                max_classification: DataClassification::Restricted,
+                require_pii_cloaking: false,
+                allowed_data_types: Vec::new(),
+                blocked_patterns: Vec::new(),
+            },
+        );
 
-        engine.add_policy("openai", AccessPolicy {
-            provider_trust: ProviderTrust::Trusted,
-            max_classification: DataClassification::Confidential,
-            require_pii_cloaking: true,
-            allowed_data_types: Vec::new(),
-            blocked_patterns: Vec::new(),
-        });
+        engine.add_policy(
+            "openai",
+            AccessPolicy {
+                provider_trust: ProviderTrust::Trusted,
+                max_classification: DataClassification::Confidential,
+                require_pii_cloaking: true,
+                allowed_data_types: Vec::new(),
+                blocked_patterns: Vec::new(),
+            },
+        );
 
-        engine.add_policy("shady-api", AccessPolicy {
-            provider_trust: ProviderTrust::Untrusted,
-            max_classification: DataClassification::Public,
-            require_pii_cloaking: true,
-            allowed_data_types: Vec::new(),
-            blocked_patterns: Vec::new(),
-        });
+        engine.add_policy(
+            "shady-api",
+            AccessPolicy {
+                provider_trust: ProviderTrust::Untrusted,
+                max_classification: DataClassification::Public,
+                require_pii_cloaking: true,
+                allowed_data_types: Vec::new(),
+                blocked_patterns: Vec::new(),
+            },
+        );
 
         engine
     }

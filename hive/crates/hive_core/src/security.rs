@@ -98,7 +98,11 @@ impl SecurityGateway {
         }
 
         // Check domain allowlist
-        if !self.allowed_domains.iter().any(|d| host.ends_with(d.as_str())) {
+        if !self
+            .allowed_domains
+            .iter()
+            .any(|d| host.ends_with(d.as_str()))
+        {
             return Err(format!("Domain not in allowlist: {host}"));
         }
 
@@ -135,7 +139,9 @@ impl SecurityGateway {
         let resolved_str = resolved.to_string_lossy();
         for prefix in &self.blocked_path_prefixes {
             if resolved_str.contains(prefix) {
-                return Err(format!("Path traversal to sensitive directory blocked: {prefix}"));
+                return Err(format!(
+                    "Path traversal to sensitive directory blocked: {prefix}"
+                ));
             }
         }
 

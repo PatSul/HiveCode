@@ -11,8 +11,8 @@
 //! callback on a background thread.
 
 use std::sync::{
-    atomic::{AtomicBool, Ordering},
     Arc,
+    atomic::{AtomicBool, Ordering},
 };
 use std::thread;
 
@@ -150,12 +150,7 @@ impl TrayService {
         let event_thread = thread::Builder::new()
             .name("hive-tray-events".into())
             .spawn(move || {
-                Self::event_loop(
-                    thread_running,
-                    toggle_id,
-                    quit_id,
-                    on_event,
-                );
+                Self::event_loop(thread_running, toggle_id, quit_id, on_event);
             })
             .context("Failed to spawn tray event thread")?;
 
@@ -212,17 +207,12 @@ impl TrayService {
     /// Falls back to a solid accent-color square if decoding fails.
     fn create_icon() -> Result<Icon> {
         let png_bytes = include_bytes!("../../../assets/hive_bee.png");
-        let img = image::load_from_memory(png_bytes)
-            .context("Failed to decode embedded hive_bee.png")?;
-        let resized = img.resize(
-            ICON_SIZE,
-            ICON_SIZE,
-            image::imageops::FilterType::Nearest,
-        );
+        let img =
+            image::load_from_memory(png_bytes).context("Failed to decode embedded hive_bee.png")?;
+        let resized = img.resize(ICON_SIZE, ICON_SIZE, image::imageops::FilterType::Nearest);
         let rgba = resized.to_rgba8();
         let (w, h) = (rgba.width(), rgba.height());
-        Icon::from_rgba(rgba.into_raw(), w, h)
-            .context("Icon::from_rgba failed for bee icon")
+        Icon::from_rgba(rgba.into_raw(), w, h).context("Icon::from_rgba failed for bee icon")
     }
 
     /// Fallback: generate a solid-color 32x32 RGBA icon using the Hive accent colour.

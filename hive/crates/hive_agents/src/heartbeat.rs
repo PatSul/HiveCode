@@ -44,7 +44,12 @@ impl HeartbeatService {
     }
 
     /// Record a heartbeat for an agent.
-    pub fn beat(&mut self, agent_id: impl Into<String>, status: impl Into<String>, current_task: Option<String>) {
+    pub fn beat(
+        &mut self,
+        agent_id: impl Into<String>,
+        status: impl Into<String>,
+        current_task: Option<String>,
+    ) {
         let agent_id = agent_id.into();
         let heartbeat = AgentHeartbeat {
             agent_id: agent_id.clone(),
@@ -59,9 +64,7 @@ impl HeartbeatService {
     pub fn is_alive(&self, agent_id: &str) -> bool {
         match self.heartbeats.get(agent_id) {
             Some(hb) => {
-                let elapsed = Utc::now()
-                    .signed_duration_since(hb.last_beat)
-                    .num_seconds();
+                let elapsed = Utc::now().signed_duration_since(hb.last_beat).num_seconds();
                 elapsed < self.timeout_secs as i64
             }
             None => false,

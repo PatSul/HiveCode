@@ -400,8 +400,6 @@ mod tests {
 
         let log = storage.get_learning_log(10).unwrap();
         assert!(!log.is_empty());
-        assert!(log
-            .iter()
-            .any(|e| e.event_type == "routing_adjustment"));
+        assert!(log.iter().any(|e| e.event_type == "routing_adjustment"));
     }
 }

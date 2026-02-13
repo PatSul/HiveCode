@@ -10,7 +10,9 @@ use reqwest::Client;
 use serde::Serialize;
 use tracing::debug;
 
-use super::{AudioData, AudioFormat, TtsError, TtsProvider, TtsProviderType, TtsRequest, VoiceInfo};
+use super::{
+    AudioData, AudioFormat, TtsError, TtsProvider, TtsProviderType, TtsRequest, VoiceInfo,
+};
 
 const API_URL: &str = "https://api.openai.com/v1/audio/speech";
 
@@ -202,7 +204,10 @@ mod tests {
     fn format_mapping() {
         assert_eq!(OpenAiTtsProvider::format_to_openai(AudioFormat::Mp3), "mp3");
         assert_eq!(OpenAiTtsProvider::format_to_openai(AudioFormat::Wav), "wav");
-        assert_eq!(OpenAiTtsProvider::format_to_openai(AudioFormat::Opus), "opus");
+        assert_eq!(
+            OpenAiTtsProvider::format_to_openai(AudioFormat::Opus),
+            "opus"
+        );
     }
 
     #[test]

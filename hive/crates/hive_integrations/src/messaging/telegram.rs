@@ -6,8 +6,8 @@
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use chrono::{DateTime, TimeZone, Utc};
-use reqwest::header::{HeaderMap, HeaderValue, CONTENT_TYPE};
 use reqwest::Client;
+use reqwest::header::{CONTENT_TYPE, HeaderMap, HeaderValue};
 use serde::Deserialize;
 use tracing::debug;
 
@@ -147,10 +147,7 @@ impl TelegramProvider {
             .map(|d| {
                 vec![Attachment {
                     name: d.file_name.clone().unwrap_or_else(|| d.file_id.clone()),
-                    url: format!(
-                        "{}/file/bot{}/{}",
-                        self.base_url, self.token, d.file_id
-                    ),
+                    url: format!("{}/file/bot{}/{}", self.base_url, self.token, d.file_id),
                     mime_type: d
                         .mime_type
                         .clone()
@@ -436,8 +433,7 @@ mod tests {
 
     #[test]
     fn test_telegram_provider_custom_base_url_strips_slash() {
-        let provider =
-            TelegramProvider::with_base_url("tok", "https://telegram.test/").unwrap();
+        let provider = TelegramProvider::with_base_url("tok", "https://telegram.test/").unwrap();
         assert_eq!(provider.base_url(), "https://telegram.test");
     }
 

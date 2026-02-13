@@ -1,5 +1,6 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use chrono::{DateTime, Utc};
+use hive_core::SecurityGateway;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::debug;
@@ -231,7 +232,10 @@ impl DockerSandbox {
                 bail!("Container {id} is already paused");
             }
             _ => {
-                bail!("Container {id} is not running (status: {:?})", container.status);
+                bail!(
+                    "Container {id} is not running (status: {:?})",
+                    container.status
+                );
             }
         }
     }
@@ -253,7 +257,10 @@ impl DockerSandbox {
                 bail!("Container {id} is not paused");
             }
             _ => {
-                bail!("Container {id} is not paused (status: {:?})", container.status);
+                bail!(
+                    "Container {id} is not paused (status: {:?})",
+                    container.status
+                );
             }
         }
     }
@@ -274,7 +281,10 @@ impl DockerSandbox {
                 Ok(())
             }
             ContainerStatus::Running | ContainerStatus::Paused => {
-                bail!("Container {id} must be stopped before removal (status: {:?})", container.status);
+                bail!(
+                    "Container {id} must be stopped before removal (status: {:?})",
+                    container.status
+                );
             }
             ContainerStatus::Removed => {
                 bail!("Container {id} has already been removed");
@@ -357,6 +367,11 @@ impl DockerSandbox {
     /// Attempts to run `docker --version`. Returns `true` if the command
     /// succeeds (exit code 0), `false` otherwise.
     pub fn is_docker_available(&self) -> bool {
+        let security = SecurityGateway::new();
+        if security.check_command("docker --version").is_err() {
+            return false;
+        }
+
         let result = std::process::Command::new("docker")
             .arg("--version")
             .stdout(std::process::Stdio::null())
@@ -434,7 +449,9 @@ mod tests {
         config.name = Some("my-node-app".into());
         config.working_dir = Some("/app".into());
         config.network_enabled = true;
-        config.env_vars.insert("NODE_ENV".into(), "production".into());
+        config
+            .env_vars
+            .insert("NODE_ENV".into(), "production".into());
         config.volumes.push(VolumeMount {
             host_path: "/data".into(),
             container_path: "/mnt/data".into(),
@@ -461,7 +478,9 @@ mod tests {
     #[test]
     fn start_transitions_created_to_running() {
         let mut sandbox = DockerSandbox::new();
-        let id = sandbox.create_container(ContainerConfig::new("ubuntu:22.04")).unwrap();
+        let id = sandbox
+            .create_container(ContainerConfig::new("ubuntu:22.04"))
+            .unwrap();
 
         sandbox.start_container(&id).unwrap();
 
@@ -473,7 +492,9 @@ mod tests {
     #[test]
     fn stop_transitions_running_to_stopped() {
         let mut sandbox = DockerSandbox::new();
-        let id = sandbox.create_container(ContainerConfig::new("ubuntu:22.04")).unwrap();
+        let id = sandbox
+            .create_container(ContainerConfig::new("ubuntu:22.04"))
+            .unwrap();
         sandbox.start_container(&id).unwrap();
 
         sandbox.stop_container(&id).unwrap();
@@ -486,7 +507,9 @@ mod tests {
     #[test]
     fn pause_transitions_running_to_paused() {
         let mut sandbox = DockerSandbox::new();
-        let id = sandbox.create_container(ContainerConfig::new("ubuntu:22.04")).unwrap();
+        let id = sandbox
+            .create_container(ContainerConfig::new("ubuntu:22.04"))
+            .unwrap();
         sandbox.start_container(&id).unwrap();
 
         sandbox.pause_container(&id).unwrap();
@@ -498,7 +521,9 @@ mod tests {
     #[test]
     fn unpause_transitions_paused_to_running() {
         let mut sandbox = DockerSandbox::new();
-        let id = sandbox.create_container(ContainerConfig::new("ubuntu:22.04")).unwrap();
+        let id = sandbox
+            .create_container(ContainerConfig::new("ubuntu:22.04"))
+            .unwrap();
         sandbox.start_container(&id).unwrap();
         sandbox.pause_container(&id).unwrap();
 
@@ -511,7 +536,9 @@ mod tests {
     #[test]
     fn restart_stopped_container() {
         let mut sandbox = DockerSandbox::new();
-        let id = sandbox.create_container(ContainerConfig::new("ubuntu:22.04")).unwrap();
+        let id = sandbox
+            .create_container(ContainerConfig::new("ubuntu:22.04"))
+            .unwrap();
         sandbox.start_container(&id).unwrap();
         sandbox.stop_container(&id).unwrap();
 
@@ -526,7 +553,9 @@ mod tests {
     #[test]
     fn start_already_running_fails() {
         let mut sandbox = DockerSandbox::new();
-        let id = sandbox.create_container(ContainerConfig::new("ubuntu:22.04")).unwrap();
+        let id = sandbox
+            .create_container(ContainerConfig::new("ubuntu:22.04"))
+            .unwrap();
         sandbox.start_container(&id).unwrap();
 
         let result = sandbox.start_container(&id);
@@ -537,7 +566,9 @@ mod tests {
     #[test]
     fn stop_created_container_fails() {
         let mut sandbox = DockerSandbox::new();
-        let id = sandbox.create_container(ContainerConfig::new("ubuntu:22.04")).unwrap();
+        let id = sandbox
+            .create_container(ContainerConfig::new("ubuntu:22.04"))
+            .unwrap();
 
         let result = sandbox.stop_container(&id);
         assert!(result.is_err());
@@ -547,7 +578,9 @@ mod tests {
     #[test]
     fn pause_non_running_container_fails() {
         let mut sandbox = DockerSandbox::new();
-        let id = sandbox.create_container(ContainerConfig::new("ubuntu:22.04")).unwrap();
+        let id = sandbox
+            .create_container(ContainerConfig::new("ubuntu:22.04"))
+            .unwrap();
 
         let result = sandbox.pause_container(&id);
         assert!(result.is_err());
@@ -557,7 +590,9 @@ mod tests {
     #[test]
     fn unpause_running_container_fails() {
         let mut sandbox = DockerSandbox::new();
-        let id = sandbox.create_container(ContainerConfig::new("ubuntu:22.04")).unwrap();
+        let id = sandbox
+            .create_container(ContainerConfig::new("ubuntu:22.04"))
+            .unwrap();
         sandbox.start_container(&id).unwrap();
 
         let result = sandbox.unpause_container(&id);
@@ -568,7 +603,9 @@ mod tests {
     #[test]
     fn remove_running_container_fails() {
         let mut sandbox = DockerSandbox::new();
-        let id = sandbox.create_container(ContainerConfig::new("ubuntu:22.04")).unwrap();
+        let id = sandbox
+            .create_container(ContainerConfig::new("ubuntu:22.04"))
+            .unwrap();
         sandbox.start_container(&id).unwrap();
 
         let result = sandbox.remove_container(&id);
@@ -581,7 +618,9 @@ mod tests {
     #[test]
     fn remove_stopped_container_succeeds() {
         let mut sandbox = DockerSandbox::new();
-        let id = sandbox.create_container(ContainerConfig::new("ubuntu:22.04")).unwrap();
+        let id = sandbox
+            .create_container(ContainerConfig::new("ubuntu:22.04"))
+            .unwrap();
         sandbox.start_container(&id).unwrap();
         sandbox.stop_container(&id).unwrap();
 
@@ -594,7 +633,9 @@ mod tests {
     #[test]
     fn remove_created_container_succeeds() {
         let mut sandbox = DockerSandbox::new();
-        let id = sandbox.create_container(ContainerConfig::new("ubuntu:22.04")).unwrap();
+        let id = sandbox
+            .create_container(ContainerConfig::new("ubuntu:22.04"))
+            .unwrap();
 
         sandbox.remove_container(&id).unwrap();
         assert_eq!(sandbox.total_count(), 0);
@@ -603,7 +644,9 @@ mod tests {
     #[test]
     fn exec_in_running_container_succeeds() {
         let mut sandbox = DockerSandbox::new();
-        let id = sandbox.create_container(ContainerConfig::new("ubuntu:22.04")).unwrap();
+        let id = sandbox
+            .create_container(ContainerConfig::new("ubuntu:22.04"))
+            .unwrap();
         sandbox.start_container(&id).unwrap();
 
         let result = sandbox.exec_in_container(&id, "echo hello").unwrap();
@@ -615,7 +658,9 @@ mod tests {
     #[test]
     fn exec_in_stopped_container_fails() {
         let mut sandbox = DockerSandbox::new();
-        let id = sandbox.create_container(ContainerConfig::new("ubuntu:22.04")).unwrap();
+        let id = sandbox
+            .create_container(ContainerConfig::new("ubuntu:22.04"))
+            .unwrap();
 
         let result = sandbox.exec_in_container(&id, "echo hello");
         assert!(result.is_err());
@@ -627,9 +672,15 @@ mod tests {
     #[test]
     fn list_containers_returns_all() {
         let mut sandbox = DockerSandbox::new();
-        sandbox.create_container(ContainerConfig::new("ubuntu:22.04")).unwrap();
-        sandbox.create_container(ContainerConfig::new("alpine:latest")).unwrap();
-        sandbox.create_container(ContainerConfig::new("node:18")).unwrap();
+        sandbox
+            .create_container(ContainerConfig::new("ubuntu:22.04"))
+            .unwrap();
+        sandbox
+            .create_container(ContainerConfig::new("alpine:latest"))
+            .unwrap();
+        sandbox
+            .create_container(ContainerConfig::new("node:18"))
+            .unwrap();
 
         let containers = sandbox.list_containers();
         assert_eq!(containers.len(), 3);
@@ -638,9 +689,15 @@ mod tests {
     #[test]
     fn running_count_reflects_state() {
         let mut sandbox = DockerSandbox::new();
-        let id1 = sandbox.create_container(ContainerConfig::new("ubuntu:22.04")).unwrap();
-        let id2 = sandbox.create_container(ContainerConfig::new("alpine:latest")).unwrap();
-        let _id3 = sandbox.create_container(ContainerConfig::new("node:18")).unwrap();
+        let id1 = sandbox
+            .create_container(ContainerConfig::new("ubuntu:22.04"))
+            .unwrap();
+        let id2 = sandbox
+            .create_container(ContainerConfig::new("alpine:latest"))
+            .unwrap();
+        let _id3 = sandbox
+            .create_container(ContainerConfig::new("node:18"))
+            .unwrap();
 
         assert_eq!(sandbox.running_count(), 0);
 
@@ -661,16 +718,22 @@ mod tests {
         let mut sandbox = DockerSandbox::new();
 
         // Container 1: running (should survive cleanup)
-        let id1 = sandbox.create_container(ContainerConfig::new("ubuntu:22.04")).unwrap();
+        let id1 = sandbox
+            .create_container(ContainerConfig::new("ubuntu:22.04"))
+            .unwrap();
         sandbox.start_container(&id1).unwrap();
 
         // Container 2: stopped (should be removed)
-        let id2 = sandbox.create_container(ContainerConfig::new("alpine:latest")).unwrap();
+        let id2 = sandbox
+            .create_container(ContainerConfig::new("alpine:latest"))
+            .unwrap();
         sandbox.start_container(&id2).unwrap();
         sandbox.stop_container(&id2).unwrap();
 
         // Container 3: created (should survive cleanup)
-        let _id3 = sandbox.create_container(ContainerConfig::new("node:18")).unwrap();
+        let _id3 = sandbox
+            .create_container(ContainerConfig::new("node:18"))
+            .unwrap();
 
         assert_eq!(sandbox.total_count(), 3);
 
@@ -684,7 +747,9 @@ mod tests {
     #[test]
     fn cleanup_stopped_returns_zero_when_none_stopped() {
         let mut sandbox = DockerSandbox::new();
-        let id = sandbox.create_container(ContainerConfig::new("ubuntu:22.04")).unwrap();
+        let id = sandbox
+            .create_container(ContainerConfig::new("ubuntu:22.04"))
+            .unwrap();
         sandbox.start_container(&id).unwrap();
 
         let removed = sandbox.cleanup_stopped();
@@ -729,8 +794,7 @@ mod tests {
         ];
         for status in &statuses {
             let json = serde_json::to_string(status).expect("serialize");
-            let restored: ContainerStatus =
-                serde_json::from_str(&json).expect("deserialize");
+            let restored: ContainerStatus = serde_json::from_str(&json).expect("deserialize");
             assert_eq!(&restored, status);
         }
     }
@@ -771,7 +835,9 @@ mod tests {
     #[test]
     fn stop_paused_container_succeeds() {
         let mut sandbox = DockerSandbox::new();
-        let id = sandbox.create_container(ContainerConfig::new("ubuntu:22.04")).unwrap();
+        let id = sandbox
+            .create_container(ContainerConfig::new("ubuntu:22.04"))
+            .unwrap();
         sandbox.start_container(&id).unwrap();
         sandbox.pause_container(&id).unwrap();
 
@@ -788,12 +854,20 @@ mod tests {
         let mut sandbox = DockerSandbox::new();
 
         // Create
-        let id = sandbox.create_container(ContainerConfig::new("ubuntu:22.04")).unwrap();
-        assert_eq!(sandbox.get_container(&id).unwrap().status, ContainerStatus::Created);
+        let id = sandbox
+            .create_container(ContainerConfig::new("ubuntu:22.04"))
+            .unwrap();
+        assert_eq!(
+            sandbox.get_container(&id).unwrap().status,
+            ContainerStatus::Created
+        );
 
         // Start
         sandbox.start_container(&id).unwrap();
-        assert_eq!(sandbox.get_container(&id).unwrap().status, ContainerStatus::Running);
+        assert_eq!(
+            sandbox.get_container(&id).unwrap().status,
+            ContainerStatus::Running
+        );
         assert_eq!(sandbox.running_count(), 1);
 
         // Exec
@@ -802,17 +876,26 @@ mod tests {
 
         // Pause
         sandbox.pause_container(&id).unwrap();
-        assert_eq!(sandbox.get_container(&id).unwrap().status, ContainerStatus::Paused);
+        assert_eq!(
+            sandbox.get_container(&id).unwrap().status,
+            ContainerStatus::Paused
+        );
         assert_eq!(sandbox.running_count(), 0);
 
         // Unpause
         sandbox.unpause_container(&id).unwrap();
-        assert_eq!(sandbox.get_container(&id).unwrap().status, ContainerStatus::Running);
+        assert_eq!(
+            sandbox.get_container(&id).unwrap().status,
+            ContainerStatus::Running
+        );
         assert_eq!(sandbox.running_count(), 1);
 
         // Stop
         sandbox.stop_container(&id).unwrap();
-        assert_eq!(sandbox.get_container(&id).unwrap().status, ContainerStatus::Stopped);
+        assert_eq!(
+            sandbox.get_container(&id).unwrap().status,
+            ContainerStatus::Stopped
+        );
         assert_eq!(sandbox.running_count(), 0);
 
         // Restart

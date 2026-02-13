@@ -33,7 +33,10 @@ pub fn generate_briefing(
 
     // Generate action items from events.
     for event in &events {
-        action_items.push(format!("Attend: {} ({} - {})", event.title, event.start, event.end));
+        action_items.push(format!(
+            "Attend: {} ({} - {})",
+            event.title, event.start, event.end
+        ));
     }
 
     // Generate action items from email digest.

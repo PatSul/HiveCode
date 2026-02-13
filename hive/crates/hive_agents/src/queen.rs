@@ -7,15 +7,17 @@
 //! a final output, and records learnings to collective memory.
 
 use std::collections::HashSet;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 
 use hive_ai::types::{ChatMessage, ChatRequest, ChatResponse, MessageRole, ModelTier};
 
 use crate::collective_memory::{CollectiveMemory, MemoryCategory, MemoryEntry};
 use crate::coordinator::{Coordinator, CoordinatorConfig, CoordinatorResult};
-use crate::hivemind::{default_model_for_tier, AiExecutor, HiveMind, HiveMindConfig, OrchestrationResult};
+use crate::hivemind::{
+    AiExecutor, HiveMind, HiveMindConfig, OrchestrationResult, default_model_for_tier,
+};
 use crate::swarm::{
     InnerResult, OrchestrationMode, SwarmConfig, SwarmPlan, SwarmResult, SwarmStatus,
     SwarmStatusCallback, TeamObjective, TeamResult, TeamStatus,
@@ -90,7 +92,10 @@ impl<E: AiExecutor + 'static> Queen<E> {
     /// prompt, sends it to the queen model, and parses the response into a set
     /// of team objectives with dependency ordering.
     pub async fn plan(&self, goal: &str) -> Result<SwarmPlan, String> {
-        self.emit_status(SwarmStatus::Planning, "Decomposing goal into team objectives");
+        self.emit_status(
+            SwarmStatus::Planning,
+            "Decomposing goal into team objectives",
+        );
 
         // Gather memory context if available.
         let memory_context = self.gather_memory_context(goal);
@@ -190,8 +195,7 @@ impl<E: AiExecutor + 'static> Queen<E> {
         // Search each term individually so LIKE matching works on partial words.
         for term in &terms {
             // Success patterns.
-            if let Ok(entries) =
-                memory.recall(term, Some(MemoryCategory::SuccessPattern), None, 3)
+            if let Ok(entries) = memory.recall(term, Some(MemoryCategory::SuccessPattern), None, 3)
             {
                 for entry in entries {
                     if seen_ids.insert(entry.id) {
@@ -201,8 +205,7 @@ impl<E: AiExecutor + 'static> Queen<E> {
             }
 
             // Failure patterns.
-            if let Ok(entries) =
-                memory.recall(term, Some(MemoryCategory::FailurePattern), None, 2)
+            if let Ok(entries) = memory.recall(term, Some(MemoryCategory::FailurePattern), None, 2)
             {
                 for entry in entries {
                     if seen_ids.insert(entry.id) {
@@ -212,9 +215,7 @@ impl<E: AiExecutor + 'static> Queen<E> {
             }
 
             // Model insights.
-            if let Ok(entries) =
-                memory.recall(term, Some(MemoryCategory::ModelInsight), None, 2)
-            {
+            if let Ok(entries) = memory.recall(term, Some(MemoryCategory::ModelInsight), None, 2) {
                 for entry in entries {
                     if seen_ids.insert(entry.id) {
                         context_parts.push(format!("- Model insight: {}", entry.content));
@@ -227,10 +228,7 @@ impl<E: AiExecutor + 'static> Queen<E> {
             return String::new();
         }
 
-        format!(
-            "\nRelevant past learnings:\n{}",
-            context_parts.join("\n")
-        )
+        format!("\nRelevant past learnings:\n{}", context_parts.join("\n"))
     }
 
     // -----------------------------------------------------------------------
@@ -345,10 +343,9 @@ impl<E: AiExecutor + 'static> Queen<E> {
 
             // Partition into ready teams (all deps satisfied, no failed deps)
             // and not-ready teams.
-            let (ready, mut still_waiting): (Vec<TeamObjective>, Vec<TeamObjective>) =
-                remaining.into_iter().partition(|t| {
-                    t.dependencies.iter().all(|d| completed_ids.contains(d))
-                });
+            let (ready, mut still_waiting): (Vec<TeamObjective>, Vec<TeamObjective>) = remaining
+                .into_iter()
+                .partition(|t| t.dependencies.iter().all(|d| completed_ids.contains(d)));
 
             // Check for teams whose dependencies have failed -- mark them skipped.
             let mut skipped_this_wave: Vec<TeamObjective> = Vec::new();
@@ -547,10 +544,7 @@ impl<E: AiExecutor + 'static> Queen<E> {
             model_overrides: {
                 let mut m = std::collections::HashMap::new();
                 // Use the preferred model for the architect role (most important).
-                m.insert(
-                    crate::hivemind::AgentRole::Architect,
-                    model,
-                );
+                m.insert(crate::hivemind::AgentRole::Architect, model);
                 m
             },
         };
@@ -625,7 +619,10 @@ impl<E: AiExecutor + 'static> Queen<E> {
         );
 
         let request = ChatRequest {
-            messages: vec![ChatMessage::text(MessageRole::User, description.to_string())],
+            messages: vec![ChatMessage::text(
+                MessageRole::User,
+                description.to_string(),
+            )],
             model: model.clone(),
             max_tokens: 4096,
             temperature: Some(0.3),
@@ -659,7 +656,10 @@ impl<E: AiExecutor + 'static> Queen<E> {
             .unwrap_or_else(|| default_model_for_tier(ModelTier::Budget));
 
         let request = ChatRequest {
-            messages: vec![ChatMessage::text(MessageRole::User, description.to_string())],
+            messages: vec![ChatMessage::text(
+                MessageRole::User,
+                description.to_string(),
+            )],
             model: model.clone(),
             max_tokens: 4096,
             temperature: Some(0.3),
@@ -746,17 +746,14 @@ impl<E: AiExecutor + 'static> Queen<E> {
             match result {
                 Some(r) if r.status == TeamStatus::Completed => {
                     let content = match &r.inner {
-                        Some(InnerResult::HiveMind { result: hr }) => {
-                            hr.synthesized_output.clone()
-                        }
-                        Some(InnerResult::Coordinator { result: cr }) => {
-                            cr.results
-                                .iter()
-                                .filter(|t| t.success)
-                                .map(|t| t.output.clone())
-                                .collect::<Vec<_>>()
-                                .join("\n\n")
-                        }
+                        Some(InnerResult::HiveMind { result: hr }) => hr.synthesized_output.clone(),
+                        Some(InnerResult::Coordinator { result: cr }) => cr
+                            .results
+                            .iter()
+                            .filter(|t| t.success)
+                            .map(|t| t.output.clone())
+                            .collect::<Vec<_>>()
+                            .join("\n\n"),
                         Some(InnerResult::Native { content, .. })
                         | Some(InnerResult::SingleShot { content, .. }) => content.clone(),
                         None => "(no output)".into(),
@@ -814,9 +811,7 @@ impl<E: AiExecutor + 'static> Queen<E> {
             }
             Err(err) => {
                 // Fall back to simple concatenation if synthesis AI call fails.
-                format!(
-                    "Synthesis failed ({err}). Raw team outputs:\n\n{all_outputs}"
-                )
+                format!("Synthesis failed ({err}). Raw team outputs:\n\n{all_outputs}")
             }
         }
     }
@@ -838,9 +833,7 @@ impl<E: AiExecutor + 'static> Queen<E> {
 
         for result in results {
             let team = plan.teams.iter().find(|t| t.id == result.team_id);
-            let team_name = team
-                .map(|t| t.name.as_str())
-                .unwrap_or(&result.team_name);
+            let team_name = team.map(|t| t.name.as_str()).unwrap_or(&result.team_name);
 
             match result.status {
                 TeamStatus::Completed => {
@@ -1024,7 +1017,9 @@ fn extract_insights_from_orchestration(result: &OrchestrationResult) -> Vec<Stri
 
     if let Some(score) = result.consensus_score {
         if score < 0.5 {
-            insights.push(format!("Low consensus ({score:.2}) -- agents disagreed significantly"));
+            insights.push(format!(
+                "Low consensus ({score:.2}) -- agents disagreed significantly"
+            ));
         } else if score > 0.9 {
             insights.push(format!("High consensus ({score:.2}) -- strong agreement"));
         }
@@ -1112,8 +1107,8 @@ mod tests {
     use crate::collective_memory::CollectiveMemory;
     use crate::swarm::{SwarmConfig, SwarmPlan, TeamObjective};
     use hive_ai::types::{ChatResponse, FinishReason, TokenUsage};
-    use std::sync::atomic::AtomicUsize;
     use std::sync::Mutex;
+    use std::sync::atomic::AtomicUsize;
 
     // -- Mock Executor -------------------------------------------------------
 
@@ -1345,12 +1340,13 @@ mod tests {
         let statuses_clone = statuses.clone();
 
         let executor = Arc::new(MockExecutor::new(json_response));
-        let queen = Queen::new(SwarmConfig::default(), executor)
-            .with_status_callback(Arc::new(move |status, detail| {
+        let queen = Queen::new(SwarmConfig::default(), executor).with_status_callback(Arc::new(
+            move |status, detail| {
                 if let Ok(mut s) = statuses_clone.lock() {
                     s.push((status, detail.to_string()));
                 }
-            }));
+            },
+        ));
 
         let _plan = queen.plan("Do something").await.unwrap();
 
@@ -1382,12 +1378,13 @@ mod tests {
         let statuses_clone = statuses.clone();
 
         let executor = Arc::new(MockExecutor::new(json_response));
-        let queen = Queen::new(SwarmConfig::default(), executor)
-            .with_status_callback(Arc::new(move |status, _detail| {
+        let queen = Queen::new(SwarmConfig::default(), executor).with_status_callback(Arc::new(
+            move |status, _detail| {
                 if let Ok(mut s) = statuses_clone.lock() {
                     s.push(status);
                 }
-            }));
+            },
+        ));
 
         let result = queen.execute("Do something").await.unwrap();
         assert_eq!(result.status, SwarmStatus::Complete);
@@ -1751,7 +1748,13 @@ mod tests {
         // Second team should be skipped because its dependency failed.
         assert_eq!(results[1].team_id, "team-2");
         assert_eq!(results[1].status, TeamStatus::Skipped);
-        assert!(results[1].error.as_deref().unwrap().contains("Dependency failed"));
+        assert!(
+            results[1]
+                .error
+                .as_deref()
+                .unwrap()
+                .contains("Dependency failed")
+        );
     }
 
     // -- Budget enforcement --------------------------------------------------
@@ -1785,11 +1788,7 @@ mod tests {
         let results = queen.execute_plan(&plan).await.unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].status, TeamStatus::Skipped);
-        assert!(results[0]
-            .error
-            .as_deref()
-            .unwrap()
-            .contains("budget"));
+        assert!(results[0].error.as_deref().unwrap().contains("budget"));
     }
 
     // -- Memory context gathering --------------------------------------------

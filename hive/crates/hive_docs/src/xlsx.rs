@@ -49,9 +49,7 @@ pub fn generate_xlsx(headers: &[&str], rows: &[Vec<String>]) -> Result<Vec<u8>> 
 }
 
 /// Generate an XLSX file with multiple named sheets.
-pub fn generate_xlsx_multi_sheet(
-    sheets: &[(&str, &[&str], &[Vec<String>])],
-) -> Result<Vec<u8>> {
+pub fn generate_xlsx_multi_sheet(sheets: &[(&str, &[&str], &[Vec<String>])]) -> Result<Vec<u8>> {
     let mut workbook = Workbook::new();
     let header_format = Format::new().set_bold();
 

@@ -208,7 +208,10 @@ impl PiiDetector {
                     let mut hasher = Sha256::new();
                     hasher.update(m.original.as_bytes());
                     let hash = hasher.finalize();
-                    format!("[{type_label}_{:x}]", &hash[..4].iter().fold(0u32, |acc, &b| (acc << 8) | b as u32))
+                    format!(
+                        "[{type_label}_{:x}]",
+                        &hash[..4].iter().fold(0u32, |acc, &b| (acc << 8) | b as u32)
+                    )
                 }
                 CloakFormat::Redact => {
                     if self.config.preserve_format {
@@ -272,8 +275,7 @@ impl PiiDetector {
     /// Returns `true` if `pii_type` should be scanned according to the
     /// current config (empty `types_to_detect` means scan everything).
     fn should_detect(&self, pii_type: &PiiType) -> bool {
-        self.config.types_to_detect.is_empty()
-            || self.config.types_to_detect.contains(pii_type)
+        self.config.types_to_detect.is_empty() || self.config.types_to_detect.contains(pii_type)
     }
 }
 
@@ -374,7 +376,11 @@ mod tests {
         let det = default_detector();
         let text = "Email: bob@test.org, SSN: 987-65-4321, IP: 10.0.0.1";
         let matches = det.detect(text);
-        assert!(matches.len() >= 3, "expected at least 3 matches, got {}", matches.len());
+        assert!(
+            matches.len() >= 3,
+            "expected at least 3 matches, got {}",
+            matches.len()
+        );
     }
 
     #[test]
@@ -401,7 +407,11 @@ mod tests {
         };
         let det = PiiDetector::new(config);
         let cloaked = det.cloak("email: a@b.co");
-        assert!(cloaked.text.contains("******"), "cloaked text: {}", cloaked.text);
+        assert!(
+            cloaked.text.contains("******"),
+            "cloaked text: {}",
+            cloaked.text
+        );
     }
 
     #[test]
@@ -413,7 +423,11 @@ mod tests {
         };
         let det = PiiDetector::new(config);
         let cloaked = det.cloak("email: alice@example.com");
-        assert!(cloaked.text.contains("[EMAIL_"), "cloaked: {}", cloaked.text);
+        assert!(
+            cloaked.text.contains("[EMAIL_"),
+            "cloaked: {}",
+            cloaked.text
+        );
         assert!(!cloaked.text.contains("alice@example.com"));
     }
 
@@ -427,9 +441,8 @@ mod tests {
         let report = det.detect_and_report("email: a@b.com");
         assert_eq!(report.risk_level, "low");
 
-        let report = det.detect_and_report(
-            "a@b.com c@d.com e@f.com 123-45-6789 555.123.4567 10.0.0.1",
-        );
+        let report =
+            det.detect_and_report("a@b.com c@d.com e@f.com 123-45-6789 555.123.4567 10.0.0.1");
         assert_eq!(report.risk_level, "high");
     }
 

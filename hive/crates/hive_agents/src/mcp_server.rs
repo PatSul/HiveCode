@@ -772,8 +772,11 @@ mod tests {
     #[test]
     fn search_files_finds_matches() {
         let (dir, server) = setup_workspace();
-        fs::write(dir.path().join("code.rs"), "fn main() {\n    println!(\"hello\");\n}\n")
-            .unwrap();
+        fs::write(
+            dir.path().join("code.rs"),
+            "fn main() {\n    println!(\"hello\");\n}\n",
+        )
+        .unwrap();
         fs::write(
             dir.path().join("lib.rs"),
             "fn helper() {\n    println!(\"world\");\n}\n",

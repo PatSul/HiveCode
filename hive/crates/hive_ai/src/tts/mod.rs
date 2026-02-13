@@ -201,11 +201,7 @@ pub trait TtsProvider: Send + Sync {
 
     /// Clone a voice from reference audio samples.
     /// Returns the new voice's info (including its new ID).
-    async fn clone_voice(
-        &self,
-        _name: &str,
-        _samples: &[Vec<u8>],
-    ) -> Result<VoiceInfo, TtsError> {
+    async fn clone_voice(&self, _name: &str, _samples: &[Vec<u8>]) -> Result<VoiceInfo, TtsError> {
         Err(TtsError::CloningNotSupported)
     }
 }
@@ -220,12 +216,30 @@ mod tests {
 
     #[test]
     fn provider_type_from_str_loose() {
-        assert_eq!(TtsProviderType::from_str_loose("elevenlabs"), Some(TtsProviderType::ElevenLabs));
-        assert_eq!(TtsProviderType::from_str_loose("openai"), Some(TtsProviderType::OpenAi));
-        assert_eq!(TtsProviderType::from_str_loose("qwen3"), Some(TtsProviderType::Qwen3));
-        assert_eq!(TtsProviderType::from_str_loose("f5"), Some(TtsProviderType::F5Tts));
-        assert_eq!(TtsProviderType::from_str_loose("telnyx"), Some(TtsProviderType::Telnyx));
-        assert_eq!(TtsProviderType::from_str_loose("ELEVENLABS"), Some(TtsProviderType::ElevenLabs));
+        assert_eq!(
+            TtsProviderType::from_str_loose("elevenlabs"),
+            Some(TtsProviderType::ElevenLabs)
+        );
+        assert_eq!(
+            TtsProviderType::from_str_loose("openai"),
+            Some(TtsProviderType::OpenAi)
+        );
+        assert_eq!(
+            TtsProviderType::from_str_loose("qwen3"),
+            Some(TtsProviderType::Qwen3)
+        );
+        assert_eq!(
+            TtsProviderType::from_str_loose("f5"),
+            Some(TtsProviderType::F5Tts)
+        );
+        assert_eq!(
+            TtsProviderType::from_str_loose("telnyx"),
+            Some(TtsProviderType::Telnyx)
+        );
+        assert_eq!(
+            TtsProviderType::from_str_loose("ELEVENLABS"),
+            Some(TtsProviderType::ElevenLabs)
+        );
         assert_eq!(TtsProviderType::from_str_loose("unknown"), None);
     }
 

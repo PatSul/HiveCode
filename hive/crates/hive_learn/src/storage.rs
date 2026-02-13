@@ -23,8 +23,8 @@ impl LearningStorage {
 
     /// Create an in-memory learning database (useful for tests).
     pub fn in_memory() -> Result<Self, String> {
-        let conn =
-            Connection::open_in_memory().map_err(|e| format!("Failed to open in-memory db: {e}"))?;
+        let conn = Connection::open_in_memory()
+            .map_err(|e| format!("Failed to open in-memory db: {e}"))?;
         Self::init_tables(&conn)?;
         Ok(Self {
             conn: Mutex::new(conn),
@@ -108,13 +108,15 @@ impl LearningStorage {
 
     /// Record an outcome from an AI interaction.
     pub fn record_outcome(&self, record: &OutcomeRecord) -> Result<i64, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
-        let outcome_str =
-            serde_json::to_value(&record.outcome)
-                .map_err(|e| format!("Failed to serialize outcome: {e}"))?
-                .as_str()
-                .unwrap_or("unknown")
-                .to_string();
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
+        let outcome_str = serde_json::to_value(&record.outcome)
+            .map_err(|e| format!("Failed to serialize outcome: {e}"))?
+            .as_str()
+            .unwrap_or("unknown")
+            .to_string();
         conn.execute(
             "INSERT INTO learning_outcomes
                 (conversation_id, message_id, model_id, task_type, tier, persona,
@@ -142,7 +144,10 @@ impl LearningStorage {
 
     /// Record a routing decision.
     pub fn record_routing(&self, entry: &RoutingHistoryEntry) -> Result<i64, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         conn.execute(
             "INSERT INTO routing_history
                 (task_type, classified_tier, actual_tier_needed, model_id, quality_score, cost, timestamp)
@@ -168,7 +173,10 @@ impl LearningStorage {
         days: u32,
         limit: usize,
     ) -> Result<Vec<OutcomeRecord>, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         let cutoff = chrono::Utc::now()
             .checked_sub_signed(chrono::Duration::days(i64::from(days)))
             .unwrap_or_else(chrono::Utc::now)
@@ -244,7 +252,10 @@ impl LearningStorage {
         task_type: Option<&str>,
         limit: usize,
     ) -> Result<Vec<RoutingHistoryEntry>, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
 
         let (sql, param_values): (String, Vec<Box<dyn rusqlite::types::ToSql>>) = match task_type {
             Some(tt) => (
@@ -296,7 +307,10 @@ impl LearningStorage {
 
     /// Retrieve a single user preference by key.
     pub fn get_preference(&self, key: &str) -> Result<Option<UserPreference>, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         let mut stmt = conn
             .prepare(
                 "SELECT key, value, confidence, observation_count, last_updated
@@ -317,14 +331,19 @@ impl LearningStorage {
             .map_err(|e| format!("Failed to query preference: {e}"))?;
 
         match rows.next() {
-            Some(row) => Ok(Some(row.map_err(|e| format!("Failed to read preference: {e}"))?)),
+            Some(row) => Ok(Some(
+                row.map_err(|e| format!("Failed to read preference: {e}"))?,
+            )),
             None => Ok(None),
         }
     }
 
     /// Insert or update a user preference.
     pub fn set_preference(&self, pref: &UserPreference) -> Result<(), String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         conn.execute(
             "INSERT INTO user_preferences (key, value, confidence, observation_count, last_updated)
              VALUES (?1, ?2, ?3, ?4, ?5)
@@ -347,7 +366,10 @@ impl LearningStorage {
 
     /// Delete a user preference. Returns true if a row was deleted.
     pub fn delete_preference(&self, key: &str) -> Result<bool, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         let affected = conn
             .execute("DELETE FROM user_preferences WHERE key = ?1", params![key])
             .map_err(|e| format!("Failed to delete preference: {e}"))?;
@@ -356,7 +378,10 @@ impl LearningStorage {
 
     /// Retrieve all user preferences.
     pub fn all_preferences(&self) -> Result<Vec<UserPreference>, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         let mut stmt = conn
             .prepare(
                 "SELECT key, value, confidence, observation_count, last_updated
@@ -385,7 +410,10 @@ impl LearningStorage {
 
     /// Save a prompt version.
     pub fn save_prompt_version(&self, pv: &PromptVersion) -> Result<i64, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         conn.execute(
             "INSERT INTO prompt_versions
                 (persona, version, prompt_text, avg_quality, sample_count, is_active, created_at)
@@ -406,7 +434,10 @@ impl LearningStorage {
 
     /// Get the currently active prompt for a persona.
     pub fn get_active_prompt(&self, persona: &str) -> Result<Option<PromptVersion>, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         let mut stmt = conn
             .prepare(
                 "SELECT persona, version, prompt_text, avg_quality, sample_count, is_active, created_at
@@ -432,16 +463,21 @@ impl LearningStorage {
             .map_err(|e| format!("Failed to query active prompt: {e}"))?;
 
         match rows.next() {
-            Some(row) => Ok(Some(
-                row.map_err(|e| format!("Failed to read prompt version: {e}"))?,
-            )),
+            Some(row) => {
+                Ok(Some(row.map_err(|e| {
+                    format!("Failed to read prompt version: {e}")
+                })?))
+            }
             None => Ok(None),
         }
     }
 
     /// Get all prompt versions for a persona, ordered by version descending.
     pub fn get_prompt_versions(&self, persona: &str) -> Result<Vec<PromptVersion>, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         let mut stmt = conn
             .prepare(
                 "SELECT persona, version, prompt_text, avg_quality, sample_count, is_active, created_at
@@ -474,7 +510,10 @@ impl LearningStorage {
 
     /// Activate a specific prompt version for a persona, deactivating all others.
     pub fn activate_prompt_version(&self, persona: &str, version: u32) -> Result<(), String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         conn.execute(
             "UPDATE prompt_versions SET is_active = 0 WHERE persona = ?1",
             params![persona],
@@ -490,7 +529,10 @@ impl LearningStorage {
 
     /// Save a code pattern.
     pub fn save_pattern(&self, pattern: &CodePattern) -> Result<i64, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         conn.execute(
             "INSERT INTO code_patterns
                 (pattern, language, category, description, quality_score, use_count, created_at)
@@ -511,7 +553,10 @@ impl LearningStorage {
 
     /// Search code patterns by substring match on pattern, description, or category.
     pub fn search_patterns(&self, query: &str, limit: usize) -> Result<Vec<CodePattern>, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         let like_query = format!("%{query}%");
         let mut stmt = conn
             .prepare(
@@ -547,7 +592,10 @@ impl LearningStorage {
 
     /// Add an entry to the transparent learning log.
     pub fn log_learning(&self, entry: &LearningLogEntry) -> Result<i64, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         conn.execute(
             "INSERT INTO learning_log (event_type, description, details, reversible, timestamp)
              VALUES (?1, ?2, ?3, ?4, ?5)",
@@ -565,7 +613,10 @@ impl LearningStorage {
 
     /// Retrieve popular code patterns sorted by use_count descending.
     pub fn popular_patterns(&self, limit: usize) -> Result<Vec<CodePattern>, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         let mut stmt = conn
             .prepare(
                 "SELECT id, pattern, language, category, description, quality_score, use_count, created_at
@@ -599,7 +650,10 @@ impl LearningStorage {
 
     /// Get distinct (task_type, tier) combos with their count and average quality.
     pub fn task_tier_stats(&self) -> Result<Vec<(String, String, u32, f64)>, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         let mut stmt = conn
             .prepare(
                 "SELECT task_type, tier, COUNT(*), AVG(quality_score)
@@ -632,7 +686,10 @@ impl LearningStorage {
         tier: &str,
         limit: usize,
     ) -> Result<Vec<f64>, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         let mut stmt = conn
             .prepare(
                 "SELECT quality_score FROM learning_outcomes
@@ -661,7 +718,10 @@ impl LearningStorage {
         avg_quality: f64,
         sample_count: u32,
     ) -> Result<(), String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         conn.execute(
             "UPDATE prompt_versions SET avg_quality = ?1, sample_count = ?2
              WHERE persona = ?3 AND is_active = 1",
@@ -673,7 +733,10 @@ impl LearningStorage {
 
     /// Get the maximum version number for a persona, or 0 if none exist.
     pub fn max_prompt_version(&self, persona: &str) -> Result<u32, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         let result: i64 = conn
             .query_row(
                 "SELECT COALESCE(MAX(version), 0) FROM prompt_versions WHERE persona = ?1",
@@ -686,7 +749,10 @@ impl LearningStorage {
 
     /// Get all active prompt versions across all personas.
     pub fn all_active_prompts(&self) -> Result<Vec<PromptVersion>, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         let mut stmt = conn
             .prepare(
                 "SELECT persona, version, prompt_text, avg_quality, sample_count, is_active, created_at
@@ -717,15 +783,24 @@ impl LearningStorage {
 
     /// Delete all user preferences.
     pub fn reset_preferences(&self) -> Result<(), String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         conn.execute("DELETE FROM user_preferences", [])
             .map_err(|e| format!("Failed to reset preferences: {e}"))?;
         Ok(())
     }
 
     /// Save a routing adjustment.
-    pub fn save_routing_adjustment(&self, adj: &crate::types::RoutingAdjustment) -> Result<(), String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+    pub fn save_routing_adjustment(
+        &self,
+        adj: &crate::types::RoutingAdjustment,
+    ) -> Result<(), String> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         conn.execute(
             "INSERT INTO routing_history (task_type, classified_tier, actual_tier_needed, model_id, quality_score, cost, timestamp)
              VALUES (?1, ?2, ?3, 'routing_adjustment', 0.0, 0.0, ?4)",
@@ -746,7 +821,10 @@ impl LearningStorage {
         task_type: &str,
         classified_tier: &str,
     ) -> Result<Option<String>, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         let mut stmt = conn
             .prepare(
                 "SELECT actual_tier_needed FROM routing_history
@@ -772,7 +850,10 @@ impl LearningStorage {
 
     /// Clear all routing adjustments.
     pub fn clear_routing_adjustments(&self) -> Result<(), String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         conn.execute(
             "DELETE FROM routing_history WHERE model_id = 'routing_adjustment'",
             [],
@@ -783,7 +864,10 @@ impl LearningStorage {
 
     /// Average quality of the most recent N outcomes.
     pub fn avg_quality_recent(&self, n: usize) -> Result<f64, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         let result: f64 = conn
             .query_row(
                 "SELECT COALESCE(AVG(quality_score), 0.0)
@@ -797,7 +881,10 @@ impl LearningStorage {
 
     /// Average quality of outcomes at offset..offset+n (ordered by timestamp DESC).
     pub fn avg_quality_at_offset(&self, offset: usize, n: usize) -> Result<f64, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         let result: f64 = conn
             .query_row(
                 "SELECT COALESCE(AVG(quality_score), 0.0)
@@ -811,7 +898,10 @@ impl LearningStorage {
 
     /// Model-level quality stats: (model_id, count, avg_quality) for models with 5+ outcomes.
     pub fn model_quality_stats(&self) -> Result<Vec<(String, u32, f64)>, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         let mut stmt = conn
             .prepare(
                 "SELECT model_id, COUNT(*), AVG(quality_score)
@@ -838,7 +928,10 @@ impl LearningStorage {
 
     /// Total cost and total quality points.
     pub fn cost_quality_totals(&self) -> Result<(f64, f64), String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         let result = conn
             .query_row(
                 "SELECT COALESCE(SUM(cost), 0.0), COALESCE(SUM(quality_score), 0.0) FROM learning_outcomes",
@@ -851,7 +944,10 @@ impl LearningStorage {
 
     /// Task-type quality stats: (task_type, count, avg_quality).
     pub fn task_type_quality_stats(&self) -> Result<Vec<(String, u32, f64)>, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         let mut stmt = conn
             .prepare(
                 "SELECT task_type, COUNT(*), AVG(quality_score)
@@ -878,7 +974,10 @@ impl LearningStorage {
 
     /// Outcome distribution: count per outcome type.
     pub fn outcome_distribution(&self) -> Result<Vec<(String, u32)>, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         let mut stmt = conn
             .prepare("SELECT outcome, COUNT(*) FROM learning_outcomes GROUP BY outcome")
             .map_err(|e| format!("Failed to prepare query: {e}"))?;
@@ -898,7 +997,10 @@ impl LearningStorage {
 
     /// Misroute rate: % of routing entries where actual_tier_needed != classified_tier.
     pub fn misroute_rate(&self) -> Result<f64, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         let total: i64 = conn
             .query_row(
                 "SELECT COUNT(*) FROM routing_history
@@ -924,7 +1026,10 @@ impl LearningStorage {
 
     /// Retrieve recent learning log entries.
     pub fn get_learning_log(&self, limit: usize) -> Result<Vec<LearningLogEntry>, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         let mut stmt = conn
             .prepare(
                 "SELECT id, event_type, description, details, reversible, timestamp
@@ -957,7 +1062,10 @@ impl LearningStorage {
     /// Get the average quality score for a model over the last N days.
     /// Returns 0.0 if no data is available.
     pub fn model_quality(&self, model_id: &str, days: u32) -> Result<f64, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         let cutoff = chrono::Utc::now()
             .checked_sub_signed(chrono::Duration::days(i64::from(days)))
             .unwrap_or_else(chrono::Utc::now)
@@ -978,13 +1086,11 @@ impl LearningStorage {
 
     /// Get the average quality score for a task type + tier combination over the last N days.
     /// Returns 0.0 if no data is available.
-    pub fn task_tier_quality(
-        &self,
-        task_type: &str,
-        tier: &str,
-        days: u32,
-    ) -> Result<f64, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+    pub fn task_tier_quality(&self, task_type: &str, tier: &str, days: u32) -> Result<f64, String> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         let cutoff = chrono::Utc::now()
             .checked_sub_signed(chrono::Duration::days(i64::from(days)))
             .unwrap_or_else(chrono::Utc::now)
@@ -1005,7 +1111,10 @@ impl LearningStorage {
 
     /// Get the total number of outcome records.
     pub fn outcome_count(&self) -> Result<u64, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         let count: i64 = conn
             .query_row("SELECT COUNT(*) FROM learning_outcomes", [], |row| {
                 row.get(0)
@@ -1454,7 +1563,9 @@ mod tests {
         record2.tier = "standard".to_string();
         storage.record_outcome(&record2).unwrap();
 
-        let avg = storage.task_tier_quality("debugging", "standard", 30).unwrap();
+        let avg = storage
+            .task_tier_quality("debugging", "standard", 30)
+            .unwrap();
         assert!((avg - 0.8).abs() < f64::EPSILON);
     }
 
@@ -1498,12 +1609,11 @@ mod tests {
         entry.actual_tier_needed = Some("premium".to_string());
         storage.record_routing(&entry).unwrap();
 
-        let history = storage.get_routing_history(Some("code_review"), 10).unwrap();
+        let history = storage
+            .get_routing_history(Some("code_review"), 10)
+            .unwrap();
         assert_eq!(history.len(), 1);
-        assert_eq!(
-            history[0].actual_tier_needed,
-            Some("premium".to_string())
-        );
+        assert_eq!(history[0].actual_tier_needed, Some("premium".to_string()));
     }
 
     #[test]
@@ -1541,9 +1651,7 @@ mod tests {
         assert!((storage.model_quality("any", 30).unwrap() - 0.0).abs() < f64::EPSILON);
 
         // Zero task-tier quality
-        assert!(
-            (storage.task_tier_quality("any", "any", 30).unwrap() - 0.0).abs() < f64::EPSILON
-        );
+        assert!((storage.task_tier_quality("any", "any", 30).unwrap() - 0.0).abs() < f64::EPSILON);
 
         // Zero outcome count
         assert_eq!(storage.outcome_count().unwrap(), 0);

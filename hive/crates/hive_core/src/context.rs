@@ -271,7 +271,11 @@ mod tests {
         assert!(pinned_count >= 1);
 
         // The pinned message should still be there
-        assert!(ctx.messages().iter().any(|m| m.pinned && m.role == "system"));
+        assert!(
+            ctx.messages()
+                .iter()
+                .any(|m| m.pinned && m.role == "system")
+        );
     }
 
     #[test]

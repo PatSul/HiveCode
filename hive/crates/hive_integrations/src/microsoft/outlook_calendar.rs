@@ -100,10 +100,9 @@ impl OutlookCalendarClient {
             anyhow::bail!("Microsoft Graph error ({}): {}", status, body);
         }
 
-        let events: Vec<CalendarEvent> = serde_json::from_value(
-            body.get("value").cloned().unwrap_or_default(),
-        )
-        .context("failed to deserialize calendar events")?;
+        let events: Vec<CalendarEvent> =
+            serde_json::from_value(body.get("value").cloned().unwrap_or_default())
+                .context("failed to deserialize calendar events")?;
 
         Ok(events)
     }
@@ -202,8 +201,7 @@ mod tests {
 
     #[test]
     fn test_client_custom_base_url_strips_trailing_slash() {
-        let client =
-            OutlookCalendarClient::with_base_url("tok", "https://graph.test.com/v1.0/");
+        let client = OutlookCalendarClient::with_base_url("tok", "https://graph.test.com/v1.0/");
         assert_eq!(client.base_url(), "https://graph.test.com/v1.0");
     }
 
@@ -275,10 +273,7 @@ mod tests {
     fn test_calendar_view_url_construction() {
         let client = OutlookCalendarClient::new("tok");
         let url = build_url(client.base_url(), "/me/calendarView");
-        assert_eq!(
-            url,
-            "https://graph.microsoft.com/v1.0/me/calendarView"
-        );
+        assert_eq!(url, "https://graph.microsoft.com/v1.0/me/calendarView");
     }
 
     #[test]

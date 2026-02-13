@@ -6,8 +6,8 @@
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 use reqwest::Client;
+use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, HeaderMap, HeaderValue};
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
@@ -352,9 +352,7 @@ impl MessagingProvider for DiscordProvider {
             for group in groups {
                 if let Some(messages) = group.as_array() {
                     for msg_val in messages {
-                        if let Ok(msg) =
-                            serde_json::from_value::<DiscordMessage>(msg_val.clone())
-                        {
+                        if let Ok(msg) = serde_json::from_value::<DiscordMessage>(msg_val.clone()) {
                             results.push(self.convert_message(&msg));
                         }
                     }
@@ -448,19 +446,13 @@ mod tests {
             provider.base_url(),
             &format!("/guilds/{}/channels", provider.guild_id()),
         );
-        assert_eq!(
-            url,
-            "https://discord.com/api/v10/guilds/guild-456/channels"
-        );
+        assert_eq!(url, "https://discord.com/api/v10/guilds/guild-456/channels");
     }
 
     #[test]
     fn test_get_messages_url_construction() {
         let provider = make_provider();
-        let url = build_url(
-            provider.base_url(),
-            "/channels/C123/messages?limit=50",
-        );
+        let url = build_url(provider.base_url(), "/channels/C123/messages?limit=50");
         assert!(url.contains("/channels/C123/messages"));
         assert!(url.contains("limit=50"));
     }

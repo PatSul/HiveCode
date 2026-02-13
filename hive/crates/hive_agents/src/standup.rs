@@ -212,10 +212,7 @@ mod tests {
         let standup = svc.generate_standup(&snapshots);
 
         assert_eq!(standup.agent_reports[0].blockers.len(), 1);
-        assert_eq!(
-            standup.agent_reports[0].blockers[0],
-            "Working on feature X"
-        );
+        assert_eq!(standup.agent_reports[0].blockers[0], "Working on feature X");
     }
 
     #[test]

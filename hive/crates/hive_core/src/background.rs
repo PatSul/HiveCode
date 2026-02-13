@@ -142,7 +142,11 @@ impl BackgroundService {
             .ok_or_else(|| anyhow::anyhow!("Task not found: {}", task_id))?;
 
         if task.status != TaskStatus::Running {
-            anyhow::bail!("Task {} is not running (status: {:?})", task_id, task.status);
+            anyhow::bail!(
+                "Task {} is not running (status: {:?})",
+                task_id,
+                task.status
+            );
         }
         task.complete();
         self.promote_pending();
@@ -159,7 +163,11 @@ impl BackgroundService {
             .ok_or_else(|| anyhow::anyhow!("Task not found: {}", task_id))?;
 
         if task.status != TaskStatus::Running {
-            anyhow::bail!("Task {} is not running (status: {:?})", task_id, task.status);
+            anyhow::bail!(
+                "Task {} is not running (status: {:?})",
+                task_id,
+                task.status
+            );
         }
         task.fail(error);
         self.promote_pending();

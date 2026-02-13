@@ -12,7 +12,7 @@ use super::openai_sse::{self, ChatCompletionResponse};
 use super::{AiProvider, ProviderError};
 use crate::types::{
     ChatMessage, ChatRequest, ChatResponse, FinishReason, ModelInfo, ProviderType, StreamChunk,
-    ToolCall, TokenUsage,
+    TokenUsage, ToolCall,
 };
 
 // ---------------------------------------------------------------------------
@@ -213,10 +213,7 @@ impl OpenAIProvider {
 
         OpenAIChatRequest {
             model: request.model.clone(),
-            messages: Self::convert_messages(
-                &request.messages,
-                request.system_prompt.as_deref(),
-            ),
+            messages: Self::convert_messages(&request.messages, request.system_prompt.as_deref()),
             stream,
             // Reasoning models use `max_completion_tokens` instead.
             max_tokens: if is_reasoning {
@@ -259,9 +256,7 @@ impl OpenAIProvider {
 
     /// Get the API key or return an error.
     fn require_key(&self) -> Result<&str, ProviderError> {
-        self.api_key
-            .as_deref()
-            .ok_or(ProviderError::InvalidKey)
+        self.api_key.as_deref().ok_or(ProviderError::InvalidKey)
     }
 
     /// Send a POST to the chat completions endpoint.
@@ -284,9 +279,7 @@ impl OpenAIProvider {
 
         // Map HTTP error codes to typed errors.
         let status = resp.status();
-        if status == reqwest::StatusCode::UNAUTHORIZED
-            || status == reqwest::StatusCode::FORBIDDEN
-        {
+        if status == reqwest::StatusCode::UNAUTHORIZED || status == reqwest::StatusCode::FORBIDDEN {
             return Err(ProviderError::InvalidKey);
         }
         if status == reqwest::StatusCode::TOO_MANY_REQUESTS {
@@ -339,9 +332,10 @@ impl AiProvider for OpenAIProvider {
             .await
             .map_err(|e| ProviderError::Other(format!("JSON parse error: {e}")))?;
 
-        let choice = data.choices.first().ok_or_else(|| {
-            ProviderError::Other("No choices in OpenAI response".into())
-        })?;
+        let choice = data
+            .choices
+            .first()
+            .ok_or_else(|| ProviderError::Other("No choices in OpenAI response".into()))?;
 
         let content = choice.message.content.clone().unwrap_or_default();
 
@@ -352,31 +346,30 @@ impl AiProvider for OpenAIProvider {
             _ => FinishReason::Stop,
         };
 
-        let usage = data.usage.map(|u| {
-            let p = u.prompt_tokens.unwrap_or(0);
-            let c = u.completion_tokens.unwrap_or(0);
-            TokenUsage {
-                prompt_tokens: p,
-                completion_tokens: c,
-                total_tokens: u.total_tokens.unwrap_or(p + c),
-            }
-        }).unwrap_or_default();
+        let usage = data
+            .usage
+            .map(|u| {
+                let p = u.prompt_tokens.unwrap_or(0);
+                let c = u.completion_tokens.unwrap_or(0);
+                TokenUsage {
+                    prompt_tokens: p,
+                    completion_tokens: c,
+                    total_tokens: u.total_tokens.unwrap_or(p + c),
+                }
+            })
+            .unwrap_or_default();
 
         // Extract tool calls from the response.
-        let tool_calls = choice
-            .message
-            .tool_calls
-            .as_ref()
-            .map(|tcs| {
-                tcs.iter()
-                    .map(|tc| ToolCall {
-                        id: tc.id.clone(),
-                        name: tc.function.name.clone(),
-                        input: serde_json::from_str(&tc.function.arguments)
-                            .unwrap_or(serde_json::Value::Object(serde_json::Map::new())),
-                    })
-                    .collect()
-            });
+        let tool_calls = choice.message.tool_calls.as_ref().map(|tcs| {
+            tcs.iter()
+                .map(|tc| ToolCall {
+                    id: tc.id.clone(),
+                    name: tc.function.name.clone(),
+                    input: serde_json::from_str(&tc.function.arguments)
+                        .unwrap_or(serde_json::Value::Object(serde_json::Map::new())),
+                })
+                .collect()
+        });
 
         Ok(ChatResponse {
             content,

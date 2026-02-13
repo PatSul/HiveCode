@@ -131,7 +131,10 @@ impl ToolHandler for WriteFileTool {
 
         let path = Path::new(path_str);
         hive_fs::FileService::write_file(path, content).map_err(|e| format!("{e}"))?;
-        Ok(format!("Successfully wrote {} bytes to {path_str}", content.len()))
+        Ok(format!(
+            "Successfully wrote {} bytes to {path_str}",
+            content.len()
+        ))
     }
 }
 
@@ -207,10 +210,7 @@ impl ToolHandler for SearchFilesTool {
             .get("pattern")
             .and_then(|v| v.as_str())
             .ok_or_else(|| "Missing required argument: pattern".to_string())?;
-        let path_str = args
-            .get("path")
-            .and_then(|v| v.as_str())
-            .unwrap_or(".");
+        let path_str = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
         let max_results = args
             .get("max_results")
             .and_then(|v| v.as_u64())
@@ -702,10 +702,7 @@ impl ToolExecutor {
     /// Returns `Some(results)` if tool calls were found and executed,
     /// or `None` if there were no tool calls (meaning the AI is done)
     /// or the iteration limit has been reached.
-    pub fn process_response(
-        &mut self,
-        response: &serde_json::Value,
-    ) -> Option<Vec<ToolResult>> {
+    pub fn process_response(&mut self, response: &serde_json::Value) -> Option<Vec<ToolResult>> {
         if self.current_iteration >= self.max_iterations {
             debug!(
                 iteration = self.current_iteration,
@@ -1595,7 +1592,11 @@ mod tests {
         let tool = ReadFileTool;
         let result = tool.execute(serde_json::json!({}));
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Missing required argument: path"));
+        assert!(
+            result
+                .unwrap_err()
+                .contains("Missing required argument: path")
+        );
     }
 
     #[test]
@@ -1603,13 +1604,19 @@ mod tests {
         let tool = WriteFileTool;
         let result = tool.execute(serde_json::json!({}));
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Missing required argument: path"));
+        assert!(
+            result
+                .unwrap_err()
+                .contains("Missing required argument: path")
+        );
 
         let result = tool.execute(serde_json::json!({"path": "/tmp/x.txt"}));
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .contains("Missing required argument: content"));
+        assert!(
+            result
+                .unwrap_err()
+                .contains("Missing required argument: content")
+        );
     }
 
     #[test]
@@ -1617,7 +1624,11 @@ mod tests {
         let tool = ListDirectoryTool;
         let result = tool.execute(serde_json::json!({}));
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Missing required argument: path"));
+        assert!(
+            result
+                .unwrap_err()
+                .contains("Missing required argument: path")
+        );
     }
 
     #[test]
@@ -1625,9 +1636,11 @@ mod tests {
         let tool = SearchFilesTool;
         let result = tool.execute(serde_json::json!({}));
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .contains("Missing required argument: pattern"));
+        assert!(
+            result
+                .unwrap_err()
+                .contains("Missing required argument: pattern")
+        );
     }
 
     #[test]
@@ -1635,9 +1648,11 @@ mod tests {
         let tool = ExecuteCommandTool::new();
         let result = tool.execute(serde_json::json!({}));
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .contains("Missing required argument: command"));
+        assert!(
+            result
+                .unwrap_err()
+                .contains("Missing required argument: command")
+        );
     }
 
     #[test]
@@ -1653,7 +1668,11 @@ mod tests {
         let tool = GitStatusTool;
         let result = tool.execute(serde_json::json!({}));
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Missing required argument: path"));
+        assert!(
+            result
+                .unwrap_err()
+                .contains("Missing required argument: path")
+        );
     }
 
     #[test]
@@ -1661,7 +1680,11 @@ mod tests {
         let tool = GitDiffTool;
         let result = tool.execute(serde_json::json!({}));
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Missing required argument: path"));
+        assert!(
+            result
+                .unwrap_err()
+                .contains("Missing required argument: path")
+        );
     }
 
     #[test]

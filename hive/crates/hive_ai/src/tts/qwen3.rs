@@ -8,7 +8,9 @@ use reqwest::Client;
 use serde::Serialize;
 use tracing::debug;
 
-use super::{AudioData, AudioFormat, TtsError, TtsProvider, TtsProviderType, TtsRequest, VoiceInfo};
+use super::{
+    AudioData, AudioFormat, TtsError, TtsProvider, TtsProviderType, TtsRequest, VoiceInfo,
+};
 
 const HF_API_BASE: &str = "https://api-inference.huggingface.co/models/Qwen/Qwen3-TTS";
 const DEFAULT_LOCAL_URL: &str = "http://localhost:8880";
@@ -38,10 +40,7 @@ impl Qwen3TtsProvider {
 
     /// Try local inference first; return the working base URL if reachable.
     async fn local_endpoint(&self) -> Option<String> {
-        let url = self
-            .local_url
-            .as_deref()
-            .unwrap_or(DEFAULT_LOCAL_URL);
+        let url = self.local_url.as_deref().unwrap_or(DEFAULT_LOCAL_URL);
         match self.client.get(format!("{url}/health")).send().await {
             Ok(resp) if resp.status().is_success() => Some(url.to_string()),
             _ => None,
@@ -49,10 +48,7 @@ impl Qwen3TtsProvider {
     }
 
     async fn synthesize_via_hf(&self, request: &TtsRequest) -> Result<AudioData, TtsError> {
-        let api_key = self
-            .api_key
-            .as_ref()
-            .ok_or(TtsError::InvalidKey)?;
+        let api_key = self.api_key.as_ref().ok_or(TtsError::InvalidKey)?;
 
         let payload = HfTtsPayload {
             inputs: request.text.clone(),
@@ -175,18 +171,19 @@ impl TtsProvider for Qwen3TtsProvider {
         true
     }
 
-    async fn clone_voice(
-        &self,
-        name: &str,
-        samples: &[Vec<u8>],
-    ) -> Result<VoiceInfo, TtsError> {
+    async fn clone_voice(&self, name: &str, samples: &[Vec<u8>]) -> Result<VoiceInfo, TtsError> {
         if samples.is_empty() {
-            return Err(TtsError::Other("At least one audio sample is required".into()));
+            return Err(TtsError::Other(
+                "At least one audio sample is required".into(),
+            ));
         }
         // Qwen3-TTS cloning works by passing reference audio at synthesis time.
         // We store a logical voice ID referencing the sample data.
         let voice_id = format!("cloned_{}", uuid::Uuid::new_v4());
-        debug!(voice_id, name, "Created cloned voice reference for Qwen3-TTS");
+        debug!(
+            voice_id,
+            name, "Created cloned voice reference for Qwen3-TTS"
+        );
         Ok(VoiceInfo {
             id: voice_id,
             name: name.to_string(),
@@ -256,7 +253,10 @@ mod tests {
     #[tokio::test]
     async fn clone_voice_creates_reference() {
         let provider = Qwen3TtsProvider::new(Some("test".into()), None);
-        let info = provider.clone_voice("My Voice", &[vec![0u8; 100]]).await.unwrap();
+        let info = provider
+            .clone_voice("My Voice", &[vec![0u8; 100]])
+            .await
+            .unwrap();
         assert!(info.id.starts_with("cloned_"));
         assert_eq!(info.name, "My Voice");
         assert!(info.is_cloned);

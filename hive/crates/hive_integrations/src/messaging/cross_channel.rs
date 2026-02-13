@@ -403,12 +403,7 @@ mod tests {
     #[test]
     fn test_link_channels() {
         let svc = make_service();
-        let link = svc.link_channels(
-            Platform::Slack,
-            "C01",
-            Platform::Discord,
-            "D01",
-        );
+        let link = svc.link_channels(Platform::Slack, "C01", Platform::Discord, "D01");
         assert!(link.id.starts_with("cl-"));
         assert_eq!(link.platform_a, Platform::Slack);
         assert_eq!(link.channel_a, "C01");
@@ -477,14 +472,7 @@ mod tests {
     #[test]
     fn test_list_thread_links() {
         let svc = make_service();
-        svc.link_threads(
-            Platform::Slack,
-            "C01",
-            "t1",
-            Platform::Discord,
-            "D01",
-            "t2",
-        );
+        svc.link_threads(Platform::Slack, "C01", "t1", Platform::Discord, "D01", "t2");
         assert_eq!(svc.list_thread_links().len(), 1);
     }
 
@@ -512,8 +500,20 @@ mod tests {
     fn test_recent_conversations() {
         let svc = make_service();
         svc.track_message(&make_message("msg-1", Platform::Slack, "C01", "a", "First"));
-        svc.track_message(&make_message("msg-2", Platform::Discord, "D01", "b", "Second"));
-        svc.track_message(&make_message("msg-3", Platform::Telegram, "T01", "c", "Third"));
+        svc.track_message(&make_message(
+            "msg-2",
+            Platform::Discord,
+            "D01",
+            "b",
+            "Second",
+        ));
+        svc.track_message(&make_message(
+            "msg-3",
+            Platform::Telegram,
+            "T01",
+            "c",
+            "Third",
+        ));
 
         let recent = svc.recent_conversations(2);
         assert_eq!(recent.len(), 2);
@@ -597,8 +597,7 @@ mod tests {
             "Hello world",
         ));
 
-        let results =
-            svc.search_platforms("hello", &[Platform::Slack], 10);
+        let results = svc.search_platforms("hello", &[Platform::Slack], 10);
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].platform, Platform::Slack);
     }

@@ -1,18 +1,18 @@
-pub mod storage;
 pub mod approval;
-pub mod plugin;
-pub mod email;
 pub mod calendar;
+pub mod email;
+pub mod plugin;
 pub mod reminders;
+pub mod storage;
 
 use std::sync::Arc;
 
-use storage::AssistantStorage;
-use email::EmailService;
+use approval::ApprovalService;
 use calendar::CalendarService;
 use calendar::daily_brief::{DailyBriefing, generate_briefing};
+use email::EmailService;
 use reminders::{ReminderService, TriggeredReminder};
-use approval::ApprovalService;
+use storage::AssistantStorage;
 
 // Re-export key types at crate root for convenience.
 pub use approval::{ApprovalLevel, ApprovalRequest, ApprovalStatus};
@@ -68,16 +68,10 @@ impl AssistantService {
         let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
 
         // Fetch today's events (stub returns empty).
-        let events = self
-            .calendar_service
-            .today_events()
-            .unwrap_or_default();
+        let events = self.calendar_service.today_events().unwrap_or_default();
 
         // Build email digest from empty inbox (stub).
-        let gmail_emails = self
-            .email_service
-            .fetch_gmail_inbox()
-            .unwrap_or_default();
+        let gmail_emails = self.email_service.fetch_gmail_inbox().unwrap_or_default();
         let email_digest = if gmail_emails.is_empty() {
             None
         } else {
@@ -88,10 +82,7 @@ impl AssistantService {
         };
 
         // Get active reminders.
-        let reminders = self
-            .reminder_service
-            .list_active()
-            .unwrap_or_default();
+        let reminders = self.reminder_service.list_active().unwrap_or_default();
 
         generate_briefing(&today, events, email_digest, reminders)
     }
@@ -156,7 +147,12 @@ mod tests {
 
         let briefing = service.daily_briefing();
         assert_eq!(briefing.active_reminders.len(), 1);
-        assert!(briefing.action_items.iter().any(|a| a.contains("Review PR")));
+        assert!(
+            briefing
+                .action_items
+                .iter()
+                .any(|a| a.contains("Review PR"))
+        );
     }
 
     #[test]
@@ -171,7 +167,10 @@ mod tests {
         let pending = service.approval_service.list_pending().unwrap();
         assert_eq!(pending.len(), 1);
 
-        service.approval_service.approve(&request.id, "admin").unwrap();
+        service
+            .approval_service
+            .approve(&request.id, "admin")
+            .unwrap();
 
         let pending_after = service.approval_service.list_pending().unwrap();
         assert!(pending_after.is_empty());
@@ -219,7 +218,12 @@ mod tests {
         // 4. Get briefing.
         let briefing = service.daily_briefing();
         assert_eq!(briefing.active_reminders.len(), 1);
-        assert!(briefing.action_items.iter().any(|a| a.contains("Future task")));
+        assert!(
+            briefing
+                .action_items
+                .iter()
+                .any(|a| a.contains("Future task"))
+        );
 
         // 5. Submit and approve something.
         let approval = service

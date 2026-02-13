@@ -4,7 +4,7 @@
 //! RFC 8058 / RFC 2369 unsubscribe headers, and provides bulk
 //! subscription management operations.
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -127,7 +127,12 @@ impl SubscriptionManager {
         //   <mailto:unsub@example.com>, <https://example.com/unsub>
         let entries: Vec<&str> = trimmed
             .split(',')
-            .map(|s| s.trim().trim_start_matches('<').trim_end_matches('>').trim())
+            .map(|s| {
+                s.trim()
+                    .trim_start_matches('<')
+                    .trim_end_matches('>')
+                    .trim()
+            })
             .filter(|s| !s.is_empty())
             .collect();
 
@@ -148,10 +153,7 @@ impl SubscriptionManager {
         // "List-Unsubscribe=One-Click" alongside an HTTPS URL, prefer
         // one-click unsubscribe.
         if let Some(post) = list_unsubscribe_post {
-            if post
-                .to_lowercase()
-                .contains("list-unsubscribe=one-click")
-            {
+            if post.to_lowercase().contains("list-unsubscribe=one-click") {
                 if let Some(url) = http_url {
                     return Some(UnsubscribeMethod::OneClick {
                         url: url.to_string(),
@@ -217,7 +219,11 @@ impl SubscriptionManager {
     /// Compute aggregate statistics.
     pub fn stats(&self) -> SubscriptionStats {
         let total = self.subscriptions.len();
-        let active = self.subscriptions.iter().filter(|s| s.is_subscribed).count();
+        let active = self
+            .subscriptions
+            .iter()
+            .filter(|s| s.is_subscribed)
+            .count();
         let unsubscribed = total - active;
         let newsletters = self
             .subscriptions
@@ -276,7 +282,12 @@ mod tests {
     #[test]
     fn test_track_updates_existing() {
         let mut mgr = manager();
-        mgr.track_subscription("news@example.com", Some("Old Name"), EmailCategory::Newsletter, None);
+        mgr.track_subscription(
+            "news@example.com",
+            Some("Old Name"),
+            EmailCategory::Newsletter,
+            None,
+        );
         let sub = mgr.track_subscription(
             "NEWS@example.com", // case-insensitive match
             Some("New Name"),
@@ -306,10 +317,8 @@ mod tests {
     // 4. Parse mailto unsubscribe
     #[test]
     fn test_parse_mailto_unsubscribe() {
-        let method = SubscriptionManager::parse_unsubscribe_headers(
-            "<mailto:unsub@example.com>",
-            None,
-        );
+        let method =
+            SubscriptionManager::parse_unsubscribe_headers("<mailto:unsub@example.com>", None);
         assert_eq!(
             method,
             Some(UnsubscribeMethod::MailTo {
@@ -370,10 +379,18 @@ mod tests {
     fn test_mark_unsubscribed() {
         let mut mgr = manager();
         mgr.track_subscription("news@example.com", None, EmailCategory::Newsletter, None);
-        assert!(mgr.get_subscription("news@example.com").unwrap().is_subscribed);
+        assert!(
+            mgr.get_subscription("news@example.com")
+                .unwrap()
+                .is_subscribed
+        );
 
         mgr.mark_unsubscribed("news@example.com").unwrap();
-        assert!(!mgr.get_subscription("news@example.com").unwrap().is_subscribed);
+        assert!(
+            !mgr.get_subscription("news@example.com")
+                .unwrap()
+                .is_subscribed
+        );
     }
 
     // 10. Mark unsubscribed fails for unknown sender
@@ -394,7 +411,11 @@ mod tests {
 
         let newsletters = mgr.list_newsletters();
         assert_eq!(newsletters.len(), 2);
-        assert!(newsletters.iter().all(|s| s.category == EmailCategory::Newsletter));
+        assert!(
+            newsletters
+                .iter()
+                .all(|s| s.category == EmailCategory::Newsletter)
+        );
     }
 
     // 12. Stats computation
@@ -459,9 +480,15 @@ mod tests {
     #[test]
     fn test_unsubscribe_method_serialization() {
         let methods = vec![
-            UnsubscribeMethod::OneClick { url: "https://example.com".into() },
-            UnsubscribeMethod::MailTo { address: "unsub@example.com".into() },
-            UnsubscribeMethod::Link { url: "https://example.com/link".into() },
+            UnsubscribeMethod::OneClick {
+                url: "https://example.com".into(),
+            },
+            UnsubscribeMethod::MailTo {
+                address: "unsub@example.com".into(),
+            },
+            UnsubscribeMethod::Link {
+                url: "https://example.com/link".into(),
+            },
         ];
         for method in &methods {
             let json = serde_json::to_string(method).unwrap();

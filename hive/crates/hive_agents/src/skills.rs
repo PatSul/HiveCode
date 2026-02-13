@@ -111,12 +111,36 @@ impl SkillsRegistry {
 
     fn register_builtins(&mut self) {
         let builtins = vec![
-            ("help", "Get help and documentation", "Display available commands, keyboard shortcuts, and feature guides."),
-            ("web-search", "Search the web", "Search the web for information relevant to the current conversation."),
-            ("code-review", "Review code", "Analyze code for bugs, security issues, and improvements."),
-            ("git-commit", "Commit changes", "Stage and commit changes with an AI-generated message."),
-            ("generate-docs", "Generate documentation", "Generate documentation for code files or functions."),
-            ("test-gen", "Generate tests", "Generate unit tests for the specified code."),
+            (
+                "help",
+                "Get help and documentation",
+                "Display available commands, keyboard shortcuts, and feature guides.",
+            ),
+            (
+                "web-search",
+                "Search the web",
+                "Search the web for information relevant to the current conversation.",
+            ),
+            (
+                "code-review",
+                "Review code",
+                "Analyze code for bugs, security issues, and improvements.",
+            ),
+            (
+                "git-commit",
+                "Commit changes",
+                "Stage and commit changes with an AI-generated message.",
+            ),
+            (
+                "generate-docs",
+                "Generate documentation",
+                "Generate documentation for code files or functions.",
+            ),
+            (
+                "test-gen",
+                "Generate tests",
+                "Generate unit tests for the specified code.",
+            ),
         ];
 
         for (name, desc, instructions) in builtins {
@@ -153,7 +177,13 @@ impl SkillsRegistry {
     }
 
     /// Install a new skill after injection scanning.
-    pub fn install(&mut self, name: String, description: String, instructions: String, source: SkillSource) -> Result<()> {
+    pub fn install(
+        &mut self,
+        name: String,
+        description: String,
+        instructions: String,
+        source: SkillSource,
+    ) -> Result<()> {
         let scan = scan_for_injection(&instructions);
         if !scan.safe {
             bail!(
@@ -199,7 +229,10 @@ impl SkillsRegistry {
         match self.skills.get(name) {
             Some(skill) if skill.enabled => {
                 if !verify_integrity(&skill.instructions, &skill.integrity_hash) {
-                    bail!("Skill '{}' integrity check failed — instructions may have been tampered", name);
+                    bail!(
+                        "Skill '{}' integrity check failed — instructions may have been tampered",
+                        name
+                    );
                 }
                 Ok(&skill.instructions)
             }
@@ -295,7 +328,14 @@ mod tests {
     #[test]
     fn uninstall_skill() {
         let mut registry = SkillsRegistry::new();
-        registry.install("temp".into(), "Temp".into(), "temp instructions".into(), SkillSource::Custom).unwrap();
+        registry
+            .install(
+                "temp".into(),
+                "Temp".into(),
+                "temp instructions".into(),
+                SkillSource::Custom,
+            )
+            .unwrap();
         assert!(registry.uninstall("temp"));
         assert!(!registry.uninstall("temp"));
     }

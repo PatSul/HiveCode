@@ -103,7 +103,11 @@ impl InteractiveShell {
     pub fn new(cwd: Option<&Path>) -> Result<Self> {
         let working_dir = match cwd {
             Some(p) => {
-                anyhow::ensure!(p.exists(), "Working directory does not exist: {}", p.display());
+                anyhow::ensure!(
+                    p.exists(),
+                    "Working directory does not exist: {}",
+                    p.display()
+                );
                 anyhow::ensure!(p.is_dir(), "Path is not a directory: {}", p.display());
                 p.to_path_buf()
             }
@@ -136,9 +140,9 @@ impl InteractiveShell {
             cmd.creation_flags(0x00000200); // CREATE_NEW_PROCESS_GROUP
         }
 
-        let mut child = cmd.spawn().with_context(|| {
-            format!("Failed to spawn shell: {program}")
-        })?;
+        let mut child = cmd
+            .spawn()
+            .with_context(|| format!("Failed to spawn shell: {program}"))?;
 
         let stdin = child.stdin.take().context("Failed to open shell stdin")?;
         let stdout = child.stdout.take().context("Failed to open shell stdout")?;
@@ -177,7 +181,10 @@ impl InteractiveShell {
             .write_all(input.as_bytes())
             .await
             .context("Failed to write to shell stdin")?;
-        self.stdin.flush().await.context("Failed to flush shell stdin")?;
+        self.stdin
+            .flush()
+            .await
+            .context("Failed to flush shell stdin")?;
         Ok(())
     }
 
@@ -239,7 +246,11 @@ impl InteractiveShell {
     /// Returns `Ok(Some(code))` if the process has exited, `Ok(None)` if it
     /// is still running, or an error if the status could not be queried.
     pub fn try_wait(&mut self) -> Result<Option<i32>> {
-        match self.child.try_wait().context("Failed to query process status")? {
+        match self
+            .child
+            .try_wait()
+            .context("Failed to query process status")?
+        {
             Some(status) => Ok(Some(status.code().unwrap_or(-1))),
             None => Ok(None),
         }
@@ -400,7 +411,10 @@ mod tests {
     #[tokio::test]
     async fn is_running_returns_true_for_live_shell() {
         let mut shell = InteractiveShell::new(None).unwrap();
-        assert!(shell.is_running(), "shell should be running immediately after spawn");
+        assert!(
+            shell.is_running(),
+            "shell should be running immediately after spawn"
+        );
         let _ = shell.kill().await;
     }
 
@@ -410,7 +424,10 @@ mod tests {
         shell.kill().await.expect("kill should succeed");
         // Give the OS a moment to reap.
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        assert!(!shell.is_running(), "shell should not be running after kill");
+        assert!(
+            !shell.is_running(),
+            "shell should not be running after kill"
+        );
     }
 
     // -- Write + read (echo) -------------------------------------------------
@@ -431,19 +448,16 @@ mod tests {
         let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
         let mut found = false;
         while tokio::time::Instant::now() < deadline {
-            match tokio::time::timeout(
-                std::time::Duration::from_millis(200),
-                shell.read_async(),
-            )
-            .await
+            match tokio::time::timeout(std::time::Duration::from_millis(200), shell.read_async())
+                .await
             {
                 Ok(Some(ShellOutput::Stdout(line))) if line.contains("hive_test_marker") => {
                     found = true;
                     break;
                 }
-                Ok(Some(_)) => continue,   // skip other output (prompt, etc.)
-                Ok(None) => break,          // channel closed
-                Err(_) => continue,         // timeout, try again
+                Ok(Some(_)) => continue, // skip other output (prompt, etc.)
+                Ok(None) => break,       // channel closed
+                Err(_) => continue,      // timeout, try again
             }
         }
         assert!(found, "expected to read back 'hive_test_marker' from shell");

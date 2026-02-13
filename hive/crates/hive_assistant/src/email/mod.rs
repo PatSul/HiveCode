@@ -1,5 +1,5 @@
-pub mod inbox_agent;
 pub mod compose_agent;
+pub mod inbox_agent;
 
 use hive_shield::HiveShield;
 use serde::{Deserialize, Serialize};
@@ -123,11 +123,7 @@ impl EmailService {
                 Ok(())
             }
             hive_shield::ShieldAction::Allow | hive_shield::ShieldAction::Warn(_) => {
-                tracing::info!(
-                    to = to,
-                    subject = subject,
-                    "Email send requested (stub)"
-                );
+                tracing::info!(to = to, subject = subject, "Email send requested (stub)");
                 // TODO: implement with actual SMTP/API sending
                 Ok(())
             }

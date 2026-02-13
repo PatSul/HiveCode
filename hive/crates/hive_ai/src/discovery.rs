@@ -36,11 +36,36 @@ struct WellKnownPort {
 }
 
 const WELL_KNOWN_PORTS: &[WellKnownPort] = &[
-    WellKnownPort { port: 11434, provider_type: ProviderType::Ollama, name: "Ollama", protocol: ProbeProtocol::Ollama },
-    WellKnownPort { port: 1234, provider_type: ProviderType::LMStudio, name: "LM Studio", protocol: ProbeProtocol::OpenAICompat },
-    WellKnownPort { port: 8000, provider_type: ProviderType::GenericLocal, name: "vLLM", protocol: ProbeProtocol::OpenAICompat },
-    WellKnownPort { port: 8080, provider_type: ProviderType::GenericLocal, name: "LocalAI", protocol: ProbeProtocol::OpenAICompat },
-    WellKnownPort { port: 5000, provider_type: ProviderType::GenericLocal, name: "TextGenWebUI", protocol: ProbeProtocol::OpenAICompat },
+    WellKnownPort {
+        port: 11434,
+        provider_type: ProviderType::Ollama,
+        name: "Ollama",
+        protocol: ProbeProtocol::Ollama,
+    },
+    WellKnownPort {
+        port: 1234,
+        provider_type: ProviderType::LMStudio,
+        name: "LM Studio",
+        protocol: ProbeProtocol::OpenAICompat,
+    },
+    WellKnownPort {
+        port: 8000,
+        provider_type: ProviderType::GenericLocal,
+        name: "vLLM",
+        protocol: ProbeProtocol::OpenAICompat,
+    },
+    WellKnownPort {
+        port: 8080,
+        provider_type: ProviderType::GenericLocal,
+        name: "LocalAI",
+        protocol: ProbeProtocol::OpenAICompat,
+    },
+    WellKnownPort {
+        port: 5000,
+        provider_type: ProviderType::GenericLocal,
+        name: "TextGenWebUI",
+        protocol: ProbeProtocol::OpenAICompat,
+    },
 ];
 
 // ---------------------------------------------------------------------------
@@ -168,9 +193,7 @@ impl LocalDiscovery {
     /// Run a full scan: probe config URLs + well-known ports concurrently.
     pub async fn scan_all(&self) {
         let mut futures: Vec<
-            std::pin::Pin<
-                Box<dyn std::future::Future<Output = Option<DiscoveredProvider>> + Send>,
-            >,
+            std::pin::Pin<Box<dyn std::future::Future<Output = Option<DiscoveredProvider>> + Send>>,
         > = Vec::new();
         let mut scanned_ports: HashSet<u16> = HashSet::new();
 
@@ -248,9 +271,7 @@ async fn probe(
     let port = extract_port(url).unwrap_or(0);
 
     match protocol {
-        ProbeProtocol::Ollama => {
-            probe_ollama(client, url, provider_type, name, port).await
-        }
+        ProbeProtocol::Ollama => probe_ollama(client, url, provider_type, name, port).await,
         ProbeProtocol::OpenAICompat => {
             probe_openai_compat(client, url, provider_type, name, port).await
         }
@@ -477,9 +498,7 @@ mod tests {
 
     #[test]
     fn test_duplicate_port_dedup() {
-        let config_urls = vec![
-            (ProviderType::Ollama, "http://localhost:11434".to_string()),
-        ];
+        let config_urls = vec![(ProviderType::Ollama, "http://localhost:11434".to_string())];
         let discovery = LocalDiscovery::new(config_urls);
         assert_eq!(discovery.config_urls.len(), 1);
         assert_eq!(discovery.config_urls[0].1, "http://localhost:11434");
@@ -490,9 +509,10 @@ mod tests {
         // Probe a port that is almost certainly not running any AI server.
         // We only care that scan_all completes without panicking and produces
         // valid state. Real servers may be running on well-known ports.
-        let discovery = LocalDiscovery::new(vec![
-            (ProviderType::Ollama, "http://127.0.0.1:19999".to_string()),
-        ]);
+        let discovery = LocalDiscovery::new(vec![(
+            ProviderType::Ollama,
+            "http://127.0.0.1:19999".to_string(),
+        )]);
         discovery.scan_all().await;
         let state = discovery.snapshot();
         assert!(state.last_scan.is_some());

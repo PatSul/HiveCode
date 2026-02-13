@@ -89,10 +89,7 @@ impl GroqProvider {
     // -----------------------------------------------------------------------
 
     /// Convert generic messages to the Groq wire format.
-    fn convert_messages(
-        messages: &[ChatMessage],
-        system_prompt: Option<&str>,
-    ) -> Vec<GroqMessage> {
+    fn convert_messages(messages: &[ChatMessage], system_prompt: Option<&str>) -> Vec<GroqMessage> {
         let mut out = Vec::with_capacity(messages.len() + 1);
 
         if let Some(sys) = system_prompt {
@@ -122,10 +119,7 @@ impl GroqProvider {
     fn build_body(&self, request: &ChatRequest, stream: bool) -> GroqChatRequest {
         GroqChatRequest {
             model: request.model.clone(),
-            messages: Self::convert_messages(
-                &request.messages,
-                request.system_prompt.as_deref(),
-            ),
+            messages: Self::convert_messages(&request.messages, request.system_prompt.as_deref()),
             stream,
             max_tokens: Some(request.max_tokens),
             temperature: request.temperature,
@@ -141,9 +135,7 @@ impl GroqProvider {
 
     /// Get the API key or return an error.
     fn require_key(&self) -> Result<&str, ProviderError> {
-        self.api_key
-            .as_deref()
-            .ok_or(ProviderError::InvalidKey)
+        self.api_key.as_deref().ok_or(ProviderError::InvalidKey)
     }
 
     /// Send a POST to the chat completions endpoint.
@@ -166,9 +158,7 @@ impl GroqProvider {
 
         // Map HTTP error codes to typed errors.
         let status = resp.status();
-        if status == reqwest::StatusCode::UNAUTHORIZED
-            || status == reqwest::StatusCode::FORBIDDEN
-        {
+        if status == reqwest::StatusCode::UNAUTHORIZED || status == reqwest::StatusCode::FORBIDDEN {
             return Err(ProviderError::InvalidKey);
         }
         if status == reqwest::StatusCode::TOO_MANY_REQUESTS {
@@ -221,9 +211,10 @@ impl AiProvider for GroqProvider {
             .await
             .map_err(|e| ProviderError::Other(format!("JSON parse error: {e}")))?;
 
-        let choice = data.choices.first().ok_or_else(|| {
-            ProviderError::Other("No choices in Groq response".into())
-        })?;
+        let choice = data
+            .choices
+            .first()
+            .ok_or_else(|| ProviderError::Other("No choices in Groq response".into()))?;
 
         let content = choice.message.content.clone().unwrap_or_default();
 
@@ -234,15 +225,18 @@ impl AiProvider for GroqProvider {
             _ => FinishReason::Stop,
         };
 
-        let usage = data.usage.map(|u| {
-            let p = u.prompt_tokens.unwrap_or(0);
-            let c = u.completion_tokens.unwrap_or(0);
-            TokenUsage {
-                prompt_tokens: p,
-                completion_tokens: c,
-                total_tokens: u.total_tokens.unwrap_or(p + c),
-            }
-        }).unwrap_or_default();
+        let usage = data
+            .usage
+            .map(|u| {
+                let p = u.prompt_tokens.unwrap_or(0);
+                let c = u.completion_tokens.unwrap_or(0);
+                TokenUsage {
+                    prompt_tokens: p,
+                    completion_tokens: c,
+                    total_tokens: u.total_tokens.unwrap_or(p + c),
+                }
+            })
+            .unwrap_or_default();
 
         Ok(ChatResponse {
             content,

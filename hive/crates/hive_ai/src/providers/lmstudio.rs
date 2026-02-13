@@ -117,10 +117,7 @@ impl LMStudioProvider {
     fn build_body(&self, request: &ChatRequest, stream: bool) -> LMStudioChatRequest {
         LMStudioChatRequest {
             model: request.model.clone(),
-            messages: Self::convert_messages(
-                &request.messages,
-                request.system_prompt.as_deref(),
-            ),
+            messages: Self::convert_messages(&request.messages, request.system_prompt.as_deref()),
             stream,
             max_tokens: Some(request.max_tokens),
             temperature: request.temperature,
@@ -238,9 +235,10 @@ impl AiProvider for LMStudioProvider {
             .await
             .map_err(|e| ProviderError::Other(format!("JSON parse error: {e}")))?;
 
-        let choice = data.choices.first().ok_or_else(|| {
-            ProviderError::Other("No choices in LM Studio response".into())
-        })?;
+        let choice = data
+            .choices
+            .first()
+            .ok_or_else(|| ProviderError::Other("No choices in LM Studio response".into()))?;
 
         let content = choice.message.content.clone().unwrap_or_default();
 
@@ -461,7 +459,11 @@ mod tests {
             chunks.push(chunk);
         }
 
-        assert!(chunks.len() >= 2, "expected at least 2 chunks, got {}", chunks.len());
+        assert!(
+            chunks.len() >= 2,
+            "expected at least 2 chunks, got {}",
+            chunks.len()
+        );
         assert_eq!(chunks[0].content, "Hello");
         assert!(!chunks[0].done);
         assert_eq!(chunks[1].content, " world");

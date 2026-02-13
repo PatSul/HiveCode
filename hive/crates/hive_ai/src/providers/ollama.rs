@@ -224,10 +224,7 @@ impl AiProvider for OllamaProvider {
             .await
             .map_err(|e| ProviderError::Other(format!("JSON parse error: {e}")))?;
 
-        let content = data
-            .message
-            .map(|m| m.content)
-            .unwrap_or_default();
+        let content = data.message.map(|m| m.content).unwrap_or_default();
 
         let prompt_tokens = data.prompt_eval_count.unwrap_or(0);
         let completion_tokens = data.eval_count.unwrap_or(0);
@@ -302,10 +299,7 @@ impl AiProvider for OllamaProvider {
 
                     match serde_json::from_str::<OllamaChatResponse>(line) {
                         Ok(data) => {
-                            let content = data
-                                .message
-                                .map(|m| m.content)
-                                .unwrap_or_default();
+                            let content = data.message.map(|m| m.content).unwrap_or_default();
 
                             let done = data.done;
 

@@ -161,18 +161,14 @@ impl LocalAiDetector {
         match result {
             Ok(resp) if resp.status().is_success() => {
                 let models = match probe.model_parser {
-                    ModelParser::OllamaTags => {
-                        match resp.text().await {
-                            Ok(body) => self.parse_ollama_tags(&body),
-                            Err(_) => Vec::new(),
-                        }
-                    }
-                    ModelParser::OpenAIModels => {
-                        match resp.text().await {
-                            Ok(body) => self.parse_openai_models(&body),
-                            Err(_) => Vec::new(),
-                        }
-                    }
+                    ModelParser::OllamaTags => match resp.text().await {
+                        Ok(body) => self.parse_ollama_tags(&body),
+                        Err(_) => Vec::new(),
+                    },
+                    ModelParser::OpenAIModels => match resp.text().await {
+                        Ok(body) => self.parse_openai_models(&body),
+                        Err(_) => Vec::new(),
+                    },
                     ModelParser::HealthOnly => Vec::new(),
                 };
 

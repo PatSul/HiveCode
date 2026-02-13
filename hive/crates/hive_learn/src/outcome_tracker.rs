@@ -98,12 +98,7 @@ impl OutcomeTracker {
     }
 
     /// Rolling average quality for a task_type + tier combination.
-    pub fn task_tier_quality(
-        &self,
-        task_type: &str,
-        tier: &str,
-        days: u32,
-    ) -> Result<f64, String> {
+    pub fn task_tier_quality(&self, task_type: &str, tier: &str, days: u32) -> Result<f64, String> {
         self.storage.task_tier_quality(task_type, tier, days)
     }
 }
@@ -255,10 +250,7 @@ mod tests {
     fn test_detect_accepted_high_similarity() {
         // Near-identical or very high overlap
         let msg = "Here is the implementation of the sorting algorithm with O(n log n) complexity";
-        assert_eq!(
-            OutcomeTracker::detect_outcome(msg, msg),
-            Outcome::Accepted
-        );
+        assert_eq!(OutcomeTracker::detect_outcome(msg, msg), Outcome::Accepted);
     }
 
     #[test]
@@ -282,30 +274,26 @@ mod tests {
 
     #[test]
     fn test_quality_score_accepted_no_penalties() {
-        let score =
-            OutcomeTracker::compute_quality_score(Outcome::Accepted, 0, None, 100, None);
+        let score = OutcomeTracker::compute_quality_score(Outcome::Accepted, 0, None, 100, None);
         assert!((score - 0.9).abs() < f64::EPSILON);
     }
 
     #[test]
     fn test_quality_score_regenerated() {
-        let score =
-            OutcomeTracker::compute_quality_score(Outcome::Regenerated, 0, None, 100, None);
+        let score = OutcomeTracker::compute_quality_score(Outcome::Regenerated, 0, None, 100, None);
         assert!((score - 0.2).abs() < f64::EPSILON);
     }
 
     #[test]
     fn test_quality_score_follow_up_penalty() {
-        let score =
-            OutcomeTracker::compute_quality_score(Outcome::Accepted, 3, None, 100, None);
+        let score = OutcomeTracker::compute_quality_score(Outcome::Accepted, 3, None, 100, None);
         // 0.9 - 3*0.05 = 0.75
         assert!((score - 0.75).abs() < f64::EPSILON);
     }
 
     #[test]
     fn test_quality_score_follow_up_penalty_caps_at_0_3() {
-        let score =
-            OutcomeTracker::compute_quality_score(Outcome::Accepted, 100, None, 100, None);
+        let score = OutcomeTracker::compute_quality_score(Outcome::Accepted, 100, None, 100, None);
         // 0.9 - 0.3 (capped) = 0.6
         assert!((score - 0.6).abs() < f64::EPSILON);
     }
@@ -432,7 +420,9 @@ mod tests {
             tracker.record(&record).unwrap();
         }
 
-        let avg = tracker.task_tier_quality("debugging", "standard", 30).unwrap();
+        let avg = tracker
+            .task_tier_quality("debugging", "standard", 30)
+            .unwrap();
         assert!((avg - 0.8).abs() < f64::EPSILON);
     }
 

@@ -86,19 +86,12 @@ impl PatternLibrary {
     /// Search for patterns matching a query string.
     ///
     /// Searches across pattern text, description, and category fields.
-    pub fn search(
-        &self,
-        query: &str,
-        limit: usize,
-    ) -> Result<Vec<CodePattern>, String> {
+    pub fn search(&self, query: &str, limit: usize) -> Result<Vec<CodePattern>, String> {
         self.storage.search_patterns(query, limit)
     }
 
     /// Get the most-used patterns, sorted by use_count descending.
-    pub fn popular_patterns(
-        &self,
-        limit: usize,
-    ) -> Result<Vec<CodePattern>, String> {
+    pub fn popular_patterns(&self, limit: usize) -> Result<Vec<CodePattern>, String> {
         self.storage.popular_patterns(limit)
     }
 }
@@ -120,10 +113,7 @@ fn classify_line(trimmed: &str, language: &str) -> Option<(String, String)> {
 fn classify_rust_line(line: &str) -> Option<(String, String)> {
     if line.starts_with("pub fn ") || line.starts_with("fn ") {
         let name = extract_fn_name(line, "fn ");
-        return Some((
-            "function".to_string(),
-            format!("Rust function: {name}"),
-        ));
+        return Some(("function".to_string(), format!("Rust function: {name}")));
     }
     if line.starts_with("pub async fn ") || line.starts_with("async fn ") {
         let name = extract_fn_name(line, "fn ");
@@ -134,24 +124,15 @@ fn classify_rust_line(line: &str) -> Option<(String, String)> {
     }
     if line.starts_with("pub struct ") || line.starts_with("struct ") {
         let name = extract_type_name(line, "struct ");
-        return Some((
-            "struct".to_string(),
-            format!("Rust struct: {name}"),
-        ));
+        return Some(("struct".to_string(), format!("Rust struct: {name}")));
     }
     if line.starts_with("pub enum ") || line.starts_with("enum ") {
         let name = extract_type_name(line, "enum ");
-        return Some((
-            "enum".to_string(),
-            format!("Rust enum: {name}"),
-        ));
+        return Some(("enum".to_string(), format!("Rust enum: {name}")));
     }
     if line.starts_with("pub trait ") || line.starts_with("trait ") {
         let name = extract_type_name(line, "trait ");
-        return Some((
-            "trait".to_string(),
-            format!("Rust trait: {name}"),
-        ));
+        return Some(("trait".to_string(), format!("Rust trait: {name}")));
     }
     if line.starts_with("impl ") {
         return Some((
@@ -161,10 +142,7 @@ fn classify_rust_line(line: &str) -> Option<(String, String)> {
     }
     if line.starts_with("pub type ") || line.starts_with("type ") {
         let name = extract_type_name(line, "type ");
-        return Some((
-            "type_alias".to_string(),
-            format!("Rust type alias: {name}"),
-        ));
+        return Some(("type_alias".to_string(), format!("Rust type alias: {name}")));
     }
     None
 }
@@ -172,10 +150,7 @@ fn classify_rust_line(line: &str) -> Option<(String, String)> {
 fn classify_python_line(line: &str) -> Option<(String, String)> {
     if line.starts_with("def ") {
         let name = extract_fn_name(line, "def ");
-        return Some((
-            "function".to_string(),
-            format!("Python function: {name}"),
-        ));
+        return Some(("function".to_string(), format!("Python function: {name}")));
     }
     if line.starts_with("async def ") {
         let name = extract_fn_name(line, "async def ");
@@ -186,10 +161,7 @@ fn classify_python_line(line: &str) -> Option<(String, String)> {
     }
     if line.starts_with("class ") {
         let name = extract_type_name(line, "class ");
-        return Some((
-            "class".to_string(),
-            format!("Python class: {name}"),
-        ));
+        return Some(("class".to_string(), format!("Python class: {name}")));
     }
     None
 }
@@ -197,10 +169,7 @@ fn classify_python_line(line: &str) -> Option<(String, String)> {
 fn classify_js_line(line: &str) -> Option<(String, String)> {
     if line.starts_with("function ") {
         let name = extract_fn_name(line, "function ");
-        return Some((
-            "function".to_string(),
-            format!("JS function: {name}"),
-        ));
+        return Some(("function".to_string(), format!("JS function: {name}")));
     }
     if line.starts_with("async function ") {
         let name = extract_fn_name(line, "async function ");
@@ -230,10 +199,7 @@ fn classify_js_line(line: &str) -> Option<(String, String)> {
             "class "
         };
         let name = extract_type_name(line, keyword);
-        return Some((
-            "class".to_string(),
-            format!("JS class: {name}"),
-        ));
+        return Some(("class".to_string(), format!("JS class: {name}")));
     }
     if line.starts_with("interface ") || line.starts_with("export interface ") {
         let keyword = if line.starts_with("export interface ") {
@@ -242,10 +208,7 @@ fn classify_js_line(line: &str) -> Option<(String, String)> {
             "interface "
         };
         let name = extract_type_name(line, keyword);
-        return Some((
-            "interface".to_string(),
-            format!("TS interface: {name}"),
-        ));
+        return Some(("interface".to_string(), format!("TS interface: {name}")));
     }
     None
 }
@@ -253,24 +216,15 @@ fn classify_js_line(line: &str) -> Option<(String, String)> {
 fn classify_go_line(line: &str) -> Option<(String, String)> {
     if line.starts_with("func ") {
         let name = extract_fn_name(line, "func ");
-        return Some((
-            "function".to_string(),
-            format!("Go function: {name}"),
-        ));
+        return Some(("function".to_string(), format!("Go function: {name}")));
     }
     if line.starts_with("type ") && line.contains("struct") {
         let name = extract_type_name(line, "type ");
-        return Some((
-            "struct".to_string(),
-            format!("Go struct: {name}"),
-        ));
+        return Some(("struct".to_string(), format!("Go struct: {name}")));
     }
     if line.starts_with("type ") && line.contains("interface") {
         let name = extract_type_name(line, "type ");
-        return Some((
-            "interface".to_string(),
-            format!("Go interface: {name}"),
-        ));
+        return Some(("interface".to_string(), format!("Go interface: {name}")));
     }
     None
 }
@@ -284,10 +238,7 @@ fn classify_java_line(line: &str) -> Option<(String, String)> {
             .split(|c: char| !c.is_alphanumeric() && c != '_')
             .next()
             .unwrap_or("unknown");
-        return Some((
-            "class".to_string(),
-            format!("Java class: {name}"),
-        ));
+        return Some(("class".to_string(), format!("Java class: {name}")));
     }
     if line.contains("interface ") {
         let keyword_pos = line.find("interface ")?;
@@ -296,10 +247,7 @@ fn classify_java_line(line: &str) -> Option<(String, String)> {
             .split(|c: char| !c.is_alphanumeric() && c != '_')
             .next()
             .unwrap_or("unknown");
-        return Some((
-            "interface".to_string(),
-            format!("Java interface: {name}"),
-        ));
+        return Some(("interface".to_string(), format!("Java interface: {name}")));
     }
     None
 }
@@ -307,10 +255,7 @@ fn classify_java_line(line: &str) -> Option<(String, String)> {
 fn classify_c_line(line: &str) -> Option<(String, String)> {
     if line.starts_with("struct ") {
         let name = extract_type_name(line, "struct ");
-        return Some((
-            "struct".to_string(),
-            format!("C struct: {name}"),
-        ));
+        return Some(("struct".to_string(), format!("C struct: {name}")));
     }
     if line.starts_with("typedef ") {
         return Some((
@@ -471,9 +416,11 @@ mod tests {
         let code = "class DataProcessor:\n    def __init__(self):\n        pass";
         let patterns = lib.extract_patterns(code, "python", 0.9).unwrap();
         assert!(patterns.iter().any(|p| p.category == "class"));
-        assert!(patterns
-            .iter()
-            .any(|p| p.description.contains("DataProcessor")));
+        assert!(
+            patterns
+                .iter()
+                .any(|p| p.description.contains("DataProcessor"))
+        );
     }
 
     #[test]
@@ -656,10 +603,7 @@ impl App {
             extract_type_name("pub struct MyStruct {", "struct "),
             "MyStruct"
         );
-        assert_eq!(
-            extract_type_name("enum Status {", "enum "),
-            "Status"
-        );
+        assert_eq!(extract_type_name("enum Status {", "enum "), "Status");
     }
 
     #[test]

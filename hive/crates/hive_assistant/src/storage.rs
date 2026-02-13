@@ -25,8 +25,8 @@ impl AssistantStorage {
 
     /// Create an in-memory assistant database (useful for tests).
     pub fn in_memory() -> Result<Self, String> {
-        let conn =
-            Connection::open_in_memory().map_err(|e| format!("Failed to open in-memory db: {e}"))?;
+        let conn = Connection::open_in_memory()
+            .map_err(|e| format!("Failed to open in-memory db: {e}"))?;
         Self::configure_and_init(&conn)?;
         Ok(Self {
             conn: Mutex::new(conn),
@@ -91,7 +91,10 @@ impl AssistantStorage {
 
     /// Insert a new reminder.
     pub fn insert_reminder(&self, reminder: &Reminder) -> Result<(), String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         let (trigger_type, trigger_at, recurring_cron) = serialize_trigger(&reminder.trigger);
         let status_str = serialize_status(&reminder.status);
         conn.execute(
@@ -115,7 +118,10 @@ impl AssistantStorage {
 
     /// Get a reminder by ID.
     pub fn get_reminder(&self, id: &str) -> Result<Option<Reminder>, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         let mut stmt = conn
             .prepare(
                 "SELECT id, title, description, trigger_type, trigger_at, recurring_cron, status, created_at, updated_at
@@ -128,14 +134,19 @@ impl AssistantStorage {
             .map_err(|e| format!("Failed to query reminder: {e}"))?;
 
         match rows.next() {
-            Some(row) => Ok(Some(row.map_err(|e| format!("Failed to read reminder: {e}"))?)),
+            Some(row) => Ok(Some(
+                row.map_err(|e| format!("Failed to read reminder: {e}"))?,
+            )),
             None => Ok(None),
         }
     }
 
     /// List reminders filtered by status.
     pub fn list_reminders_by_status(&self, status: &str) -> Result<Vec<Reminder>, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         let mut stmt = conn
             .prepare(
                 "SELECT id, title, description, trigger_type, trigger_at, recurring_cron, status, created_at, updated_at
@@ -161,7 +172,10 @@ impl AssistantStorage {
         status: &str,
         updated_at: &str,
     ) -> Result<bool, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         let affected = conn
             .execute(
                 "UPDATE reminders SET status = ?1, updated_at = ?2 WHERE id = ?3",
@@ -182,7 +196,10 @@ impl AssistantStorage {
         last_poll_at: &str,
         last_message_id: &str,
     ) -> Result<(), String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         conn.execute(
             "INSERT INTO email_poll_state (provider, last_poll_at, last_message_id)
              VALUES (?1, ?2, ?3)
@@ -196,13 +213,15 @@ impl AssistantStorage {
     }
 
     /// Get the poll state for a given provider.
-    pub fn get_poll_state(
-        &self,
-        provider: &str,
-    ) -> Result<Option<(String, String)>, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+    pub fn get_poll_state(&self, provider: &str) -> Result<Option<(String, String)>, String> {
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         let mut stmt = conn
-            .prepare("SELECT last_poll_at, last_message_id FROM email_poll_state WHERE provider = ?1")
+            .prepare(
+                "SELECT last_poll_at, last_message_id FROM email_poll_state WHERE provider = ?1",
+            )
             .map_err(|e| format!("Failed to prepare query: {e}"))?;
 
         let mut rows = stmt
@@ -212,7 +231,9 @@ impl AssistantStorage {
             .map_err(|e| format!("Failed to query poll state: {e}"))?;
 
         match rows.next() {
-            Some(row) => Ok(Some(row.map_err(|e| format!("Failed to read poll state: {e}"))?)),
+            Some(row) => Ok(Some(
+                row.map_err(|e| format!("Failed to read poll state: {e}"))?,
+            )),
             None => Ok(None),
         }
     }
@@ -223,7 +244,10 @@ impl AssistantStorage {
 
     /// Insert an email digest.
     pub fn insert_digest(&self, digest: &EmailDigest) -> Result<(), String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         let provider_str = format!("{:?}", digest.provider);
         conn.execute(
             "INSERT INTO email_digests (id, provider, summary, email_count, created_at)
@@ -242,7 +266,10 @@ impl AssistantStorage {
 
     /// Get the most recent digest for a provider.
     pub fn latest_digest(&self, provider: &str) -> Result<Option<EmailDigest>, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         let mut stmt = conn
             .prepare(
                 "SELECT id, provider, summary, email_count, created_at
@@ -264,7 +291,9 @@ impl AssistantStorage {
             .map_err(|e| format!("Failed to query digest: {e}"))?;
 
         match rows.next() {
-            Some(row) => Ok(Some(row.map_err(|e| format!("Failed to read digest: {e}"))?)),
+            Some(row) => Ok(Some(
+                row.map_err(|e| format!("Failed to read digest: {e}"))?,
+            )),
             None => Ok(None),
         }
     }
@@ -275,7 +304,10 @@ impl AssistantStorage {
 
     /// Insert an approval request into the log.
     pub fn insert_approval(&self, request: &ApprovalRequest) -> Result<(), String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         let level_str = format!("{:?}", request.level);
         conn.execute(
             "INSERT INTO approval_log (id, action, resource, level, status, requested_by, created_at)
@@ -301,7 +333,10 @@ impl AssistantStorage {
         decided_by: &str,
         decided_at: &str,
     ) -> Result<bool, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         let affected = conn
             .execute(
                 "UPDATE approval_log SET status = ?1, decided_by = ?2, decided_at = ?3 WHERE id = ?4",
@@ -313,7 +348,10 @@ impl AssistantStorage {
 
     /// List approvals by status.
     pub fn list_approvals_by_status(&self, status: &str) -> Result<Vec<ApprovalRequest>, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         let mut stmt = conn
             .prepare(
                 "SELECT id, action, resource, level, requested_by, created_at
@@ -343,7 +381,10 @@ impl AssistantStorage {
 
     /// Get an approval by ID.
     pub fn get_approval(&self, id: &str) -> Result<Option<ApprovalRequest>, String> {
-        let conn = self.conn.lock().map_err(|e| format!("Lock poisoned: {e}"))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| format!("Lock poisoned: {e}"))?;
         let mut stmt = conn
             .prepare(
                 "SELECT id, action, resource, level, requested_by, created_at
@@ -365,7 +406,9 @@ impl AssistantStorage {
             .map_err(|e| format!("Failed to query approval: {e}"))?;
 
         match rows.next() {
-            Some(row) => Ok(Some(row.map_err(|e| format!("Failed to read approval: {e}"))?)),
+            Some(row) => Ok(Some(
+                row.map_err(|e| format!("Failed to read approval: {e}"))?,
+            )),
             None => Ok(None),
         }
     }
@@ -398,12 +441,8 @@ fn deserialize_trigger(
             // Fallback: use epoch if parsing fails
             ReminderTrigger::At(chrono::DateTime::UNIX_EPOCH)
         }
-        "recurring" => {
-            ReminderTrigger::Recurring(recurring_cron.unwrap_or_default())
-        }
-        "on_event" => {
-            ReminderTrigger::OnEvent(trigger_at.unwrap_or_default())
-        }
+        "recurring" => ReminderTrigger::Recurring(recurring_cron.unwrap_or_default()),
+        "on_event" => ReminderTrigger::OnEvent(trigger_at.unwrap_or_default()),
         _ => ReminderTrigger::OnEvent("unknown".to_string()),
     }
 }
@@ -750,12 +789,7 @@ mod tests {
         storage.insert_approval(&request).unwrap();
 
         let updated = storage
-            .update_approval_decision(
-                "apr-dec",
-                "approved",
-                "admin",
-                "2026-02-10T13:00:00Z",
-            )
+            .update_approval_decision("apr-dec", "approved", "admin", "2026-02-10T13:00:00Z")
             .unwrap();
         assert!(updated);
 

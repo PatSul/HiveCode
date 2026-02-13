@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
-use reqwest::header::{HeaderMap, HeaderValue};
 use reqwest::Client;
+use reqwest::header::{HeaderMap, HeaderValue};
 use serde_json::Value;
 use tracing::debug;
 
@@ -23,11 +23,14 @@ impl SupabaseClient {
         let anon_key = anon_key.into();
 
         let mut headers = HeaderMap::new();
-        let key_value = HeaderValue::from_str(&anon_key)
-            .context("invalid characters in Supabase anon key")?;
+        let key_value =
+            HeaderValue::from_str(&anon_key).context("invalid characters in Supabase anon key")?;
         headers.insert("apikey", key_value.clone());
-        headers.insert("Authorization", HeaderValue::from_str(&format!("Bearer {anon_key}"))
-            .context("invalid characters in Supabase auth header")?);
+        headers.insert(
+            "Authorization",
+            HeaderValue::from_str(&format!("Bearer {anon_key}"))
+                .context("invalid characters in Supabase auth header")?,
+        );
         headers.insert("Content-Type", HeaderValue::from_static("application/json"));
         headers.insert("Prefer", HeaderValue::from_static("return=representation"));
 
@@ -66,10 +69,7 @@ impl SupabaseClient {
             .context("Supabase health check request failed")?;
 
         let status = response.status();
-        let body: Value = response
-            .json()
-            .await
-            .unwrap_or(Value::Null);
+        let body: Value = response.json().await.unwrap_or(Value::Null);
 
         if !status.is_success() {
             anyhow::bail!("Supabase health check failed ({}): {}", status, body);
@@ -130,10 +130,7 @@ impl SupabaseClient {
             .context("Supabase delete request failed")?;
 
         let status = response.status();
-        let body: Value = response
-            .json()
-            .await
-            .unwrap_or(Value::Null);
+        let body: Value = response.json().await.unwrap_or(Value::Null);
 
         if !status.is_success() {
             anyhow::bail!("Supabase delete error ({}): {}", status, body);

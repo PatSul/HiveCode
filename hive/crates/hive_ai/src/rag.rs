@@ -87,10 +87,7 @@ fn term_frequency(tokens: &[String]) -> HashMap<String, f32> {
 }
 
 /// Compute inverse document frequency (IDF) for terms across documents.
-fn inverse_document_frequency(
-    term: &str,
-    document_token_sets: &[HashSet<String>],
-) -> f32 {
+fn inverse_document_frequency(term: &str, document_token_sets: &[HashSet<String>]) -> f32 {
     let n = document_token_sets.len() as f32;
     if n == 0.0 {
         return 0.0;
@@ -272,10 +269,7 @@ impl RagService {
         for entry in entries {
             let entry = entry?;
             let entry_path = entry.path();
-            let file_name = entry
-                .file_name()
-                .to_string_lossy()
-                .to_string();
+            let file_name = entry.file_name().to_string_lossy().to_string();
 
             // Skip hidden files/directories
             if file_name.starts_with('.') {
@@ -400,16 +394,8 @@ impl RagService {
 
     /// Return statistics about the current index.
     pub fn stats(&self) -> IndexStats {
-        let files: HashSet<&str> = self
-            .index
-            .iter()
-            .map(|c| c.source_file.as_str())
-            .collect();
-        let total_tokens: usize = self
-            .index
-            .iter()
-            .map(|c| estimate_tokens(&c.content))
-            .sum();
+        let files: HashSet<&str> = self.index.iter().map(|c| c.source_file.as_str()).collect();
+        let total_tokens: usize = self.index.iter().map(|c| estimate_tokens(&c.content)).sum();
 
         IndexStats {
             total_chunks: self.index.len(),
@@ -464,8 +450,7 @@ mod tests {
 
     #[test]
     fn test_cosine_similarity_identical() {
-        let a: HashMap<String, f32> =
-            [("hello".into(), 1.0), ("world".into(), 2.0)].into();
+        let a: HashMap<String, f32> = [("hello".into(), 1.0), ("world".into(), 2.0)].into();
         let sim = cosine_similarity(&a, &a);
         assert!((sim - 1.0).abs() < 0.001);
     }
@@ -536,7 +521,10 @@ mod tests {
     fn test_query_returns_relevant_chunks() {
         let mut service = RagService::new(5, 0);
         service.index_file("math.rs", "fn add(a: i32, b: i32) -> i32 {\n    a + b\n}");
-        service.index_file("greet.rs", "fn greet(name: &str) {\n    println!(\"Hello {}\", name);\n}");
+        service.index_file(
+            "greet.rs",
+            "fn greet(name: &str) {\n    println!(\"Hello {}\", name);\n}",
+        );
 
         let query = RagQuery {
             query: "add numbers".to_string(),
@@ -553,10 +541,7 @@ mod tests {
     fn test_query_respects_max_results() {
         let mut service = RagService::new(2, 0);
         for i in 0..10 {
-            service.index_file(
-                &format!("file{}.rs", i),
-                &format!("fn func{}() {{}}", i),
-            );
+            service.index_file(&format!("file{}.rs", i), &format!("fn func{}() {{}}", i));
         }
         let query = RagQuery {
             query: "fn func".to_string(),

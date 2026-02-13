@@ -10,10 +10,7 @@ pub fn generate_docx_document(title: &str, sections: &[(&str, &str)]) -> Result<
     let mut docx = Docx::new();
 
     // Title paragraph -- large bold text
-    let title_run = Run::new()
-        .add_text(title)
-        .bold()
-        .size(48); // size is in half-points, so 48 = 24pt
+    let title_run = Run::new().add_text(title).bold().size(48); // size is in half-points, so 48 = 24pt
     docx = docx.add_paragraph(Paragraph::new().add_run(title_run));
 
     // Spacer paragraph
@@ -21,17 +18,12 @@ pub fn generate_docx_document(title: &str, sections: &[(&str, &str)]) -> Result<
 
     for (heading, body) in sections {
         // Section heading -- bold, medium size
-        let heading_run = Run::new()
-            .add_text(*heading)
-            .bold()
-            .size(32); // 16pt
+        let heading_run = Run::new().add_text(*heading).bold().size(32); // 16pt
         docx = docx.add_paragraph(Paragraph::new().add_run(heading_run));
 
         // Body text -- split by newlines into separate paragraphs
         for line in body.lines() {
-            let body_run = Run::new()
-                .add_text(line)
-                .size(22); // 11pt
+            let body_run = Run::new().add_text(line).size(22); // 11pt
             docx = docx.add_paragraph(Paragraph::new().add_run(body_run));
         }
 
@@ -55,10 +47,7 @@ pub fn generate_docx_table(title: &str, headers: &[&str], rows: &[Vec<String>]) 
     let mut docx = Docx::new();
 
     // Title
-    let title_run = Run::new()
-        .add_text(title)
-        .bold()
-        .size(36); // 18pt
+    let title_run = Run::new().add_text(title).bold().size(36); // 18pt
     docx = docx.add_paragraph(Paragraph::new().add_run(title_run));
     docx = docx.add_paragraph(Paragraph::new());
 
@@ -170,9 +159,13 @@ mod tests {
     #[test]
     fn test_generate_docx_table_many_columns() {
         let headers = &["A", "B", "C", "D", "E"];
-        let rows = vec![
-            vec!["1".into(), "2".into(), "3".into(), "4".into(), "5".into()],
-        ];
+        let rows = vec![vec![
+            "1".into(),
+            "2".into(),
+            "3".into(),
+            "4".into(),
+            "5".into(),
+        ]];
         let bytes = generate_docx_table("Wide Table", headers, &rows).unwrap();
         assert_eq!(&bytes[0..2], b"PK");
     }

@@ -172,12 +172,7 @@ impl WebhookRegistry {
                 "delivering webhook"
             );
 
-            let result = self
-                .client
-                .post(&webhook.url)
-                .json(&body)
-                .send()
-                .await;
+            let result = self.client.post(&webhook.url).json(&body).send().await;
 
             match result {
                 Ok(response) if response.status().is_success() => {
@@ -306,9 +301,15 @@ mod tests {
     #[test]
     fn test_multiple_webhooks_different_events() {
         let mut registry = WebhookRegistry::new();
-        registry.register(sample_webhook("a", vec!["push"])).unwrap();
-        registry.register(sample_webhook("b", vec!["deploy"])).unwrap();
-        registry.register(sample_webhook("c", vec!["push", "deploy"])).unwrap();
+        registry
+            .register(sample_webhook("a", vec!["push"]))
+            .unwrap();
+        registry
+            .register(sample_webhook("b", vec!["deploy"]))
+            .unwrap();
+        registry
+            .register(sample_webhook("c", vec!["push", "deploy"]))
+            .unwrap();
 
         assert_eq!(registry.len(), 3);
 
@@ -353,7 +354,10 @@ mod tests {
         let wh = Webhook::new("bad", "https://localhost/hook", vec!["push".into()]);
         let mut registry = WebhookRegistry::new();
         let err = registry.register(wh).unwrap_err();
-        assert!(err.contains("local address"), "expected local address error, got: {err}");
+        assert!(
+            err.contains("local address"),
+            "expected local address error, got: {err}"
+        );
     }
 
     #[test]
@@ -380,7 +384,11 @@ mod tests {
 
     #[test]
     fn test_validate_accepts_valid_https() {
-        let wh = Webhook::new("good", "https://hooks.example.com/event", vec!["push".into()]);
+        let wh = Webhook::new(
+            "good",
+            "https://hooks.example.com/event",
+            vec!["push".into()],
+        );
         let mut registry = WebhookRegistry::new();
         assert!(registry.register(wh).is_ok());
     }
@@ -390,6 +398,9 @@ mod tests {
         let wh = Webhook::new("bad", "not a url", vec!["push".into()]);
         let mut registry = WebhookRegistry::new();
         let err = registry.register(wh).unwrap_err();
-        assert!(err.contains("Invalid URL"), "expected Invalid URL error, got: {err}");
+        assert!(
+            err.contains("Invalid URL"),
+            "expected Invalid URL error, got: {err}"
+        );
     }
 }

@@ -96,13 +96,21 @@ impl FallbackReason {
     /// Parse an error message into a `FallbackReason`.
     pub fn from_error(error: &str) -> Self {
         let lower = error.to_lowercase();
-        if lower.contains("rate limit") || lower.contains("429") || lower.contains("too many requests") {
+        if lower.contains("rate limit")
+            || lower.contains("429")
+            || lower.contains("too many requests")
+        {
             Self::RateLimit
         } else if lower.contains("timeout") || lower.contains("timed out") {
             Self::Timeout
-        } else if lower.contains("budget") || lower.contains("insufficient funds") || lower.contains("quota") {
+        } else if lower.contains("budget")
+            || lower.contains("insufficient funds")
+            || lower.contains("quota")
+        {
             Self::BudgetExhausted
-        } else if lower.contains("model") && (lower.contains("not found") || lower.contains("unavailable")) {
+        } else if lower.contains("model")
+            && (lower.contains("not found") || lower.contains("unavailable"))
+        {
             Self::ModelUnavailable
         } else if lower.contains("500") || lower.contains("502") || lower.contains("503") {
             Self::ServerError
@@ -443,7 +451,9 @@ impl AutoFallbackManager {
             // first, then fall down.
             let tier_dist_a = (ta as i32 - tier_order as i32).unsigned_abs();
             let tier_dist_b = (tb as i32 - tier_order as i32).unsigned_abs();
-            tier_dist_a.cmp(&tier_dist_b).then(a.priority.cmp(&b.priority))
+            tier_dist_a
+                .cmp(&tier_dist_b)
+                .then(a.priority.cmp(&b.priority))
         });
 
         // Deduplicate providers while preserving order
@@ -464,8 +474,7 @@ impl AutoFallbackManager {
         reason: FallbackReason,
         tried: &[ProviderType],
     ) -> Option<FallbackChainEntry> {
-        let tried_set: std::collections::HashSet<ProviderType> =
-            tried.iter().copied().collect();
+        let tried_set: std::collections::HashSet<ProviderType> = tried.iter().copied().collect();
 
         let mut candidates: Vec<&FallbackChainEntry> = self
             .fallback_chain

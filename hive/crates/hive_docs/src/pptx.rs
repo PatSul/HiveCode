@@ -1,8 +1,8 @@
 use anyhow::{Context, Result};
 use std::io::{Cursor, Write};
-use zip::write::SimpleFileOptions;
 use zip::CompressionMethod;
 use zip::ZipWriter;
+use zip::write::SimpleFileOptions;
 
 /// A single slide in a PPTX presentation.
 pub struct PptxSlide {

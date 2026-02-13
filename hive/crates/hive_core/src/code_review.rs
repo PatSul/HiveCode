@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -301,12 +301,7 @@ mod tests {
 
     fn make_store_with_review() -> (CodeReviewStore, String) {
         let mut store = CodeReviewStore::new();
-        let review = store.create_review(
-            "Add login feature",
-            "feature/login",
-            "main",
-            "alice",
-        );
+        let review = store.create_review("Add login feature", "feature/login", "main", "alice");
         (store, review.id)
     }
 
@@ -356,7 +351,10 @@ mod tests {
         assert_eq!(store.get_review(&id).unwrap().status, ReviewStatus::Pending);
 
         store.update_status(&id, ReviewStatus::Approved).unwrap();
-        assert_eq!(store.get_review(&id).unwrap().status, ReviewStatus::Approved);
+        assert_eq!(
+            store.get_review(&id).unwrap().status,
+            ReviewStatus::Approved
+        );
     }
 
     // -----------------------------------------------------------------------

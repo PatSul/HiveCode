@@ -1,5 +1,5 @@
 use chrono::Utc;
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -119,8 +119,8 @@ impl CollectiveMemory {
 
     /// Create an in-memory SQLite database (useful for testing).
     pub fn in_memory() -> Result<Self, String> {
-        let conn =
-            Connection::open_in_memory().map_err(|e| format!("Failed to open in-memory db: {e}"))?;
+        let conn = Connection::open_in_memory()
+            .map_err(|e| format!("Failed to open in-memory db: {e}"))?;
         Self::init_tables(&conn)?;
         Ok(Self {
             conn: Mutex::new(conn),
@@ -259,7 +259,9 @@ impl CollectiveMemory {
         sql.push_str(" ORDER BY relevance_score DESC");
         sql.push_str(&format!(" LIMIT {limit}"));
 
-        let mut stmt = conn.prepare(&sql).map_err(|e| format!("Prepare error: {e}"))?;
+        let mut stmt = conn
+            .prepare(&sql)
+            .map_err(|e| format!("Prepare error: {e}"))?;
 
         // Build a vector of boxed dyn ToSql so we can handle a dynamic number of params.
         let like_query = format!("%{query}%");
@@ -276,7 +278,8 @@ impl CollectiveMemory {
             }
         }
 
-        let param_refs: Vec<&dyn rusqlite::types::ToSql> = param_values.iter().map(|b| b.as_ref()).collect();
+        let param_refs: Vec<&dyn rusqlite::types::ToSql> =
+            param_values.iter().map(|b| b.as_ref()).collect();
 
         let rows = stmt
             .query_map(param_refs.as_slice(), Self::row_to_entry)
@@ -415,7 +418,10 @@ mod tests {
     #[test]
     fn remember_and_recall_roundtrip() {
         let mem = CollectiveMemory::in_memory().unwrap();
-        let entry = make_entry(MemoryCategory::SuccessPattern, "Use batch inserts for speed");
+        let entry = make_entry(
+            MemoryCategory::SuccessPattern,
+            "Use batch inserts for speed",
+        );
 
         let id = mem.remember(&entry).unwrap();
         assert!(id > 0);

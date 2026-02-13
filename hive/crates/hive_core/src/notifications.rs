@@ -204,8 +204,7 @@ mod tests {
 
     #[test]
     fn notification_serde_roundtrip() {
-        let n = AppNotification::new(NotificationType::Warning, "test")
-            .with_title("Title");
+        let n = AppNotification::new(NotificationType::Warning, "test").with_title("Title");
         let json = serde_json::to_string(&n).unwrap();
         let parsed: AppNotification = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.message, "test");

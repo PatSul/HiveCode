@@ -4,8 +4,8 @@
 //! `reqwest` for HTTP and bearer-token authentication.
 
 use anyhow::{Context, Result};
-use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
 use reqwest::Client;
+use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderValue};
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
@@ -190,16 +190,8 @@ impl GoogleDocsClient {
     }
 
     /// Insert text at a specific index in the document.
-    pub async fn insert_text(
-        &self,
-        document_id: &str,
-        text: &str,
-        index: i64,
-    ) -> Result<()> {
-        let url = format!(
-            "{}/documents/{}:batchUpdate",
-            self.base_url, document_id
-        );
+    pub async fn insert_text(&self, document_id: &str, text: &str, index: i64) -> Result<()> {
+        let url = format!("{}/documents/{}:batchUpdate", self.base_url, document_id);
 
         let body = serde_json::json!({
             "requests": [
@@ -257,12 +249,9 @@ impl GoogleDocsClient {
 
     /// Shared helper to download exported bytes from Drive.
     async fn export_bytes(&self, url: &str, format_label: &str) -> Result<Vec<u8>> {
-        let resp = self
-            .client
-            .get(url)
-            .send()
-            .await
-            .with_context(|| format!("Docs export_{} request failed", format_label.to_lowercase()))?;
+        let resp = self.client.get(url).send().await.with_context(|| {
+            format!("Docs export_{} request failed", format_label.to_lowercase())
+        })?;
 
         let status = resp.status();
         if !status.is_success() {

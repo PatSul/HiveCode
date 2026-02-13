@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use tracing::debug;
@@ -211,17 +211,12 @@ fn validate_canonical(path: &Path) -> Result<()> {
     let path_str = normalize_path_str(path);
 
     if is_system_root(&path_str) {
-        bail!(
-            "Path resolves to system root: {}",
-            path.display()
-        );
+        bail!("Path resolves to system root: {}", path.display());
     }
 
     for segment in BLOCKED_SEGMENTS {
         if path_str.contains(segment) {
-            bail!(
-                "Path traversal to sensitive directory blocked: {segment}"
-            );
+            bail!("Path traversal to sensitive directory blocked: {segment}");
         }
     }
 
@@ -235,7 +230,12 @@ fn is_system_root(path_str: &str) -> bool {
         return true;
     }
     // Match Windows drive roots like "C:" or "C:/"
-    if trimmed.len() <= 2 && trimmed.as_bytes().first().is_some_and(|b| b.is_ascii_alphabetic()) {
+    if trimmed.len() <= 2
+        && trimmed
+            .as_bytes()
+            .first()
+            .is_some_and(|b| b.is_ascii_alphabetic())
+    {
         if trimmed.len() == 2 && trimmed.ends_with(':') {
             return true;
         }

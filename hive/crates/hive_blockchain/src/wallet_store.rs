@@ -132,7 +132,8 @@ impl WalletStore {
 
     /// Persist the wallet store to a JSON file.
     pub fn save_to_file(&self, path: &Path) -> Result<()> {
-        let json = serde_json::to_string_pretty(self).context("failed to serialize wallet store")?;
+        let json =
+            serde_json::to_string_pretty(self).context("failed to serialize wallet store")?;
         std::fs::write(path, json).context("failed to write wallet store file")?;
 
         // Restrict file permissions to owner-only on Unix (0o600 = rw-------).

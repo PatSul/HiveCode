@@ -80,7 +80,11 @@ pub async fn fetch_google_models(api_key: &str) -> Result<Vec<ModelInfo>, String
         .filter(|m| m.name.contains("gemini"))
         .map(|m| {
             // Google returns "models/gemini-2.5-pro" — strip the prefix
-            let id = m.name.strip_prefix("models/").unwrap_or(&m.name).to_string();
+            let id = m
+                .name
+                .strip_prefix("models/")
+                .unwrap_or(&m.name)
+                .to_string();
             let context = m.input_token_limit.unwrap_or(1_048_576);
 
             // Try to find in static registry for pricing

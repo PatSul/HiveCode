@@ -4,8 +4,8 @@
 //! implementations (Slack, Discord, etc.) must satisfy, along with the
 //! common data types exchanged across providers.
 
-use async_trait::async_trait;
 use anyhow::Result;
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -218,14 +218,12 @@ mod tests {
             author: "bob".into(),
             content: "See attached".into(),
             timestamp: Utc::now(),
-            attachments: vec![
-                Attachment {
-                    name: "doc.pdf".into(),
-                    url: "https://files.example.com/doc.pdf".into(),
-                    mime_type: "application/pdf".into(),
-                    size: 10240,
-                },
-            ],
+            attachments: vec![Attachment {
+                name: "doc.pdf".into(),
+                url: "https://files.example.com/doc.pdf".into(),
+                mime_type: "application/pdf".into(),
+                size: 10240,
+            }],
             platform: Platform::Discord,
         };
         let json = serde_json::to_string(&msg).unwrap();

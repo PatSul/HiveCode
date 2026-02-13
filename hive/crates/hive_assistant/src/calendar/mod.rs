@@ -1,6 +1,6 @@
 pub mod conflict_detector;
-pub mod smart_scheduler;
 pub mod daily_brief;
+pub mod smart_scheduler;
 
 use serde::{Deserialize, Serialize};
 
@@ -121,7 +121,12 @@ mod tests {
     #[test]
     fn test_create_event_returns_id() {
         let service = CalendarService::new();
-        let event = make_event("ev-1", "Team standup", "2026-02-10T09:00:00Z", "2026-02-10T09:30:00Z");
+        let event = make_event(
+            "ev-1",
+            "Team standup",
+            "2026-02-10T09:00:00Z",
+            "2026-02-10T09:30:00Z",
+        );
         let id = service.create_event(&event).unwrap();
         assert_eq!(id, "ev-1");
     }
@@ -135,7 +140,10 @@ mod tests {
             end: "2026-02-10T11:00:00Z".to_string(),
             location: Some("Room 42".to_string()),
             provider: CalendarProvider::Outlook,
-            attendees: vec!["alice@example.com".to_string(), "bob@example.com".to_string()],
+            attendees: vec![
+                "alice@example.com".to_string(),
+                "bob@example.com".to_string(),
+            ],
             description: Some("Weekly sync".to_string()),
         };
         let json = serde_json::to_string(&event).unwrap();

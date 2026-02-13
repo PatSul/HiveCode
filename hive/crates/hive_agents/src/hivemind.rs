@@ -9,9 +9,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 
-use hive_ai::types::{
-    ChatMessage, ChatRequest, ChatResponse, MessageRole, ModelTier, TokenUsage,
-};
+use hive_ai::types::{ChatMessage, ChatRequest, ChatResponse, MessageRole, ModelTier, TokenUsage};
 
 // ---------------------------------------------------------------------------
 // Agent Roles
@@ -75,15 +73,33 @@ impl AgentRole {
 
     pub fn system_prompt(self) -> &'static str {
         match self {
-            Self::Architect => "You are a software architect. Analyze requirements and design clean, scalable solutions. Break down complex tasks into smaller subtasks. Consider patterns, trade-offs, and maintainability.",
-            Self::Coder => "You are an expert programmer. Write clean, efficient, well-tested code. Follow the project's coding conventions. Implement exactly what is specified.",
-            Self::Reviewer => "You are a code reviewer. Check for bugs, logic errors, style violations, and potential improvements. Be thorough but constructive. Focus on correctness and maintainability.",
-            Self::Tester => "You are a testing expert. Write comprehensive tests covering happy paths, edge cases, and error conditions. Ensure adequate coverage. Run tests and report results.",
-            Self::Documenter => "You are a technical writer. Generate clear, accurate documentation. Include examples, parameter descriptions, and usage guides. Keep documentation in sync with code.",
-            Self::Debugger => "You are a debugging expert. Analyze error messages, stack traces, and logs. Identify root causes systematically. Propose targeted fixes.",
-            Self::Security => "You are a security auditor. Check for injection vulnerabilities, data leaks, insecure defaults, and OWASP top 10 issues. Recommend specific mitigations.",
-            Self::OutputReviewer => "You are an output quality reviewer. Verify that generated content is accurate, complete, well-formatted, and meets the stated requirements.",
-            Self::TaskVerifier => "You are a task verification agent. Compare deliverables against the original requirements. Check that all acceptance criteria are met. Report any gaps.",
+            Self::Architect => {
+                "You are a software architect. Analyze requirements and design clean, scalable solutions. Break down complex tasks into smaller subtasks. Consider patterns, trade-offs, and maintainability."
+            }
+            Self::Coder => {
+                "You are an expert programmer. Write clean, efficient, well-tested code. Follow the project's coding conventions. Implement exactly what is specified."
+            }
+            Self::Reviewer => {
+                "You are a code reviewer. Check for bugs, logic errors, style violations, and potential improvements. Be thorough but constructive. Focus on correctness and maintainability."
+            }
+            Self::Tester => {
+                "You are a testing expert. Write comprehensive tests covering happy paths, edge cases, and error conditions. Ensure adequate coverage. Run tests and report results."
+            }
+            Self::Documenter => {
+                "You are a technical writer. Generate clear, accurate documentation. Include examples, parameter descriptions, and usage guides. Keep documentation in sync with code."
+            }
+            Self::Debugger => {
+                "You are a debugging expert. Analyze error messages, stack traces, and logs. Identify root causes systematically. Propose targeted fixes."
+            }
+            Self::Security => {
+                "You are a security auditor. Check for injection vulnerabilities, data leaks, insecure defaults, and OWASP top 10 issues. Recommend specific mitigations."
+            }
+            Self::OutputReviewer => {
+                "You are an output quality reviewer. Verify that generated content is accurate, complete, well-formatted, and meets the stated requirements."
+            }
+            Self::TaskVerifier => {
+                "You are a task verification agent. Compare deliverables against the original requirements. Check that all acceptance criteria are met. Report any gaps."
+            }
         }
     }
 
@@ -427,7 +443,10 @@ impl<E: AiExecutor> HiveMind<E> {
     pub fn build_request(&self, role: AgentRole, task_content: &str) -> ChatRequest {
         let model = self.model_for_role(role);
         ChatRequest {
-            messages: vec![ChatMessage::text(MessageRole::User, task_content.to_string())],
+            messages: vec![ChatMessage::text(
+                MessageRole::User,
+                task_content.to_string(),
+            )],
             model,
             max_tokens: 4096,
             temperature: Some(0.3),
@@ -658,7 +677,11 @@ pub fn classify_task_roles(task: &str) -> Vec<AgentRole> {
         roles.push(AgentRole::Documenter);
     }
 
-    if lower.contains("debug") || lower.contains("fix") || lower.contains("error") || lower.contains("bug") {
+    if lower.contains("debug")
+        || lower.contains("fix")
+        || lower.contains("error")
+        || lower.contains("bug")
+    {
         roles.push(AgentRole::Debugger);
     }
 
@@ -741,9 +764,7 @@ pub fn compute_consensus(outputs: &[AgentOutput]) -> f32 {
 ///
 /// Splits on whitespace, lowercases, and filters out short/common words.
 fn extract_keywords(text: &str) -> std::collections::HashSet<&str> {
-    text.split_whitespace()
-        .filter(|w| w.len() >= 4)
-        .collect()
+    text.split_whitespace().filter(|w| w.len() >= 4).collect()
 }
 
 /// Synthesize a final output from all agent results.
@@ -1271,7 +1292,10 @@ mod tests {
             recorded.len()
         );
         assert_eq!(recorded[0], OrchestrationStatus::Decomposing);
-        assert!(matches!(recorded.last(), Some(OrchestrationStatus::Complete)));
+        assert!(matches!(
+            recorded.last(),
+            Some(OrchestrationStatus::Complete)
+        ));
     }
 
     #[test]
@@ -1329,11 +1353,8 @@ mod tests {
 
     #[test]
     fn orchestration_result_failed_constructor() {
-        let result = OrchestrationResult::failed(
-            "run-1".into(),
-            "task".into(),
-            "something broke".into(),
-        );
+        let result =
+            OrchestrationResult::failed("run-1".into(), "task".into(), "something broke".into());
         assert!(matches!(result.status, OrchestrationStatus::Failed(_)));
         assert_eq!(result.successful_agents(), 0);
         assert_eq!(result.total_cost, 0.0);
@@ -1641,6 +1662,9 @@ mod tests {
 
         assert_eq!(result.status, OrchestrationStatus::Complete);
         // Should have called executor once per selected role.
-        assert_eq!(call_count.load(Ordering::SeqCst), result.agent_outputs.len());
+        assert_eq!(
+            call_count.load(Ordering::SeqCst),
+            result.agent_outputs.len()
+        );
     }
 }

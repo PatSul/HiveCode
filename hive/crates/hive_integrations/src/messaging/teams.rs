@@ -7,8 +7,8 @@
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 use reqwest::Client;
+use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, HeaderMap, HeaderValue};
 use serde::Deserialize;
 use tracing::debug;
 
@@ -247,10 +247,7 @@ impl MessagingProvider for TeamsProvider {
     }
 
     async fn list_channels(&self) -> Result<Vec<Channel>> {
-        let url = format!(
-            "{}/teams/{}/channels",
-            self.base_url, self.team_id
-        );
+        let url = format!("{}/teams/{}/channels", self.base_url, self.team_id);
 
         debug!(url = %url, team = %self.team_id, "listing Teams channels");
 
@@ -359,10 +356,7 @@ impl MessagingProvider for TeamsProvider {
         // For Teams, a proper search would use /search/query or iterate channels.
         // We list channels and search messages in each, but for simplicity we
         // fetch from the first channel and filter client-side.
-        let channels_url = format!(
-            "{}/teams/{}/channels",
-            self.base_url, self.team_id
-        );
+        let channels_url = format!("{}/teams/{}/channels", self.base_url, self.team_id);
 
         let resp = self
             .client
@@ -454,8 +448,7 @@ mod tests {
     }
 
     fn make_provider() -> TeamsProvider {
-        TeamsProvider::with_base_url("eyJ0eXAi.access-token", "team-123", DEFAULT_BASE_URL)
-            .unwrap()
+        TeamsProvider::with_base_url("eyJ0eXAi.access-token", "team-123", DEFAULT_BASE_URL).unwrap()
     }
 
     #[test]
@@ -500,10 +493,7 @@ mod tests {
         let provider = make_provider();
         let url = build_url(
             provider.base_url(),
-            &format!(
-                "/teams/{}/channels/ch-1/messages",
-                provider.team_id()
-            ),
+            &format!("/teams/{}/channels/ch-1/messages", provider.team_id()),
         );
         assert_eq!(
             url,

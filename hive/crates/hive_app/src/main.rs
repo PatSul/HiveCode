@@ -8,22 +8,22 @@ use gpui::*;
 use tracing::{error, info};
 
 use hive_ai::service::AiServiceConfig;
-use hive_ai::tts::service::TtsServiceConfig;
 use hive_ai::tts::TtsProviderType;
+use hive_ai::tts::service::TtsServiceConfig;
 use hive_core::config::{ConfigManager, HiveConfig};
 use hive_core::logging;
 use hive_core::notifications::{AppNotification, NotificationType};
 use hive_core::persistence::Database;
 use hive_core::security::SecurityGateway;
 use hive_ui::globals::{
-    AppAiService, AppAssistant, AppAutomation, AppCli, AppConfig, AppDatabase, AppIde,
-    AppLearning, AppMarketplace, AppMcpServer, AppNotifications, AppPersonas, AppRpcConfig,
-    AppSecurity, AppShield, AppSkills, AppSpecs, AppTts, AppWallets,
+    AppAiService, AppAssistant, AppAutomation, AppCli, AppConfig, AppDatabase, AppIde, AppLearning,
+    AppMarketplace, AppMcpServer, AppNotifications, AppPersonas, AppRpcConfig, AppSecurity,
+    AppShield, AppSkills, AppSpecs, AppTts, AppWallets,
 };
 use hive_ui::workspace::{
     ClearChat, HiveWorkspace, NewConversation, SwitchPanel, SwitchToAgents, SwitchToChat,
-    SwitchToCosts, SwitchToFiles, SwitchToHistory, SwitchToKanban, SwitchToLogs,
-    SwitchToMonitor, SwitchToReview, SwitchToSpecs,
+    SwitchToCosts, SwitchToFiles, SwitchToHistory, SwitchToKanban, SwitchToLogs, SwitchToMonitor,
+    SwitchToReview, SwitchToSpecs,
 };
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -79,7 +79,9 @@ fn init_services(cx: &mut App) -> anyhow::Result<()> {
     cx.set_global(AppSecurity(SecurityGateway::new()));
     info!("SecurityGateway initialized");
 
-    cx.set_global(AppNotifications(hive_core::notifications::NotificationStore::new()));
+    cx.set_global(AppNotifications(
+        hive_core::notifications::NotificationStore::new(),
+    ));
 
     // Build AI service from config (needed before wiring LearnerTierAdjuster).
     let config = cx.global::<AppConfig>().0.get().clone();
@@ -121,8 +123,7 @@ fn init_services(cx: &mut App) -> anyhow::Result<()> {
     let (db_result, learning_result, assistant_result) = std::thread::scope(|s| {
         let db_handle = s.spawn(|| Database::open());
         let learn_handle = s.spawn(|| hive_learn::LearningService::open(&learning_db_str));
-        let assist_handle =
-            s.spawn(|| hive_assistant::AssistantService::open(&assistant_db_str));
+        let assist_handle = s.spawn(|| hive_assistant::AssistantService::open(&assistant_db_str));
 
         (
             db_handle.join().expect("Database::open thread panicked"),
@@ -234,11 +235,12 @@ fn init_services(cx: &mut App) -> anyhow::Result<()> {
         .map(|d| d.join("wallets.enc"))
         .unwrap_or_else(|_| std::path::PathBuf::from("wallets.enc"));
     let wallets = if wallet_path.exists() {
-        hive_blockchain::wallet_store::WalletStore::load_from_file(&wallet_path)
-            .unwrap_or_else(|e| {
+        hive_blockchain::wallet_store::WalletStore::load_from_file(&wallet_path).unwrap_or_else(
+            |e| {
                 error!("WalletStore load failed: {e}");
                 hive_blockchain::wallet_store::WalletStore::new()
-            })
+            },
+        )
     } else {
         hive_blockchain::wallet_store::WalletStore::new()
     };
@@ -246,7 +248,9 @@ fn init_services(cx: &mut App) -> anyhow::Result<()> {
     info!("WalletStore initialized");
 
     // RPC config — default endpoints for EVM and Solana chains.
-    cx.set_global(AppRpcConfig(hive_blockchain::rpc_config::RpcConfigStore::with_defaults()));
+    cx.set_global(AppRpcConfig(
+        hive_blockchain::rpc_config::RpcConfigStore::with_defaults(),
+    ));
     info!("RpcConfigStore initialized");
 
     // IDE integration — workspace and file tracking.
@@ -315,7 +319,10 @@ fn register_actions(cx: &mut App) {
         info!("TogglePrivacy action triggered");
         if cx.has_global::<AppConfig>() {
             let current = cx.global::<AppConfig>().0.get().privacy_mode;
-            let _ = cx.global_mut::<AppConfig>().0.update(|c| c.privacy_mode = !current);
+            let _ = cx
+                .global_mut::<AppConfig>()
+                .0
+                .update(|c| c.privacy_mode = !current);
             info!("Privacy mode toggled to {}", !current);
         }
     });

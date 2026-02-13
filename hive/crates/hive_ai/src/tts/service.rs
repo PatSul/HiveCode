@@ -79,10 +79,7 @@ impl TtsService {
         );
         providers.insert(
             TtsProviderType::F5Tts,
-            Arc::new(F5TtsProvider::new(
-                config.huggingface_api_key.clone(),
-                None,
-            )),
+            Arc::new(F5TtsProvider::new(config.huggingface_api_key.clone(), None)),
         );
 
         // Cloud providers — register if API key is available.
@@ -226,8 +223,7 @@ impl TtsService {
     }
 
     fn cache_path(&self, key: &str, format: &super::AudioFormat) -> PathBuf {
-        self.cache_dir
-            .join(format!("{key}.{}", format.extension()))
+        self.cache_dir.join(format!("{key}.{}", format.extension()))
     }
 
     fn load_cached(&self, key: &str) -> Option<AudioData> {

@@ -374,9 +374,7 @@ impl IdeIntegrationService {
                     .collect();
 
                 if matching.is_empty() {
-                    CommandResult::err(format!(
-                        "symbol '{old_name}' not found in '{file_path}'"
-                    ))
+                    CommandResult::err(format!("symbol '{old_name}' not found in '{file_path}'"))
                 } else {
                     CommandResult::ok(Some(serde_json::json!({
                         "renamed": true,
@@ -520,7 +518,11 @@ mod tests {
     #[test]
     fn test_add_and_find_symbols() {
         let mut svc = IdeIntegrationService::new();
-        svc.add_symbol(sample_symbol("process_data", "main.rs", SymbolKind::Function));
+        svc.add_symbol(sample_symbol(
+            "process_data",
+            "main.rs",
+            SymbolKind::Function,
+        ));
         svc.add_symbol(sample_symbol("DataProcessor", "lib.rs", SymbolKind::Class));
         svc.add_symbol(sample_symbol("process_item", "lib.rs", SymbolKind::Method));
 
@@ -570,7 +572,11 @@ mod tests {
     fn test_execute_find_references() {
         let mut svc = IdeIntegrationService::new();
         svc.add_symbol(sample_symbol("render", "ui.rs", SymbolKind::Function));
-        svc.add_symbol(sample_symbol("render_frame", "gfx.rs", SymbolKind::Function));
+        svc.add_symbol(sample_symbol(
+            "render_frame",
+            "gfx.rs",
+            SymbolKind::Function,
+        ));
 
         let result = svc.execute_command(EditorCommand::FindReferences {
             symbol_name: "render".into(),

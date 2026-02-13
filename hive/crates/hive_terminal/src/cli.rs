@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
+use hive_core::SecurityGateway;
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
@@ -108,7 +109,11 @@ impl CliService {
         service.add_alias("doctor", "health").expect("alias");
 
         service
-            .register_command("config", "View or edit configuration", "hive config [key] [value]")
+            .register_command(
+                "config",
+                "View or edit configuration",
+                "hive config [key] [value]",
+            )
             .expect("built-in registration");
         service.add_alias("config", "settings").expect("alias");
 
@@ -125,7 +130,10 @@ impl CliService {
             .expect("built-in registration");
         service.add_alias("help", "?").expect("alias");
 
-        debug!(count = service.commands.len(), "CLI service initialised with built-in commands");
+        debug!(
+            count = service.commands.len(),
+            "CLI service initialised with built-in commands"
+        );
 
         service
     }
@@ -240,7 +248,10 @@ impl CliService {
             } else {
                 format!(" ({})", cmd.aliases.join(", "))
             };
-            help.push_str(&format!("  {:<16} {}{}\n", cmd.name, cmd.description, aliases));
+            help.push_str(&format!(
+                "  {:<16} {}{}\n",
+                cmd.name, cmd.description, aliases
+            ));
         }
         help
     }
@@ -263,9 +274,18 @@ impl CliService {
 
     /// Produce a summary of pass/warn/fail counts from a set of checks.
     pub fn doctor_summary(checks: &[DoctorCheck]) -> DoctorSummary {
-        let pass = checks.iter().filter(|c| c.status == CheckStatus::Pass).count();
-        let warn = checks.iter().filter(|c| c.status == CheckStatus::Warn).count();
-        let fail = checks.iter().filter(|c| c.status == CheckStatus::Fail).count();
+        let pass = checks
+            .iter()
+            .filter(|c| c.status == CheckStatus::Pass)
+            .count();
+        let warn = checks
+            .iter()
+            .filter(|c| c.status == CheckStatus::Warn)
+            .count();
+        let fail = checks
+            .iter()
+            .filter(|c| c.status == CheckStatus::Fail)
+            .count();
         DoctorSummary {
             pass,
             warn,
@@ -298,7 +318,9 @@ impl CliService {
                 description: "Check if ~/.hive/config.json exists".to_string(),
                 status: CheckStatus::Warn,
                 message: format!("Config file not found at {}", config_path.display()),
-                fix_suggestion: Some("Run 'hive config init' to create a default configuration".to_string()),
+                fix_suggestion: Some(
+                    "Run 'hive config init' to create a default configuration".to_string(),
+                ),
             }
         }
     }
@@ -319,16 +341,26 @@ impl CliService {
                 description: "Check if ~/.hive/ directory exists".to_string(),
                 status: CheckStatus::Warn,
                 message: format!("Data directory not found at {}", data_dir.display()),
-                fix_suggestion: Some("Run 'hive config init' to create the data directory".to_string()),
+                fix_suggestion: Some(
+                    "Run 'hive config init' to create the data directory".to_string(),
+                ),
             }
         }
     }
 
     fn check_git_available(&self) -> DoctorCheck {
-        match std::process::Command::new("git")
-            .arg("--version")
-            .output()
-        {
+        let security = SecurityGateway::new();
+        if let Err(reason) = security.check_command("git --version") {
+            return DoctorCheck {
+                name: "Git Available".to_string(),
+                description: "Check if git is available on PATH".to_string(),
+                status: CheckStatus::Fail,
+                message: format!("Security gateway blocked git probe: {reason}"),
+                fix_suggestion: Some("Review SecurityGateway command policy".to_string()),
+            };
+        }
+
+        match std::process::Command::new("git").arg("--version").output() {
             Ok(output) if output.status.success() => {
                 let version = String::from_utf8_lossy(&output.stdout).trim().to_string();
                 DoctorCheck {
@@ -397,7 +429,11 @@ mod tests {
     fn new_creates_service_with_built_in_commands() {
         let service = CliService::new();
         let commands = service.list_commands();
-        assert!(commands.len() >= 5, "expected at least 5 built-in commands, got {}", commands.len());
+        assert!(
+            commands.len() >= 5,
+            "expected at least 5 built-in commands, got {}",
+            commands.len()
+        );
     }
 
     #[test]
@@ -434,7 +470,8 @@ mod tests {
     #[test]
     fn register_custom_command() {
         let mut service = CliService::new();
-        let result = service.register_command("deploy", "Deploy the application", "hive deploy [env]");
+        let result =
+            service.register_command("deploy", "Deploy the application", "hive deploy [env]");
         assert!(result.is_ok());
         let cmd = service.get_command("deploy");
         assert!(cmd.is_some());
@@ -571,9 +608,15 @@ mod tests {
         let service = CliService::new();
         let help = service.generate_help("doctor").unwrap();
         assert!(help.contains("doctor"), "help should contain command name");
-        assert!(help.contains("health checks"), "help should contain description");
+        assert!(
+            help.contains("health checks"),
+            "help should contain description"
+        );
         assert!(help.contains("Usage:"), "help should contain usage section");
-        assert!(help.contains("Aliases:"), "help should contain aliases section");
+        assert!(
+            help.contains("Aliases:"),
+            "help should contain aliases section"
+        );
         assert!(help.contains("check"), "help should list aliases");
     }
 
@@ -807,7 +850,10 @@ mod tests {
     fn default_creates_same_as_new() {
         let from_new = CliService::new();
         let from_default = CliService::default();
-        assert_eq!(from_new.list_commands().len(), from_default.list_commands().len());
+        assert_eq!(
+            from_new.list_commands().len(),
+            from_default.list_commands().len()
+        );
     }
 
     // -- Git check actually runs ---------------------------------------------
@@ -820,7 +866,10 @@ mod tests {
         // Git is either available or not - both are valid outcomes.
         match &git.status {
             CheckStatus::Pass => {
-                assert!(git.message.contains("git"), "pass message should mention git");
+                assert!(
+                    git.message.contains("git"),
+                    "pass message should mention git"
+                );
                 assert!(git.fix_suggestion.is_none());
             }
             CheckStatus::Fail => {

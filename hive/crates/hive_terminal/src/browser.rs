@@ -23,10 +23,7 @@ pub enum BrowserAction {
     /// Take a screenshot and save it to the given path.
     Screenshot { path: String },
     /// Wait for an element matching the selector to appear, with a timeout.
-    WaitForSelector {
-        selector: String,
-        timeout_ms: u64,
-    },
+    WaitForSelector { selector: String, timeout_ms: u64 },
     /// Evaluate a JavaScript expression in the page context.
     Evaluate { script: String },
     /// Get the text content of the element matching the given CSS selector.
@@ -250,8 +247,7 @@ impl BrowserPool {
     /// Remove all instances that have been idle longer than the configured
     /// timeout. Returns the number of instances removed.
     pub fn cleanup_idle(&mut self) -> usize {
-        let cutoff = Utc::now()
-            - chrono::Duration::seconds(self.config.idle_timeout_secs as i64);
+        let cutoff = Utc::now() - chrono::Duration::seconds(self.config.idle_timeout_secs as i64);
         let to_remove: Vec<String> = self
             .instances
             .values()
@@ -364,10 +360,7 @@ impl BrowserAutomation {
             }
             BrowserAction::GetText { selector } => {
                 debug!(id = %instance_id, selector = %selector, "get_text");
-                ActionResult::ok(
-                    Some(String::new()),
-                    start.elapsed().as_millis() as u64,
-                )
+                ActionResult::ok(Some(String::new()), start.elapsed().as_millis() as u64)
             }
             BrowserAction::GetAttribute {
                 selector,
@@ -467,8 +460,7 @@ mod tests {
             headless: false,
         };
         let json = serde_json::to_string(&cfg).expect("serialize");
-        let restored: BrowserPoolConfig =
-            serde_json::from_str(&json).expect("deserialize");
+        let restored: BrowserPoolConfig = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(restored.max_instances, 5);
         assert_eq!(restored.idle_timeout_secs, 600);
         assert!(!restored.headless);
@@ -488,8 +480,7 @@ mod tests {
     fn instance_serialization_roundtrip() {
         let inst = BrowserInstance::new();
         let json = serde_json::to_string(&inst).expect("serialize");
-        let restored: BrowserInstance =
-            serde_json::from_str(&json).expect("deserialize");
+        let restored: BrowserInstance = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(restored.id, inst.id);
         assert_eq!(restored.is_busy, inst.is_busy);
     }
@@ -588,8 +579,7 @@ mod tests {
         let id = pool.acquire().expect("acquire");
         pool.release(&id).expect("release");
         // Force the last_used timestamp into the past.
-        pool.get_mut(&id).unwrap().last_used =
-            Utc::now() - chrono::Duration::seconds(10);
+        pool.get_mut(&id).unwrap().last_used = Utc::now() - chrono::Duration::seconds(10);
         let removed = pool.cleanup_idle();
         assert_eq!(removed, 1);
         assert_eq!(pool.total_count(), 0);
@@ -618,8 +608,7 @@ mod tests {
             url: "https://example.com".into(),
         };
         let json = serde_json::to_string(&action).expect("serialize");
-        let restored: BrowserAction =
-            serde_json::from_str(&json).expect("deserialize");
+        let restored: BrowserAction = serde_json::from_str(&json).expect("deserialize");
         match restored {
             BrowserAction::Navigate { url } => {
                 assert_eq!(url, "https://example.com");
@@ -636,8 +625,7 @@ mod tests {
         };
         let json = serde_json::to_string(&action).expect("serialize");
         assert!(json.contains("hello"));
-        let restored: BrowserAction =
-            serde_json::from_str(&json).expect("deserialize");
+        let restored: BrowserAction = serde_json::from_str(&json).expect("deserialize");
         match restored {
             BrowserAction::Type { selector, text } => {
                 assert_eq!(selector, "#input");
@@ -654,8 +642,7 @@ mod tests {
             attribute: "src".into(),
         };
         let json = serde_json::to_string(&action).expect("serialize");
-        let restored: BrowserAction =
-            serde_json::from_str(&json).expect("deserialize");
+        let restored: BrowserAction = serde_json::from_str(&json).expect("deserialize");
         match restored {
             BrowserAction::GetAttribute {
                 selector,
@@ -692,8 +679,7 @@ mod tests {
     fn action_result_serialization_roundtrip() {
         let r = ActionResult::ok(Some("hello".into()), 100);
         let json = serde_json::to_string(&r).expect("serialize");
-        let restored: ActionResult =
-            serde_json::from_str(&json).expect("deserialize");
+        let restored: ActionResult = serde_json::from_str(&json).expect("deserialize");
         assert!(restored.success);
         assert_eq!(restored.value.as_deref(), Some("hello"));
         assert_eq!(restored.duration_ms, 100);
@@ -705,9 +691,7 @@ mod tests {
     fn automation_navigate_updates_url() {
         let mut auto = BrowserAutomation::new(BrowserPoolConfig::default());
         let id = auto.pool_mut().acquire().expect("acquire");
-        let result = auto
-            .navigate(&id, "https://example.com")
-            .expect("navigate");
+        let result = auto.navigate(&id, "https://example.com").expect("navigate");
         assert!(result.success);
         assert_eq!(
             auto.pool().get(&id).unwrap().current_url.as_deref(),
@@ -721,9 +705,7 @@ mod tests {
         let id = auto.pool_mut().acquire().expect("acquire");
         let shot_path = std::env::temp_dir().join("shot.png");
         let shot_str = shot_path.to_string_lossy().to_string();
-        let result = auto
-            .screenshot(&id, &shot_str)
-            .expect("screenshot");
+        let result = auto.screenshot(&id, &shot_str).expect("screenshot");
         assert!(result.success);
         assert_eq!(result.value.as_deref(), Some(shot_str.as_str()));
     }
@@ -757,9 +739,7 @@ mod tests {
                 selector: "h1".into(),
             },
         ];
-        let results = auto
-            .execute_sequence(&id, &actions)
-            .expect("sequence");
+        let results = auto.execute_sequence(&id, &actions).expect("sequence");
         assert_eq!(results.len(), 3);
         assert!(results.iter().all(|r| r.success));
     }

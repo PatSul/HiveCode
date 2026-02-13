@@ -23,12 +23,7 @@ impl PreferenceModel {
     /// converges to the mean signal strength over time.
     ///
     /// Formula: `new_conf = (old_conf * count + signal_strength) / (count + 1)`
-    pub fn observe(
-        &self,
-        key: &str,
-        value: &str,
-        signal_strength: f64,
-    ) -> Result<(), String> {
+    pub fn observe(&self, key: &str, value: &str, signal_strength: f64) -> Result<(), String> {
         let signal = signal_strength.clamp(0.0, 1.0);
 
         let existing = self.storage.get_preference(key)?;
@@ -70,11 +65,7 @@ impl PreferenceModel {
     ///
     /// Returns `None` if the preference does not exist or its confidence is below
     /// `min_confidence`.
-    pub fn get(
-        &self,
-        key: &str,
-        min_confidence: f64,
-    ) -> Result<Option<String>, String> {
+    pub fn get(&self, key: &str, min_confidence: f64) -> Result<Option<String>, String> {
         match self.storage.get_preference(key)? {
             Some(pref) if pref.confidence >= min_confidence => Ok(Some(pref.value)),
             _ => Ok(None),
@@ -88,8 +79,7 @@ impl PreferenceModel {
     pub fn prompt_addendum(&self) -> Result<String, String> {
         let all = self.storage.all_preferences()?;
 
-        let confident: Vec<&UserPreference> =
-            all.iter().filter(|p| p.confidence >= 0.6).collect();
+        let confident: Vec<&UserPreference> = all.iter().filter(|p| p.confidence >= 0.6).collect();
 
         if confident.is_empty() {
             return Ok(String::new());

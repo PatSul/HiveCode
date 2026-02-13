@@ -98,8 +98,8 @@ impl AgentPersistenceService {
     pub fn save_snapshot(&self, snapshot: &AgentSnapshot) -> Result<()> {
         self.ensure_dir()?;
         let path = self.snapshot_path(&snapshot.agent_id);
-        let content = serde_json::to_string_pretty(snapshot)
-            .context("Failed to serialize agent snapshot")?;
+        let content =
+            serde_json::to_string_pretty(snapshot).context("Failed to serialize agent snapshot")?;
         std::fs::write(&path, content)
             .with_context(|| format!("Failed to write snapshot: {}", path.display()))?;
         Ok(())

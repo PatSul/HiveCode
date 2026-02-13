@@ -243,10 +243,7 @@ impl ModelRouter {
                 provider,
                 model_id: model_id.to_string(),
                 tier,
-                reasoning: format!(
-                    "Explicit model selection: {} via {}",
-                    model_id, provider
-                ),
+                reasoning: format!("Explicit model selection: {} via {}", model_id, provider),
             };
         }
 
@@ -260,7 +257,8 @@ impl ModelRouter {
 
         let chain = self.fallback_manager.get_fallback_chain(tier);
         for fallback_provider in chain {
-            if fallback_provider != provider && self.fallback_manager.is_available(fallback_provider)
+            if fallback_provider != provider
+                && self.fallback_manager.is_available(fallback_provider)
             {
                 // For OpenRouter we can proxy most models
                 if fallback_provider == ProviderType::OpenRouter {
@@ -339,17 +337,14 @@ impl ModelRouter {
         // the desired tier (or close to it).
         for provider in &chain {
             // Find the first chain entry for this provider at or near the tier
-            if let Some(entry) = self
-                .fallback_manager
-                .get_next_fallback(
-                    // We treat this as "give me a fallback from any provider"
-                    // by using a dummy original.
-                    ProviderType::GenericLocal,
-                    "__auto__",
-                    FallbackReason::ProviderDown,
-                    &[], // no tried list — we handle ordering via the chain
-                )
-            {
+            if let Some(entry) = self.fallback_manager.get_next_fallback(
+                // We treat this as "give me a fallback from any provider"
+                // by using a dummy original.
+                ProviderType::GenericLocal,
+                "__auto__",
+                FallbackReason::ProviderDown,
+                &[], // no tried list — we handle ordering via the chain
+            ) {
                 // Only use if the provider matches what the chain told us
                 if entry.provider == *provider {
                     return RoutingDecision {
@@ -385,10 +380,7 @@ impl ModelRouter {
             provider,
             model_id: model.to_string(),
             tier,
-            reasoning: format!(
-                "Auto-routed (default): {} | {}",
-                result.reasoning, model
-            ),
+            reasoning: format!("Auto-routed (default): {} | {}", result.reasoning, model),
         }
     }
 }
@@ -514,11 +506,7 @@ mod tests {
     #[test]
     fn explicit_model_routes_directly() {
         let router = setup_router();
-        let decision = router.route(
-            &[user_msg("hello")],
-            Some("claude-opus-4-20250514"),
-            None,
-        );
+        let decision = router.route(&[user_msg("hello")], Some("claude-opus-4-20250514"), None);
         assert_eq!(decision.provider, ProviderType::Anthropic);
         assert_eq!(decision.model_id, "claude-opus-4-20250514");
     }
@@ -526,11 +514,7 @@ mod tests {
     #[test]
     fn explicit_openrouter_model() {
         let router = setup_router();
-        let decision = router.route(
-            &[user_msg("hello")],
-            Some("deepseek/deepseek-chat"),
-            None,
-        );
+        let decision = router.route(&[user_msg("hello")], Some("deepseek/deepseek-chat"), None);
         assert_eq!(decision.provider, ProviderType::OpenRouter);
     }
 
@@ -545,7 +529,9 @@ mod tests {
     fn auto_route_architecture_premium() {
         let router = setup_router();
         let decision = router.route(
-            &[user_msg("Design the system architecture for our new platform")],
+            &[user_msg(
+                "Design the system architecture for our new platform",
+            )],
             None,
             None,
         );
@@ -587,10 +573,7 @@ mod tests {
 
     #[test]
     fn infer_tier_budget() {
-        assert_eq!(
-            infer_tier("deepseek/deepseek-chat"),
-            ModelTier::Budget
-        );
+        assert_eq!(infer_tier("deepseek/deepseek-chat"), ModelTier::Budget);
         assert_eq!(infer_tier("claude-haiku-4-5-20251001"), ModelTier::Budget);
     }
 
@@ -598,7 +581,11 @@ mod tests {
     fn record_result_success() {
         let router = setup_router();
         router.record_result(ProviderType::Anthropic, true, None);
-        assert!(router.fallback_manager().is_available(ProviderType::Anthropic));
+        assert!(
+            router
+                .fallback_manager()
+                .is_available(ProviderType::Anthropic)
+        );
     }
 
     #[test]
@@ -655,13 +642,11 @@ mod tests {
     fn fallback_when_provider_down() {
         let router = setup_router();
         // Take Anthropic down
-        router.fallback_manager().set_available(ProviderType::Anthropic, false);
+        router
+            .fallback_manager()
+            .set_available(ProviderType::Anthropic, false);
 
-        let decision = router.route(
-            &[user_msg("hello")],
-            Some("claude-opus-4-20250514"),
-            None,
-        );
+        let decision = router.route(&[user_msg("hello")], Some("claude-opus-4-20250514"), None);
         // Should have fallen back — either via OpenRouter proxy or another provider
         assert_ne!(decision.provider, ProviderType::Anthropic);
     }

@@ -4,7 +4,7 @@
 //! workflows containing conditional steps, lifecycle management, simulated
 //! execution, and run-history tracking.
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use chrono::{DateTime, Utc};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -43,12 +43,28 @@ pub enum ConditionOp {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "type")]
 pub enum ActionType {
-    RunCommand { command: String },
-    SendMessage { channel: String, content: String },
-    CallApi { url: String, method: String },
-    CreateTask { title: String },
-    SendNotification { title: String, body: String },
-    ExecuteSkill { skill_trigger: String, input: String },
+    RunCommand {
+        command: String,
+    },
+    SendMessage {
+        channel: String,
+        content: String,
+    },
+    CallApi {
+        url: String,
+        method: String,
+    },
+    CreateTask {
+        title: String,
+    },
+    SendNotification {
+        title: String,
+        body: String,
+    },
+    ExecuteSkill {
+        skill_trigger: String,
+        input: String,
+    },
 }
 
 /// Lifecycle status of a workflow.
@@ -322,7 +338,10 @@ impl AutomationService {
         };
 
         self.run_history.push(result.clone());
-        debug!(workflow_id, success, steps_completed, "Recorded workflow run");
+        debug!(
+            workflow_id,
+            success, steps_completed, "Recorded workflow run"
+        );
         Ok(result)
     }
 

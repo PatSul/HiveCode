@@ -40,7 +40,10 @@ pub fn find_available_slots(
     let duration = chrono::Duration::minutes(duration_minutes);
 
     // Parse and sort events by start time.
-    let mut parsed: Vec<(chrono::DateTime<chrono::FixedOffset>, chrono::DateTime<chrono::FixedOffset>)> = events
+    let mut parsed: Vec<(
+        chrono::DateTime<chrono::FixedOffset>,
+        chrono::DateTime<chrono::FixedOffset>,
+    )> = events
         .iter()
         .filter_map(|e| {
             let start = chrono::DateTime::parse_from_rfc3339(&e.start).ok()?;
@@ -140,8 +143,16 @@ mod tests {
     #[test]
     fn test_gap_between_events() {
         let events = vec![
-            make_event("a", "2026-02-10T09:00:00+00:00", "2026-02-10T10:00:00+00:00"),
-            make_event("b", "2026-02-10T11:00:00+00:00", "2026-02-10T12:00:00+00:00"),
+            make_event(
+                "a",
+                "2026-02-10T09:00:00+00:00",
+                "2026-02-10T10:00:00+00:00",
+            ),
+            make_event(
+                "b",
+                "2026-02-10T11:00:00+00:00",
+                "2026-02-10T12:00:00+00:00",
+            ),
         ];
 
         let suggestions = find_available_slots(
@@ -160,8 +171,16 @@ mod tests {
     #[test]
     fn test_no_gap_large_enough() {
         let events = vec![
-            make_event("a", "2026-02-10T09:00:00+00:00", "2026-02-10T09:50:00+00:00"),
-            make_event("b", "2026-02-10T09:50:00+00:00", "2026-02-10T10:00:00+00:00"),
+            make_event(
+                "a",
+                "2026-02-10T09:00:00+00:00",
+                "2026-02-10T09:50:00+00:00",
+            ),
+            make_event(
+                "b",
+                "2026-02-10T09:50:00+00:00",
+                "2026-02-10T10:00:00+00:00",
+            ),
         ];
 
         // 60 min needed, but only 0 min gaps and some time after b

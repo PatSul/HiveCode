@@ -7,8 +7,8 @@
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use chrono::{DateTime, TimeZone, Utc};
-use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
 use reqwest::Client;
+use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, HeaderMap, HeaderValue};
 use serde::Deserialize;
 use tracing::debug;
 
@@ -287,13 +287,12 @@ impl MessagingProvider for MatrixProvider {
             );
 
             let name = match self.client.get(&name_url).send().await {
-                Ok(resp) if resp.status().is_success() => {
-                    resp.json::<MatrixRoomNameResponse>()
-                        .await
-                        .ok()
-                        .and_then(|r| r.name)
-                        .unwrap_or_else(|| room_id.clone())
-                }
+                Ok(resp) if resp.status().is_success() => resp
+                    .json::<MatrixRoomNameResponse>()
+                    .await
+                    .ok()
+                    .and_then(|r| r.name)
+                    .unwrap_or_else(|| room_id.clone()),
                 _ => room_id.clone(),
             };
 
@@ -419,9 +418,7 @@ impl MessagingProvider for MatrixProvider {
         {
             for result in room_events.iter().take(limit as usize) {
                 if let Some(event_val) = result.get("result") {
-                    if let Ok(event) =
-                        serde_json::from_value::<MatrixEvent>(event_val.clone())
-                    {
+                    if let Ok(event) = serde_json::from_value::<MatrixEvent>(event_val.clone()) {
                         results.push(self.convert_event(&event, ""));
                     }
                 }
@@ -472,12 +469,8 @@ mod tests {
     #[test]
     fn test_matrix_provider_custom_base_url_strips_slash() {
         let provider =
-            MatrixProvider::with_base_url("tok", "https://matrix.test/_matrix/client/v3/")
-                .unwrap();
-        assert_eq!(
-            provider.base_url(),
-            "https://matrix.test/_matrix/client/v3"
-        );
+            MatrixProvider::with_base_url("tok", "https://matrix.test/_matrix/client/v3/").unwrap();
+        assert_eq!(provider.base_url(), "https://matrix.test/_matrix/client/v3");
     }
 
     #[test]
@@ -514,10 +507,7 @@ mod tests {
     fn test_joined_rooms_url_construction() {
         let provider = make_provider();
         let url = build_url(provider.base_url(), "/joined_rooms");
-        assert_eq!(
-            url,
-            "https://matrix.org/_matrix/client/v3/joined_rooms"
-        );
+        assert_eq!(url, "https://matrix.org/_matrix/client/v3/joined_rooms");
     }
 
     #[test]
@@ -548,10 +538,7 @@ mod tests {
     fn test_search_url_construction() {
         let provider = make_provider();
         let url = build_url(provider.base_url(), "/search");
-        assert_eq!(
-            url,
-            "https://matrix.org/_matrix/client/v3/search"
-        );
+        assert_eq!(url, "https://matrix.org/_matrix/client/v3/search");
     }
 
     #[test]
@@ -638,10 +625,7 @@ mod tests {
         assert_eq!(event.event_id, "$evt1");
         assert_eq!(event.sender, "@alice:matrix.org");
         assert_eq!(event.event_type, "m.room.message");
-        assert_eq!(
-            event.content.unwrap().body.as_deref(),
-            Some("Hello!")
-        );
+        assert_eq!(event.content.unwrap().body.as_deref(), Some("Hello!"));
     }
 
     #[test]

@@ -83,10 +83,9 @@ impl OutlookEmailClient {
             anyhow::bail!("Microsoft Graph error ({}): {}", status, body);
         }
 
-        let messages: Vec<EmailMessage> = serde_json::from_value(
-            body.get("value").cloned().unwrap_or_default(),
-        )
-        .context("failed to deserialize email messages")?;
+        let messages: Vec<EmailMessage> =
+            serde_json::from_value(body.get("value").cloned().unwrap_or_default())
+                .context("failed to deserialize email messages")?;
 
         Ok(messages)
     }
@@ -257,10 +256,7 @@ mod tests {
     #[test]
     fn test_list_messages_url_construction() {
         let client = OutlookEmailClient::new("tok");
-        let url = build_url(
-            client.base_url(),
-            "/me/mailFolders/inbox/messages",
-        );
+        let url = build_url(client.base_url(), "/me/mailFolders/inbox/messages");
         assert_eq!(
             url,
             "https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages"
@@ -297,9 +293,6 @@ mod tests {
         assert_eq!(payload["message"]["subject"], "Test");
         let recips = payload["message"]["toRecipients"].as_array().unwrap();
         assert_eq!(recips.len(), 2);
-        assert_eq!(
-            recips[0]["emailAddress"]["address"],
-            "alice@example.com"
-        );
+        assert_eq!(recips[0]["emailAddress"]["address"], "alice@example.com");
     }
 }

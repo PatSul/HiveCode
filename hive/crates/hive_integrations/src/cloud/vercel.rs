@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
-use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
 use reqwest::Client;
+use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderValue};
 use serde_json::Value;
 use tracing::debug;
 
@@ -151,10 +151,7 @@ mod tests {
     #[test]
     fn test_list_deployments_url() {
         let client = make_client();
-        let url = build_url(
-            client.base_url(),
-            "/v6/deployments?projectId=prj_abc",
-        );
+        let url = build_url(client.base_url(), "/v6/deployments?projectId=prj_abc");
         assert!(url.contains("projectId=prj_abc"));
     }
 

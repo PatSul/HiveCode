@@ -174,11 +174,26 @@ mod tests {
 
     #[test]
     fn test_outcome_serde_snake_case() {
-        assert_eq!(serde_json::to_string(&Outcome::Accepted).unwrap(), "\"accepted\"");
-        assert_eq!(serde_json::to_string(&Outcome::Corrected).unwrap(), "\"corrected\"");
-        assert_eq!(serde_json::to_string(&Outcome::Regenerated).unwrap(), "\"regenerated\"");
-        assert_eq!(serde_json::to_string(&Outcome::Ignored).unwrap(), "\"ignored\"");
-        assert_eq!(serde_json::to_string(&Outcome::Unknown).unwrap(), "\"unknown\"");
+        assert_eq!(
+            serde_json::to_string(&Outcome::Accepted).unwrap(),
+            "\"accepted\""
+        );
+        assert_eq!(
+            serde_json::to_string(&Outcome::Corrected).unwrap(),
+            "\"corrected\""
+        );
+        assert_eq!(
+            serde_json::to_string(&Outcome::Regenerated).unwrap(),
+            "\"regenerated\""
+        );
+        assert_eq!(
+            serde_json::to_string(&Outcome::Ignored).unwrap(),
+            "\"ignored\""
+        );
+        assert_eq!(
+            serde_json::to_string(&Outcome::Unknown).unwrap(),
+            "\"unknown\""
+        );
     }
 
     #[test]
@@ -245,7 +260,11 @@ mod tests {
 
     #[test]
     fn test_quality_trend_serde() {
-        let trends = [QualityTrend::Improving, QualityTrend::Declining, QualityTrend::Stable];
+        let trends = [
+            QualityTrend::Improving,
+            QualityTrend::Declining,
+            QualityTrend::Stable,
+        ];
         for trend in &trends {
             let json = serde_json::to_string(trend).unwrap();
             let parsed: QualityTrend = serde_json::from_str(&json).unwrap();
