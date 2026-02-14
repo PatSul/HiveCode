@@ -775,35 +775,73 @@ impl Render for SettingsView {
                     cx.notify();
                 }),
             )
-            // Header
-            .child(render_header(key_count, theme))
-            // API Keys
-            .child(render_api_keys_section(
-                key_count,
-                anthropic_set,
-                &self.anthropic_key_input,
-                openai_set,
-                &self.openai_key_input,
-                openrouter_set,
-                &self.openrouter_key_input,
-                google_set,
-                &self.google_key_input,
-                groq_set,
-                &self.groq_key_input,
-                huggingface_set,
-                &self.huggingface_key_input,
-                theme,
-            ))
-            // Local AI
-            .child(self.render_local_ai_section(cx))
-            // Model Routing
-            .child(self.render_model_routing_section(cx))
-            // Budget
-            .child(self.render_budget_section(cx))
-            // Voice & TTS
-            .child(self.render_voice_tts_section(cx))
-            // General
-            .child(self.render_general_section(cx))
+            .child(
+                div()
+                    .w_full()
+                    .max_w(px(1260.0))
+                    .mx_auto()
+                    .flex()
+                    .flex_col()
+                    .gap(theme.space_4)
+                    // Header
+                    .child(render_header(key_count, theme))
+                    // Summary strip
+                    .child(render_settings_overview(
+                        key_count,
+                        self.discovered_model_count,
+                        self.privacy_mode,
+                        self.auto_routing,
+                        theme,
+                    ))
+                    // Main content
+                    .child(
+                        div()
+                            .flex()
+                            .flex_row()
+                            .flex_wrap()
+                            .items_start()
+                            .gap(theme.space_4)
+                            // Left column
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .gap(theme.space_4)
+                                    .flex_1()
+                                    .min_w(px(520.0))
+                                    .child(render_api_keys_section(
+                                        key_count,
+                                        anthropic_set,
+                                        &self.anthropic_key_input,
+                                        openai_set,
+                                        &self.openai_key_input,
+                                        openrouter_set,
+                                        &self.openrouter_key_input,
+                                        google_set,
+                                        &self.google_key_input,
+                                        groq_set,
+                                        &self.groq_key_input,
+                                        huggingface_set,
+                                        &self.huggingface_key_input,
+                                        theme,
+                                    ))
+                                    .child(self.render_local_ai_section(cx)),
+                            )
+                            // Right column
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .gap(theme.space_4)
+                                    .flex_1()
+                                    .min_w(px(420.0))
+                                    .child(self.render_model_routing_section(cx))
+                                    .child(self.render_budget_section(cx))
+                                    .child(self.render_voice_tts_section(cx))
+                                    .child(self.render_general_section(cx)),
+                            ),
+                    ),
+            )
     }
 }
 
@@ -1053,8 +1091,8 @@ fn card(theme: &HiveTheme) -> Div {
     div()
         .flex()
         .flex_col()
-        .p(theme.space_4)
-        .gap(theme.space_3)
+        .p(theme.space_6)
+        .gap(theme.space_4)
         .rounded(theme.radius_md)
         .bg(theme.bg_surface)
         .border_1()
@@ -1108,17 +1146,13 @@ fn status_dot(present: bool, theme: &HiveTheme) -> AnyElement {
         .into_any_element()
 }
 
-fn status_badge(connected: bool, theme: &HiveTheme) -> AnyElement {
-    let (label, bg, color) = if connected {
-        ("Connected", theme.bg_tertiary, theme.accent_green)
+fn status_text(connected: bool, theme: &HiveTheme) -> AnyElement {
+    let (label, color) = if connected {
+        ("Connected", theme.accent_green)
     } else {
-        ("Not configured", theme.bg_tertiary, theme.accent_red)
+        ("Not configured", theme.accent_red)
     };
     div()
-        .px(theme.space_2)
-        .py(px(2.0))
-        .rounded(theme.radius_sm)
-        .bg(bg)
         .text_size(theme.font_size_xs)
         .text_color(color)
         .child(label)
@@ -1196,39 +1230,42 @@ fn api_key_row(
 ) -> AnyElement {
     div()
         .flex()
-        .items_center()
-        .justify_between()
+        .items_start()
         .gap(theme.space_4)
-        .py(theme.space_1)
+        .py(theme.space_2)
         .child(
             div()
                 .flex()
-                .flex_row()
-                .items_center()
+                .flex_col()
+                .flex_1()
                 .gap(theme.space_2)
-                .child(status_dot(has_key, theme))
                 .child(
                     div()
-                        .text_size(theme.font_size_base)
-                        .text_color(theme.text_secondary)
-                        .child(label.to_string()),
-                ),
+                        .flex()
+                        .flex_row()
+                        .items_center()
+                        .gap(theme.space_2)
+                        .child(status_dot(has_key, theme))
+                        .child(
+                            div()
+                                .text_size(theme.font_size_base)
+                                .text_color(theme.text_secondary)
+                                .child(label.to_string()),
+                        ),
+                )
+                .child(status_text(has_key, theme)),
         )
         .child(
             div()
-                .flex()
-                .flex_row()
-                .items_center()
-                .gap(theme.space_2)
+                .min_w(px(280.0))
+                .max_w(px(420.0))
+                .w_full()
                 .child(
-                    div().min_w(px(240.0)).child(
-                        Input::new(input_state)
-                            .appearance(true)
-                            .mask_toggle()
-                            .cleanable(false),
-                    ),
-                )
-                .child(status_badge(has_key, theme)),
+                    Input::new(input_state)
+                        .appearance(true)
+                        .mask_toggle()
+                        .cleanable(false),
+                ),
         )
         .into_any_element()
 }
@@ -1237,12 +1274,12 @@ fn api_key_row(
 fn input_row(label: &str, input_state: &Entity<InputState>, theme: &HiveTheme) -> AnyElement {
     div()
         .flex()
-        .items_center()
-        .justify_between()
+        .items_start()
         .gap(theme.space_4)
-        .py(theme.space_1)
+        .py(theme.space_2)
         .child(
             div()
+                .flex_1()
                 .text_size(theme.font_size_base)
                 .text_color(theme.text_secondary)
                 .child(label.to_string()),
@@ -1250,6 +1287,8 @@ fn input_row(label: &str, input_state: &Entity<InputState>, theme: &HiveTheme) -
         .child(
             div()
                 .min_w(px(280.0))
+                .max_w(px(420.0))
+                .w_full()
                 .child(Input::new(input_state).appearance(true).cleanable(false)),
         )
         .into_any_element()
@@ -1307,11 +1346,11 @@ fn switch_row<A: Action + Clone>(
     div()
         .flex()
         .items_center()
-        .justify_between()
         .gap(theme.space_4)
-        .py(theme.space_1)
+        .py(theme.space_2)
         .child(
             div()
+                .flex_1()
                 .text_size(theme.font_size_base)
                 .text_color(theme.text_secondary)
                 .child(label.to_string()),
@@ -1376,6 +1415,111 @@ fn render_header(key_count: usize, theme: &HiveTheme) -> AnyElement {
                         .text_size(theme.font_size_sm)
                         .text_color(theme.text_muted)
                         .child(summary),
+                ),
+        )
+        .into_any_element()
+}
+
+fn render_settings_overview(
+    key_count: usize,
+    discovered_model_count: usize,
+    privacy_mode: bool,
+    auto_routing: bool,
+    theme: &HiveTheme,
+) -> AnyElement {
+    card(theme)
+        .child(
+            div()
+                .flex()
+                .flex_row()
+                .flex_wrap()
+                .items_center()
+                .gap(theme.space_2)
+                .child(overview_chip(
+                    "Cloud Providers",
+                    format!("{key_count}/6 configured"),
+                    if key_count > 0 {
+                        theme.accent_green
+                    } else {
+                        theme.accent_red
+                    },
+                    theme,
+                ))
+                .child(overview_chip(
+                    "Local Models",
+                    if discovered_model_count > 0 {
+                        format!("{discovered_model_count} discovered")
+                    } else {
+                        "none detected".to_string()
+                    },
+                    if discovered_model_count > 0 {
+                        theme.accent_green
+                    } else {
+                        theme.text_muted
+                    },
+                    theme,
+                ))
+                .child(overview_chip(
+                    "Privacy",
+                    if privacy_mode {
+                        "local-only".to_string()
+                    } else {
+                        "cloud enabled".to_string()
+                    },
+                    if privacy_mode {
+                        theme.accent_green
+                    } else {
+                        theme.accent_yellow
+                    },
+                    theme,
+                ))
+                .child(overview_chip(
+                    "Routing",
+                    if auto_routing {
+                        "automatic".to_string()
+                    } else {
+                        "manual default".to_string()
+                    },
+                    theme.accent_cyan,
+                    theme,
+                )),
+        )
+        .into_any_element()
+}
+
+fn overview_chip(label: &str, value: String, accent: Hsla, theme: &HiveTheme) -> AnyElement {
+    div()
+        .px(theme.space_3)
+        .py(theme.space_2)
+        .rounded(theme.radius_md)
+        .bg(theme.bg_primary)
+        .border_1()
+        .border_color(theme.border)
+        .child(
+            div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap(theme.space_2)
+                .child(
+                    div()
+                        .w(px(8.0))
+                        .h(px(8.0))
+                        .rounded(theme.radius_full)
+                        .bg(accent),
+                )
+                .child(
+                    div()
+                        .text_size(theme.font_size_xs)
+                        .text_color(theme.text_muted)
+                        .child(format!("{label}: ")),
+                )
+                .child(
+                    div()
+                        .text_size(theme.font_size_sm)
+                        .text_color(theme.text_primary)
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .child(value),
                 ),
         )
         .into_any_element()

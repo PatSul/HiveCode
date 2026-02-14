@@ -2,6 +2,7 @@ use gpui::*;
 use gpui_component::{Icon, IconName};
 
 use hive_ui_core::HiveTheme;
+use hive_ui_core::AgentsRunWorkflow;
 
 // ---------------------------------------------------------------------------
 // Data types
@@ -332,12 +333,61 @@ fn spec_progress_bar(spec: &SpecSummary, theme: &HiveTheme) -> Div {
 }
 
 fn spec_card_footer(spec: &SpecSummary, theme: &HiveTheme) -> Div {
-    div().flex().flex_row().items_center().child(
-        div()
-            .text_size(theme.font_size_xs)
-            .text_color(theme.text_muted)
-            .child(format!("Updated {}", spec.updated_at)),
-    )
+    let source_id = spec.id.clone();
+    let title = spec.title.clone();
+    let status = spec.status.clone();
+    let summary = format!(
+        "Status: {status} • Updated {when}",
+        when = spec.updated_at
+    );
+
+    div()
+        .flex()
+        .flex_row()
+        .items_center()
+        .child(
+            div()
+                .text_size(theme.font_size_xs)
+                .text_color(theme.text_muted)
+                .child(summary),
+        )
+        .child(div().flex_1())
+        .child(
+            div()
+                .px(theme.space_2)
+                .py(theme.space_1)
+                .rounded(theme.radius_sm)
+                .bg(theme.bg_surface)
+                .border_1()
+                .border_color(theme.accent_cyan)
+                .text_size(theme.font_size_xs)
+                .text_color(theme.accent_cyan)
+                .font_weight(FontWeight::SEMIBOLD)
+                .cursor_pointer()
+                .on_mouse_down(MouseButton::Left, move |_event, window, cx| {
+                    let instruction = format!("Run specification {} end-to-end: {}", title, spec_status_summary(&status));
+                    window.dispatch_action(
+                        Box::new(AgentsRunWorkflow {
+                            workflow_id: "builtin:hive-dogfood-v1".into(),
+                            instruction,
+                            source: "spec".into(),
+                            source_id: source_id.clone(),
+                        }),
+                        cx,
+                    );
+                })
+                .child("Run via Agents"),
+        )
+}
+
+fn spec_status_summary(status: &str) -> &'static str {
+    if status == "Complete" {
+        "verify delivery and report completion"
+    } else if status == "Draft" {
+        "build and execute a first-pass plan"
+    } else {
+        "execute planned work and capture results"
+    }
 }
 
 // ---------------------------------------------------------------------------

@@ -9,6 +9,7 @@ pub struct StatusBar {
     pub connectivity: ConnectivityDisplay,
     pub current_model: String,
     pub privacy_mode: bool,
+    pub active_project: String,
     pub total_cost: f64,
     pub version: String,
 }
@@ -44,6 +45,7 @@ impl StatusBar {
             connectivity: ConnectivityDisplay::Offline,
             current_model: "(no model)".into(),
             privacy_mode: false,
+            active_project: "No project".into(),
             total_cost: 0.0,
             version: env!("CARGO_PKG_VERSION").into(),
         }
@@ -53,13 +55,18 @@ impl StatusBar {
         let conn_color = self.connectivity.color(theme);
         let conn_label = self.connectivity.label();
         let model = self.current_model.clone();
-        let cost_str = format!("${:.4}", self.total_cost);
-        let privacy = if self.privacy_mode { "Private" } else { "Open" };
+        let cost_str = format!("${:.2}", self.total_cost);
+        let privacy = if self.privacy_mode {
+            "Private Mode"
+        } else {
+            "Cloud Mode"
+        };
         let privacy_icon = if self.privacy_mode {
             IconName::EyeOff
         } else {
             IconName::Eye
         };
+        let project = self.active_project.clone();
         let version = format!("v{}", self.version);
 
         div()
@@ -67,7 +74,7 @@ impl StatusBar {
             .items_center()
             .justify_between()
             .w_full()
-            .h(px(26.0))
+            .h(px(30.0))
             .bg(theme.bg_secondary)
             .border_t_1()
             .border_color(theme.border)
@@ -79,12 +86,18 @@ impl StatusBar {
                 div()
                     .flex()
                     .items_center()
-                    .gap(theme.space_3)
+                    .gap(theme.space_2)
                     .child(
                         div()
                             .flex()
                             .items_center()
                             .gap(theme.space_1)
+                            .px(theme.space_2)
+                            .py(px(2.0))
+                            .rounded(theme.radius_sm)
+                            .bg(theme.bg_surface)
+                            .border_1()
+                            .border_color(theme.border)
                             .child(
                                 div()
                                     .w(px(8.0))
@@ -100,13 +113,29 @@ impl StatusBar {
                             .px(theme.space_2)
                             .py(px(2.0))
                             .rounded(theme.radius_sm)
-                            .bg(theme.bg_tertiary)
+                            .bg(theme.bg_surface)
+                            .border_1()
+                            .border_color(theme.border)
                             .text_color(theme.accent_cyan)
                             .cursor_pointer()
                             .on_mouse_down(MouseButton::Left, |_event, window, cx| {
                                 window.dispatch_action(Box::new(SwitchToSettings), cx);
                             })
                             .child(model),
+                    )
+                    .child(
+                        div()
+                            .px(theme.space_2)
+                            .py(px(2.0))
+                            .rounded(theme.radius_sm)
+                            .bg(theme.bg_surface)
+                            .border_1()
+                            .border_color(theme.border)
+                            .text_color(theme.text_muted)
+                            .text_size(theme.font_size_xs)
+                            .overflow_hidden()
+                            .max_w(px(220.0))
+                            .child(format!("Project: {project}")),
                     ),
             )
             .child(
@@ -114,16 +143,32 @@ impl StatusBar {
                 div()
                     .flex()
                     .items_center()
-                    .gap(theme.space_3)
+                    .gap(theme.space_2)
                     .child(
                         div()
                             .flex()
                             .items_center()
                             .gap(theme.space_1)
+                            .px(theme.space_2)
+                            .py(px(2.0))
+                            .rounded(theme.radius_sm)
+                            .bg(theme.bg_surface)
+                            .border_1()
+                            .border_color(theme.border)
                             .child(Icon::new(privacy_icon).size_3p5())
                             .child(privacy),
                     )
-                    .child(div().text_color(theme.accent_green).child(cost_str))
+                    .child(
+                        div()
+                            .px(theme.space_2)
+                            .py(px(2.0))
+                            .rounded(theme.radius_sm)
+                            .bg(theme.bg_surface)
+                            .border_1()
+                            .border_color(theme.border)
+                            .text_color(theme.accent_green)
+                            .child(cost_str),
+                    )
                     .child(div().child(version)),
             )
     }

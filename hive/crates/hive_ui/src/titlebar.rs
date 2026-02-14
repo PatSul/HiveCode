@@ -14,9 +14,8 @@ const TITLE_BAR_HEIGHT: Pixels = px(34.0);
 /// behavior (drag, button actions) is blocked because the workspace's focus
 /// handler runs on every click and sets `default_prevented = true`.
 ///
-/// Window drag and maximize/restore toggle are handled by the OS via
-/// `window_control_area` → WM_NCHITTEST → DefWindowProcW. Minimize and close
-/// buttons have `on_click` fallback handlers in addition to `window_control_area`.
+/// Window drag and window controls are handled by the OS via
+/// `window_control_area` → WM_NCHITTEST → DefWindowProcW.
 pub struct Titlebar;
 
 impl Titlebar {
@@ -95,10 +94,7 @@ fn version_badge(theme: &HiveTheme) -> impl IntoElement {
 /// Minimize / Maximize-or-Restore / Close buttons.
 ///
 /// All buttons use `window_control_area` for native NC behavior (correct
-/// maximize/restore toggle via the Win32 NC handler). Minimize and close
-/// also have `on_click` fallback handlers; maximize does NOT because
-/// `zoom_window()` only maximizes (never restores) and would conflict
-/// with the NC handler's toggle logic.
+/// maximize/restore toggle via the Win32 NC handler).
 fn window_controls(theme: &HiveTheme, is_maximized: bool) -> impl IntoElement {
     let fg = theme.text_primary;
     let hover_bg = hsla(0.0, 0.0, 1.0, 0.1);
@@ -172,10 +168,6 @@ fn window_controls(theme: &HiveTheme, is_maximized: bool) -> impl IntoElement {
                 .hover(|s| s.bg(close_hover_bg).text_color(hsla(0.0, 0.0, 1.0, 1.0)))
                 .active(|s| s.bg(close_hover_bg))
                 .window_control_area(WindowControlArea::Close)
-                .on_click(|_, window, cx| {
-                    cx.stop_propagation();
-                    window.remove_window();
-                })
                 .child(Icon::new(IconName::WindowClose).small()),
         )
 }

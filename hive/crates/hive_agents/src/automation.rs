@@ -4,12 +4,16 @@
 //! workflows containing conditional steps, lifecycle management, simulated
 //! execution, and run-history tracking.
 
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use chrono::{DateTime, Utc};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 use tracing::debug;
 use uuid::Uuid;
+use std::time::Duration;
+
+use hive_terminal::executor::CommandExecutor;
 
 // ---------------------------------------------------------------------------
 // Enums
@@ -127,6 +131,52 @@ pub struct WorkflowRunResult {
     pub error: Option<String>,
 }
 
+/// Stable ID for the built-in dogfood workflow.
+pub const BUILTIN_DOGFOOD_WORKFLOW_ID: &str = "builtin:hive-dogfood-v1";
+
+/// Workspace-relative directory for user-defined workflows.
+pub const USER_WORKFLOW_DIR: &str = ".hive/workflows";
+
+/// Minimal JSON shape for user-defined workflows.
+#[derive(Debug, Clone, Deserialize)]
+pub struct WorkflowTemplate {
+    pub name: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub trigger: Option<TriggerType>,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    pub steps: Vec<WorkflowStepTemplate>,
+}
+
+/// Minimal JSON shape for user-defined workflow steps.
+#[derive(Debug, Clone, Deserialize)]
+pub struct WorkflowStepTemplate {
+    pub name: String,
+    pub action: ActionType,
+    #[serde(default)]
+    pub conditions: Vec<Condition>,
+    #[serde(default)]
+    pub timeout_secs: Option<u64>,
+    #[serde(default)]
+    pub retry_count: u32,
+}
+
+/// Result of loading user workflow files.
+#[derive(Debug, Clone, Default)]
+pub struct WorkflowLoadReport {
+    pub source_dir: PathBuf,
+    pub loaded: usize,
+    pub failed: usize,
+    pub skipped: usize,
+    pub errors: Vec<String>,
+}
+
+fn default_true() -> bool {
+    true
+}
+
 // ---------------------------------------------------------------------------
 // AutomationService
 // ---------------------------------------------------------------------------
@@ -169,6 +219,148 @@ impl AutomationService {
         debug!(name, id = %workflow.id, "Created workflow");
         self.workflows.push(workflow.clone());
         workflow
+    }
+
+    /// Ensure that built-in workflows are present.
+    pub fn ensure_builtin_workflows(&mut self) {
+        if self
+            .workflows
+            .iter()
+            .any(|wf| wf.id == BUILTIN_DOGFOOD_WORKFLOW_ID)
+        {
+            return;
+        }
+
+        let now = Utc::now();
+        let workflow = Workflow {
+            id: BUILTIN_DOGFOOD_WORKFLOW_ID.to_string(),
+            name: "Local Build Check".to_string(),
+            description:
+                "Run a local validation loop: quick build check, core tests, and git state checks."
+                    .to_string(),
+            trigger: TriggerType::ManualTrigger,
+            steps: vec![
+                WorkflowStep {
+                    id: "builtin:hive-dogfood-v1:step-1".to_string(),
+                    name: "Cargo check".to_string(),
+                    action: ActionType::RunCommand {
+                        command: "cargo check --quiet".to_string(),
+                    },
+                    conditions: Vec::new(),
+                    timeout_secs: Some(900),
+                    retry_count: 0,
+                },
+                WorkflowStep {
+                    id: "builtin:hive-dogfood-v1:step-2".to_string(),
+                    name: "Run tests (hive_app)".to_string(),
+                    action: ActionType::RunCommand {
+                        command: "cargo test --quiet -p hive_app".to_string(),
+                    },
+                    conditions: Vec::new(),
+                    timeout_secs: Some(1200),
+                    retry_count: 0,
+                },
+                WorkflowStep {
+                    id: "builtin:hive-dogfood-v1:step-3".to_string(),
+                    name: "Git status".to_string(),
+                    action: ActionType::RunCommand {
+                        command: "git status --short".to_string(),
+                    },
+                    conditions: Vec::new(),
+                    timeout_secs: Some(120),
+                    retry_count: 0,
+                },
+                WorkflowStep {
+                    id: "builtin:hive-dogfood-v1:step-4".to_string(),
+                    name: "Git diff stat".to_string(),
+                    action: ActionType::RunCommand {
+                        command: "git diff --stat".to_string(),
+                    },
+                    conditions: Vec::new(),
+                    timeout_secs: Some(120),
+                    retry_count: 0,
+                },
+            ],
+            status: WorkflowStatus::Active,
+            created_at: now,
+            updated_at: now,
+            last_run: None,
+            run_count: 0,
+        };
+
+        self.workflows.push(workflow);
+    }
+
+    /// Replace file-based workflows by reading JSON templates from
+    /// `<workspace>/.hive/workflows/*.json`.
+    pub fn reload_user_workflows(&mut self, workspace_root: &Path) -> WorkflowLoadReport {
+        let source_dir = workspace_root.join(USER_WORKFLOW_DIR);
+        let mut report = WorkflowLoadReport {
+            source_dir: source_dir.clone(),
+            ..WorkflowLoadReport::default()
+        };
+
+        // Keep built-in and runtime-created workflows, replace only file imports.
+        self.workflows.retain(|wf| !wf.id.starts_with("file:"));
+
+        if !source_dir.exists() {
+            return report;
+        }
+
+        let entries = match std::fs::read_dir(&source_dir) {
+            Ok(entries) => entries,
+            Err(e) => {
+                report.failed += 1;
+                report
+                    .errors
+                    .push(format!("{}: failed to read directory: {e}", source_dir.display()));
+                return report;
+            }
+        };
+
+        let mut paths: Vec<PathBuf> = entries
+            .filter_map(|entry| entry.ok().map(|e| e.path()))
+            .filter(|path| path.is_file())
+            .collect();
+        paths.sort();
+
+        for path in paths {
+            let is_json = path
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("json"));
+            if !is_json {
+                report.skipped += 1;
+                continue;
+            }
+
+            let result = Self::parse_workflow_template(&path).and_then(|template| {
+                Self::validate_workflow_template(&template)?;
+                self.install_template_from_template(&path, template)
+            });
+
+            match result {
+                Ok(()) => report.loaded += 1,
+                Err(e) => {
+                    report.failed += 1;
+                    report.errors.push(format!("{}: {e}", path.display()));
+                }
+            }
+        }
+
+        report
+    }
+
+    /// Convenience helper for startup: install built-ins and load user files.
+    pub fn initialize_workflows(&mut self, workspace_root: &Path) -> WorkflowLoadReport {
+        self.ensure_builtin_workflows();
+        let _ = std::fs::create_dir_all(workspace_root.join(USER_WORKFLOW_DIR));
+        self.reload_user_workflows(workspace_root)
+    }
+
+    /// Clone a workflow for execution on a background thread.
+    pub fn clone_workflow(&self, workflow_id: &str) -> Option<Workflow> {
+        self.get_workflow(workflow_id).cloned()
     }
 
     /// Add a step to an existing workflow.
@@ -356,6 +548,89 @@ impl AutomationService {
         all[start..].to_vec()
     }
 
+    /// Return all run results across workflows (oldest first).
+    pub fn list_run_history(&self) -> &[WorkflowRunResult] {
+        &self.run_history
+    }
+
+    /// Execute a workflow that contains only `run_command` steps.
+    ///
+    /// This is intentionally a blocking call, suitable for running on a
+    /// background thread. Commands are validated by the SecurityGateway
+    /// inside `CommandExecutor`.
+    pub fn execute_run_commands_blocking(
+        workflow: &Workflow,
+        working_dir: PathBuf,
+    ) -> Result<WorkflowRunResult> {
+        // Ensure we never run anything unexpected in V1.
+        for step in &workflow.steps {
+            match step.action {
+                ActionType::RunCommand { .. } => {}
+                _ => bail!(
+                    "Unsupported action in workflow '{}': only run_command is supported in V1",
+                    workflow.name
+                ),
+            }
+        }
+
+        let started_at = Utc::now();
+
+        // Run tokio-based process execution on an isolated runtime to avoid
+        // assuming anything about the UI executor.
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .context("Failed to create tokio runtime for workflow execution")?;
+
+        let executor = CommandExecutor::new(working_dir)?;
+
+        let mut steps_completed = 0usize;
+        let mut success = true;
+        let mut error: Option<String> = None;
+
+        for step in &workflow.steps {
+            let ActionType::RunCommand { ref command } = step.action else {
+                continue;
+            };
+
+            let timeout = Duration::from_secs(step.timeout_secs.unwrap_or(30));
+            let result = rt.block_on(executor.execute_with_timeout(command, timeout));
+
+            match result {
+                Ok(output) if output.exit_code == 0 => {
+                    steps_completed += 1;
+                }
+                Ok(output) => {
+                    success = false;
+                    let stderr = output.stderr.trim();
+                    error = Some(if stderr.is_empty() {
+                        format!("Command failed (exit={}): {}", output.exit_code, command)
+                    } else {
+                        format!(
+                            "Command failed (exit={}): {}\n{}",
+                            output.exit_code, command, stderr
+                        )
+                    });
+                    break;
+                }
+                Err(e) => {
+                    success = false;
+                    error = Some(format!("Command failed: {command}\n{e}"));
+                    break;
+                }
+            }
+        }
+
+        Ok(WorkflowRunResult {
+            workflow_id: workflow.id.clone(),
+            started_at,
+            completed_at: Utc::now(),
+            success,
+            steps_completed,
+            error,
+        })
+    }
+
     /// Return the total number of workflows.
     pub fn workflow_count(&self) -> usize {
         self.workflows.len()
@@ -392,6 +667,109 @@ impl AutomationService {
                 .map(|re| re.is_match(actual_value))
                 .unwrap_or(false),
         }
+    }
+
+    fn parse_workflow_template(path: &Path) -> Result<WorkflowTemplate> {
+        let raw = std::fs::read_to_string(path)
+            .with_context(|| format!("failed to read workflow file {}", path.display()))?;
+        let template: WorkflowTemplate = serde_json::from_str(&raw)
+            .with_context(|| "invalid workflow JSON (expected WorkflowTemplate schema)")?;
+        Ok(template)
+    }
+
+    fn validate_workflow_template(template: &WorkflowTemplate) -> Result<()> {
+        if template.name.trim().is_empty() {
+            bail!("workflow name must not be empty");
+        }
+        if template.steps.is_empty() {
+            bail!("workflow must contain at least one step");
+        }
+
+        for (idx, step) in template.steps.iter().enumerate() {
+            if step.name.trim().is_empty() {
+                bail!("step #{} has an empty name", idx + 1);
+            }
+
+            match &step.action {
+                ActionType::RunCommand { command } => {
+                    if command.trim().is_empty() {
+                        bail!("step '{}' has an empty command", step.name);
+                    }
+                    if command.contains('\n') || command.contains('\r') {
+                        bail!(
+                            "step '{}' has a multiline command; use a single command line",
+                            step.name
+                        );
+                    }
+                }
+                _ => bail!(
+                    "step '{}' uses unsupported action type; V1 supports only run_command",
+                    step.name
+                ),
+            }
+        }
+
+        Ok(())
+    }
+
+    fn install_template_from_template(
+        &mut self,
+        path: &Path,
+        template: WorkflowTemplate,
+    ) -> Result<()> {
+        let file_stem = path
+            .file_stem()
+            .and_then(|stem| stem.to_str())
+            .ok_or_else(|| anyhow::anyhow!("invalid workflow file name"))?;
+        let workflow_id = format!("file:{}", Self::sanitize_identifier(file_stem));
+        let now = Utc::now();
+
+        let mut steps = Vec::with_capacity(template.steps.len());
+        for (idx, step) in template.steps.iter().enumerate() {
+            steps.push(WorkflowStep {
+                id: format!("{workflow_id}:step-{}", idx + 1),
+                name: step.name.clone(),
+                action: step.action.clone(),
+                conditions: step.conditions.clone(),
+                timeout_secs: step.timeout_secs,
+                retry_count: step.retry_count,
+            });
+        }
+
+        let workflow = Workflow {
+            id: workflow_id.clone(),
+            name: template.name,
+            description: template.description,
+            trigger: template.trigger.unwrap_or(TriggerType::ManualTrigger),
+            steps,
+            status: if template.enabled {
+                WorkflowStatus::Active
+            } else {
+                WorkflowStatus::Draft
+            },
+            created_at: now,
+            updated_at: now,
+            last_run: None,
+            run_count: 0,
+        };
+
+        self.workflows.push(workflow);
+        Ok(())
+    }
+
+    fn sanitize_identifier(raw: &str) -> String {
+        let mut out = String::with_capacity(raw.len());
+        for ch in raw.chars() {
+            if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' {
+                out.push(ch.to_ascii_lowercase());
+            } else {
+                out.push('-');
+            }
+        }
+        while out.contains("--") {
+            out = out.replace("--", "-");
+        }
+        out.trim_matches('-').to_string()
     }
 }
 
@@ -926,5 +1304,78 @@ mod tests {
         let svc = AutomationService::default();
         assert_eq!(svc.workflow_count(), 0);
         assert_eq!(svc.active_count(), 0);
+    }
+
+    #[test]
+    fn ensure_builtin_workflows_is_idempotent() {
+        let mut svc = AutomationService::new();
+        svc.ensure_builtin_workflows();
+        svc.ensure_builtin_workflows();
+
+        let builtins = svc
+            .list_workflows()
+            .iter()
+            .filter(|wf| wf.id == BUILTIN_DOGFOOD_WORKFLOW_ID)
+            .count();
+        assert_eq!(builtins, 1);
+    }
+
+    #[test]
+    fn reload_user_workflows_loads_json_templates() {
+        let tmp = tempfile::tempdir().unwrap();
+        let workflows_dir = tmp.path().join(USER_WORKFLOW_DIR);
+        std::fs::create_dir_all(&workflows_dir).unwrap();
+
+        let json = r#"{
+  "name": "Local QA",
+  "description": "Run smoke checks",
+  "enabled": true,
+  "steps": [
+    {
+      "name": "Check",
+      "action": { "type": "run_command", "command": "cargo check --quiet" }
+    }
+  ]
+}"#;
+        std::fs::write(workflows_dir.join("qa.json"), json).unwrap();
+
+        let mut svc = AutomationService::new();
+        svc.ensure_builtin_workflows();
+        let report = svc.reload_user_workflows(tmp.path());
+
+        assert_eq!(report.loaded, 1);
+        assert_eq!(report.failed, 0);
+        assert!(
+            svc.list_workflows().iter().any(|wf| wf.id == "file:qa"),
+            "expected file-based workflow id"
+        );
+    }
+
+    #[test]
+    fn reload_user_workflows_blocks_insecure_api_urls() {
+        let tmp = tempfile::tempdir().unwrap();
+        let workflows_dir = tmp.path().join(USER_WORKFLOW_DIR);
+        std::fs::create_dir_all(&workflows_dir).unwrap();
+
+        let json = r#"{
+  "name": "Bad API",
+  "steps": [
+    {
+      "name": "Call local service",
+      "action": { "type": "call_api", "url": "http://127.0.0.1/api", "method": "POST" }
+    }
+  ]
+}"#;
+        std::fs::write(workflows_dir.join("bad.json"), json).unwrap();
+
+        let mut svc = AutomationService::new();
+        let report = svc.reload_user_workflows(tmp.path());
+        assert_eq!(report.loaded, 0);
+        assert_eq!(report.failed, 1);
+        assert!(
+            report.errors[0].contains("only run_command"),
+            "unexpected error: {}",
+            report.errors[0]
+        );
     }
 }

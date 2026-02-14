@@ -39,6 +39,10 @@ pub struct Reminder {
     pub title: String,
     pub description: String,
     pub trigger: ReminderTrigger,
+    /// Optional project root this reminder belongs to.
+    ///
+    /// `None` means the reminder is global/unscoped.
+    pub project_root: Option<String>,
     pub status: ReminderStatus,
     pub created_at: String,
     pub updated_at: String,
@@ -73,12 +77,24 @@ impl ReminderService {
         description: &str,
         trigger_at: DateTime<Utc>,
     ) -> Result<Reminder, String> {
+        self.create_for_project(title, description, trigger_at, None)
+    }
+
+    /// Create a one-time reminder for a specific project root.
+    pub fn create_for_project(
+        &self,
+        title: &str,
+        description: &str,
+        trigger_at: DateTime<Utc>,
+        project_root: Option<&str>,
+    ) -> Result<Reminder, String> {
         let now = Utc::now();
         let reminder = Reminder {
             id: Uuid::new_v4().to_string(),
             title: title.to_string(),
             description: description.to_string(),
             trigger: ReminderTrigger::At(trigger_at),
+            project_root: project_root.map(|p| p.to_string()),
             status: ReminderStatus::Active,
             created_at: now.to_rfc3339(),
             updated_at: now.to_rfc3339(),
@@ -94,12 +110,24 @@ impl ReminderService {
         description: &str,
         cron_expr: &str,
     ) -> Result<Reminder, String> {
+        self.create_recurring_for_project(title, description, cron_expr, None)
+    }
+
+    /// Create a recurring reminder for a specific project root.
+    pub fn create_recurring_for_project(
+        &self,
+        title: &str,
+        description: &str,
+        cron_expr: &str,
+        project_root: Option<&str>,
+    ) -> Result<Reminder, String> {
         let now = Utc::now();
         let reminder = Reminder {
             id: Uuid::new_v4().to_string(),
             title: title.to_string(),
             description: description.to_string(),
             trigger: ReminderTrigger::Recurring(cron_expr.to_string()),
+            project_root: project_root.map(|p| p.to_string()),
             status: ReminderStatus::Active,
             created_at: now.to_rfc3339(),
             updated_at: now.to_rfc3339(),
@@ -175,6 +203,18 @@ impl ReminderService {
     pub fn list_active(&self) -> Result<Vec<Reminder>, String> {
         self.storage.list_reminders_by_status("active")
     }
+
+    /// List active reminders scoped to a specific project.
+    ///
+    /// `project_root` can be a canonical path or project identifier. `None`
+    /// returns all active reminders (matching current behavior).
+    pub fn list_active_for_project(
+        &self,
+        project_root: Option<&str>,
+    ) -> Result<Vec<Reminder>, String> {
+        self.storage
+            .list_reminders_by_project_root("active", project_root)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -207,6 +247,41 @@ mod tests {
         let active = service.list_active().unwrap();
         assert_eq!(active.len(), 1);
         assert_eq!(active[0].title, "Standup");
+    }
+
+    #[test]
+    fn test_create_for_project_scopes_active() {
+        let service = make_service();
+        let future = Utc::now() + Duration::hours(1);
+
+        service
+            .create_for_project(
+                "Personal reminders",
+                "Personal reminders",
+                future,
+                Some("/Users/example/personal-reminders"),
+            )
+            .unwrap();
+        service
+            .create_for_project(
+                "Work reminders",
+                "Work reminders",
+                future,
+                Some("/Users/example/workspace"),
+            )
+            .unwrap();
+
+        let personal = service
+            .list_active_for_project(Some("/Users/example/personal-reminders"))
+            .unwrap();
+        assert_eq!(personal.len(), 1);
+        assert_eq!(personal[0].title, "Personal reminders");
+
+        let workspace = service
+            .list_active_for_project(Some("/Users/example/workspace"))
+            .unwrap();
+        assert_eq!(workspace.len(), 1);
+        assert_eq!(workspace[0].title, "Work reminders");
     }
 
     #[test]

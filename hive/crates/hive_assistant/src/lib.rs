@@ -6,6 +6,7 @@ pub mod reminders;
 pub mod storage;
 
 use std::sync::Arc;
+use std::path::Path;
 
 use approval::ApprovalService;
 use calendar::CalendarService;
@@ -65,6 +66,14 @@ impl AssistantService {
     /// Generate a daily briefing combining calendar events, email digest,
     /// and active reminders.
     pub fn daily_briefing(&self) -> DailyBriefing {
+        self.daily_briefing_for_project(None)
+    }
+
+    /// Generate a daily briefing for a specific project root.
+    ///
+    /// When `project_root` is `Some`, reminders are filtered to that project.
+    /// `None` keeps current behavior and returns reminders from all projects.
+    pub fn daily_briefing_for_project(&self, project_root: Option<&Path>) -> DailyBriefing {
         let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
 
         // Fetch today's events (stub returns empty).
@@ -82,7 +91,13 @@ impl AssistantService {
         };
 
         // Get active reminders.
-        let reminders = self.reminder_service.list_active().unwrap_or_default();
+        let reminders = match project_root.map(|p| p.to_string_lossy().to_string()) {
+            Some(root) => self
+                .reminder_service
+                .list_active_for_project(Some(&root))
+                .unwrap_or_default(),
+            None => self.reminder_service.list_active().unwrap_or_default(),
+        };
 
         generate_briefing(&today, events, email_digest, reminders)
     }
@@ -99,6 +114,7 @@ impl AssistantService {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
     use chrono::{Duration, Utc};
 
     use crate::AssistantService;
@@ -153,6 +169,36 @@ mod tests {
                 .iter()
                 .any(|a| a.contains("Review PR"))
         );
+    }
+
+    #[test]
+    fn test_daily_briefing_for_project_scoped() {
+        let service = AssistantService::in_memory().unwrap();
+        let future = Utc::now() + Duration::hours(1);
+
+        service
+            .reminder_service
+            .create_for_project(
+                "Buy coffee",
+                "Personal reminder",
+                future,
+                Some("/Users/example/personal"),
+            )
+            .unwrap();
+        service
+            .reminder_service
+            .create_for_project(
+                "Plan sprint",
+                "Work reminder",
+                future,
+                Some("/Users/example/work"),
+            )
+            .unwrap();
+
+        let personal = service
+            .daily_briefing_for_project(Some(Path::new("/Users/example/personal")));
+        assert_eq!(personal.active_reminders.len(), 1);
+        assert_eq!(personal.active_reminders[0].title, "Buy coffee");
     }
 
     #[test]

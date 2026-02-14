@@ -3,6 +3,7 @@ use gpui_component::{Icon, IconName};
 
 use hive_ui_core::HiveTheme;
 use hive_ui_core::KanbanAddTask;
+use hive_ui_core::AgentsRunWorkflow;
 
 // ---------------------------------------------------------------------------
 // Data types
@@ -553,6 +554,37 @@ impl KanbanPanel {
                 .text_size(theme.font_size_xs)
                 .text_color(theme.text_muted)
                 .child(task.created_at.clone()),
+        );
+
+        let task_id = task.id;
+        let title = task.title.clone();
+        let description = task.description.clone();
+
+        footer = footer.child(
+            div()
+                .px(theme.space_2)
+                .py(theme.space_1)
+                .rounded(theme.radius_sm)
+                .bg(theme.bg_surface)
+                .border_1()
+                .border_color(theme.accent_aqua)
+                .text_size(theme.font_size_xs)
+                .text_color(theme.accent_aqua)
+                .font_weight(FontWeight::SEMIBOLD)
+                .cursor_pointer()
+                .on_mouse_down(MouseButton::Left, move |_event, window, cx| {
+                    let instruction = format!("Execute kanban task {}: {}", title, description);
+                    window.dispatch_action(
+                        Box::new(AgentsRunWorkflow {
+                            workflow_id: "builtin:hive-dogfood-v1".into(),
+                            instruction,
+                            source: "kanban-task".into(),
+                            source_id: task_id.to_string(),
+                        }),
+                        cx,
+                    );
+                })
+                .child("Run"),
         );
 
         footer

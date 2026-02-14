@@ -23,7 +23,8 @@ pub mod worktree;
 pub use auto_commit::{AutoCommitConfig, AutoCommitService, CommitResult};
 pub use automation::{
     ActionType, AutomationService, Condition, ConditionOp, TriggerType, Workflow,
-    WorkflowRunResult, WorkflowStatus, WorkflowStep,
+    WorkflowLoadReport, WorkflowRunResult, WorkflowStatus, WorkflowStep, BUILTIN_DOGFOOD_WORKFLOW_ID,
+    USER_WORKFLOW_DIR,
 };
 pub use collective_memory::{CollectiveMemory, MemoryCategory, MemoryEntry, MemoryStats};
 pub use coordinator::{

@@ -145,6 +145,7 @@ pub struct HiveConfig {
     pub auto_update: bool,
     pub notifications_enabled: bool,
     pub log_level: String,
+    pub close_to_tray_notice_seen: bool,
 }
 
 impl Default for HiveConfig {
@@ -180,6 +181,7 @@ impl Default for HiveConfig {
             auto_update: true,
             notifications_enabled: true,
             log_level: "info".into(),
+            close_to_tray_notice_seen: false,
         }
     }
 }

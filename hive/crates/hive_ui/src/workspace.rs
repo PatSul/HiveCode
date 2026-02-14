@@ -1,7 +1,9 @@
 use gpui::prelude::FluentBuilder;
 use gpui::*;
 use gpui_component::Icon;
-use std::path::PathBuf;
+use gpui_component::scroll::ScrollableElement;
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tracing::{error, info, warn};
 
@@ -10,12 +12,14 @@ use hive_ai::types::{ChatRequest, ToolDefinition as AiToolDefinition};
 use hive_core::config::HiveConfig;
 use hive_core::notifications::{AppNotification, NotificationType};
 use hive_core::session::SessionState;
+use hive_assistant::ReminderTrigger;
 
 use crate::chat_input::{ChatInputView, SubmitMessage};
 use crate::chat_service::{ChatService, StreamCompleted};
+use chrono::Utc;
 use hive_ui_core::{
     // Globals
-    AppAiService, AppAssistant, AppConfig, AppLearning, AppMarketplace, AppNotifications,
+    AppAiService, AppAssistant, AppAutomation, AppConfig, AppLearning, AppMarketplace, AppNotifications,
     AppPersonas, AppSecurity, AppShield, AppSpecs,
     // Types
     HiveTheme, Panel, Sidebar,
@@ -34,7 +38,7 @@ pub use hive_ui_core::{
     CostsExportCsv, CostsResetToday, CostsClearHistory,
     ReviewStageAll, ReviewUnstageAll, ReviewCommit, ReviewDiscardAll,
     SkillsRefresh, RoutingAddRule, TokenLaunchDeploy, TokenLaunchSetStep, TokenLaunchSelectChain,
-    SettingsSave, MonitorRefresh,
+    SettingsSave, MonitorRefresh, AgentsReloadWorkflows, AgentsRunWorkflow,
 };
 use hive_ui_panels::panels::chat::{DisplayMessage, ToolCallDisplay};
 use hive_ui_panels::panels::{
@@ -72,6 +76,8 @@ pub struct HiveWorkspace {
     theme: HiveTheme,
     sidebar: Sidebar,
     status_bar: StatusBar,
+    current_project_root: PathBuf,
+    current_project_name: String,
     chat_input: Entity<ChatInputView>,
     chat_service: Entity<ChatService>,
     settings_view: Entity<SettingsView>,
@@ -203,6 +209,15 @@ impl HiveWorkspace {
         let mut sidebar = Sidebar::new();
         sidebar.active_panel = restored_panel;
 
+        let project_root = Self::resolve_project_root_from_session(&session);
+        let project_name = Self::project_name_from_path(&project_root);
+        let files_data = FilesData::from_path(&project_root);
+        status_bar.active_project = format!(
+            "{} [{}]",
+            project_name,
+            project_root.display()
+        );
+
         // Create the interactive chat input entity.
         let chat_input = cx.new(|cx| ChatInputView::new(window, cx));
 
@@ -234,14 +249,6 @@ impl HiveWorkspace {
         let focus_handle = cx.focus_handle();
 
         let history_data = HistoryData::empty();
-        // Defer directory listing — will load when Files panel is first opened.
-        let files_data = FilesData {
-            current_path: std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
-            entries: Vec::new(),
-            search_query: String::new(),
-            selected_file: None,
-            breadcrumbs: Vec::new(),
-        };
         let kanban_data = KanbanData::default();
         let monitor_data = MonitorData::empty();
         let logs_data = LogsData::empty();
@@ -260,6 +267,8 @@ impl HiveWorkspace {
             theme: HiveTheme::dark(),
             sidebar,
             status_bar,
+            current_project_root: project_root,
+            current_project_name: project_name,
             chat_input,
             chat_service,
             settings_view,
@@ -286,6 +295,63 @@ impl HiveWorkspace {
             last_discovery_scan: None,
             discovery_scan_pending: false,
             discovery_done_flag: None,
+        }
+    }
+
+    fn resolve_project_root_from_session(session: &SessionState) -> PathBuf {
+        let fallback = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        let requested = session
+            .working_directory
+            .as_deref()
+            .map(PathBuf::from)
+            .unwrap_or_else(|| fallback.clone());
+
+        let requested = if requested.exists() { requested } else { fallback };
+        Self::discover_project_root(&requested)
+    }
+
+    fn discover_project_root(path: &Path) -> PathBuf {
+        let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+        let mut current = canonical.as_path();
+
+        while let Some(parent) = current.parent() {
+            if current.join(".git").exists() {
+                return current.to_path_buf();
+            }
+            current = parent;
+        }
+
+        if canonical.join(".git").exists() {
+            return canonical;
+        }
+
+        canonical
+    }
+
+    fn project_name_from_path(path: &Path) -> String {
+        path.file_name()
+            .unwrap_or_else(|| path.as_os_str())
+            .to_string_lossy()
+            .to_string()
+    }
+
+    fn project_label(&self) -> String {
+        format!("{} [{}]", self.current_project_name, self.current_project_root.display())
+    }
+
+    fn apply_project_context(&mut self, cwd: &Path, cx: &mut Context<Self>) {
+        let project_root = Self::discover_project_root(cwd);
+        if project_root != self.current_project_root {
+            self.current_project_root = project_root;
+            self.current_project_name = Self::project_name_from_path(&self.current_project_root);
+            self.status_bar.active_project = self.project_label();
+            self.session_dirty = true;
+            self.save_session(cx);
+            cx.notify();
+        } else if self.current_project_name.is_empty() {
+            self.current_project_name = Self::project_name_from_path(&self.current_project_root);
+            self.status_bar.active_project = self.project_label();
+            cx.notify();
         }
     }
 
@@ -418,7 +484,7 @@ impl HiveWorkspace {
     }
 
     fn refresh_agents_data(&mut self, cx: &App) {
-        use hive_ui_panels::panels::agents::PersonaDisplay;
+        use hive_ui_panels::panels::agents::{PersonaDisplay, RunDisplay, WorkflowDisplay};
 
         if cx.has_global::<AppPersonas>() {
             let registry = &cx.global::<AppPersonas>().0;
@@ -433,6 +499,134 @@ impl HiveWorkspace {
                     active: false,
                 })
                 .collect();
+        }
+
+        if cx.has_global::<AppAutomation>() {
+            let automation = &cx.global::<AppAutomation>().0;
+
+            self.agents_data.workflows = automation
+                .list_workflows()
+                .iter()
+                .map(|wf| WorkflowDisplay {
+                    id: wf.id.clone(),
+                    name: wf.name.clone(),
+                    description: wf.description.clone(),
+                    commands: Self::workflow_command_preview(wf),
+                    source: if wf.id.starts_with("builtin:") {
+                        "Built-in".into()
+                    } else if wf.id.starts_with("file:") {
+                        "User file".into()
+                    } else {
+                        "Runtime".into()
+                    },
+                    status: format!("{:?}", wf.status),
+                    trigger: Self::trigger_label(&wf.trigger),
+                    steps: wf.steps.len(),
+                    run_count: wf.run_count as usize,
+                    last_run: wf
+                        .last_run
+                        .as_ref()
+                        .map(|ts: &chrono::DateTime<chrono::Utc>| {
+                            ts.format("%Y-%m-%d %H:%M").to_string()
+                        }),
+                })
+                .collect();
+
+            self.agents_data.active_runs = automation
+                .list_workflows()
+                .iter()
+                .filter(|wf| {
+                    matches!(
+                        wf.status,
+                        hive_agents::automation::WorkflowStatus::Active
+                            | hive_agents::automation::WorkflowStatus::Draft
+                    )
+                })
+                .map(|wf| RunDisplay {
+                    id: wf.id.clone(),
+                    spec_title: wf.name.clone(),
+                    status: format!("{:?}", wf.status),
+                    progress: if wf.steps.is_empty() { 0.0 } else { 1.0 },
+                    tasks_done: wf.steps.len(),
+                    tasks_total: wf.steps.len(),
+                    cost: 0.0,
+                    elapsed: wf
+                        .last_run
+                        .as_ref()
+                        .map(|_| "recent".to_string())
+                        .unwrap_or_else(|| "-".to_string()),
+                })
+                .collect();
+
+            self.agents_data.run_history = automation
+                .list_run_history()
+                .iter()
+                .rev()
+                .take(8)
+                .filter_map(|run| {
+                    let workflow = automation.get_workflow(&run.workflow_id)?;
+                    Some(RunDisplay {
+                        id: run.workflow_id.clone(),
+                        spec_title: workflow.name.clone(),
+                        status: if run.success {
+                            "Complete".into()
+                        } else {
+                            "Failed".into()
+                        },
+                        progress: if run.success { 1.0 } else { 0.0 },
+                        tasks_done: run.steps_completed,
+                        tasks_total: workflow.steps.len(),
+                        cost: 0.0,
+                        elapsed: format!(
+                            "{}s",
+                            (run.completed_at - run.started_at).num_seconds().max(0)
+                        ),
+                    })
+                })
+                .collect();
+
+            self.agents_data.workflow_source_dir = hive_agents::USER_WORKFLOW_DIR.to_string();
+            self.agents_data.workflow_hint = Some(format!(
+                "{} workflows loaded ({} active)",
+                automation.workflow_count(),
+                automation.active_count()
+            ));
+        }
+    }
+
+    fn workflow_command_preview(
+        workflow: &hive_agents::automation::Workflow,
+    ) -> Vec<String> {
+        workflow
+            .steps
+            .iter()
+            .filter_map(|step| match &step.action {
+                hive_agents::automation::ActionType::RunCommand { command } => {
+                    Some(command.to_string())
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn trigger_label(trigger: &hive_agents::automation::TriggerType) -> String {
+        match trigger {
+            hive_agents::automation::TriggerType::ManualTrigger => "Manual".into(),
+            hive_agents::automation::TriggerType::Schedule { cron } => {
+                format!("Schedule ({cron})")
+            }
+            hive_agents::automation::TriggerType::FileChange { path } => {
+                format!("File Change ({path})")
+            }
+            hive_agents::automation::TriggerType::WebhookReceived { event } => {
+                format!("Webhook ({event})")
+            }
+            hive_agents::automation::TriggerType::OnMessage { pattern } => {
+                format!("Message ({pattern})")
+            }
+            hive_agents::automation::TriggerType::OnError { source } => {
+                format!("Error ({source})")
+            }
         }
     }
 
@@ -461,7 +655,7 @@ impl HiveWorkspace {
 
         if cx.has_global::<AppAssistant>() {
             let svc = &cx.global::<AppAssistant>().0;
-            let briefing = svc.daily_briefing();
+            let briefing = svc.daily_briefing_for_project(Some(&self.current_project_root));
 
             self.assistant_data.briefing = Some(BriefingSummary {
                 greeting: "Good morning!".into(),
@@ -477,8 +671,16 @@ impl HiveWorkspace {
                 .iter()
                 .map(|r| ActiveReminder {
                     title: r.title.clone(),
-                    due: r.updated_at.clone(),
-                    is_overdue: false,
+                    due: match &r.trigger {
+                        ReminderTrigger::At(at) => at.format("%Y-%m-%d %H:%M").to_string(),
+                        ReminderTrigger::Recurring(expr) => {
+                            format!("Recurring: {expr}")
+                        }
+                        ReminderTrigger::OnEvent(event) => {
+                            format!("On event: {event}")
+                        }
+                    },
+                    is_overdue: matches!(&r.trigger, ReminderTrigger::At(at) if *at <= Utc::now()),
                 })
                 .collect();
         }
@@ -515,7 +717,7 @@ impl HiveWorkspace {
             active_conversation_id: conv_id.clone(),
             active_panel: self.sidebar.active_panel.to_stored().to_string(),
             window_size: None, // TODO: read from window when GPUI exposes it
-            working_directory: None,
+            working_directory: Some(self.current_project_root.to_string_lossy().to_string()),
             open_files: Vec::new(),
             chat_draft: None,
         };
@@ -661,6 +863,8 @@ impl HiveWorkspace {
             let conv_id = svc.conversation_id().map(String::from);
             (model, streaming, total, conv_id)
         };
+
+        self.status_bar.active_project = self.project_label();
 
         self.status_bar.current_model = if model.is_empty() {
             "(no model)".to_string()
@@ -1074,6 +1278,528 @@ impl HiveWorkspace {
         self.switch_to_panel(Panel::Help, cx);
     }
 
+    // -- Agents panel handlers -----------------------------------------------
+
+    fn handle_agents_reload_workflows(
+        &mut self,
+        _action: &AgentsReloadWorkflows,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if !cx.has_global::<AppAutomation>() {
+            return;
+        }
+
+        let workspace_root = std::env::current_dir().unwrap_or_default();
+        let report = {
+            let automation = &mut cx.global_mut::<AppAutomation>().0;
+            automation.ensure_builtin_workflows();
+            automation.reload_user_workflows(&workspace_root)
+        };
+
+        info!(
+            "Agents: reloaded workflows (loaded={}, failed={}, skipped={})",
+            report.loaded, report.failed, report.skipped
+        );
+
+        if cx.has_global::<AppNotifications>() {
+            let msg = format!(
+                "Reloaded workflows: {} loaded, {} failed, {} skipped",
+                report.loaded, report.failed, report.skipped
+            );
+            let notif_type = if report.failed > 0 {
+                NotificationType::Warning
+            } else {
+                NotificationType::Success
+            };
+            cx.global_mut::<AppNotifications>()
+                .0
+                .push(AppNotification::new(notif_type, msg).with_title("Workflow Reload"));
+        }
+
+        for error in report.errors {
+            warn!("Workflow load error: {error}");
+        }
+
+        self.refresh_agents_data(cx);
+        cx.notify();
+    }
+
+    fn handle_agents_run_workflow(
+        &mut self,
+        action: &AgentsRunWorkflow,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if !cx.has_global::<AppAutomation>() {
+            return;
+        }
+
+        let Some(workflow) = self.make_workflow_for_run(action, cx) else {
+            return;
+        };
+
+        if cx.has_global::<AppNotifications>() {
+            cx.global_mut::<AppNotifications>()
+                .0
+                .push(AppNotification::new(
+                    NotificationType::Info,
+                    format!(
+                        "Running workflow '{}' ({} step(s)) from {} in {}",
+                        workflow.id,
+                        workflow.steps.len(),
+                        if action.source.is_empty() {
+                            "manual trigger"
+                        } else {
+                            action.source.as_str()
+                        },
+                        self.current_project_root.display()
+                    ),
+                ));
+        }
+
+        let working_dir = self
+            .current_project_root
+            .clone()
+            .canonicalize()
+            .unwrap_or_else(|_| self.current_project_root.clone());
+        let workflow_for_thread = workflow.clone();
+        let run_result = std::sync::Arc::new(std::sync::Mutex::new(None));
+        let run_result_for_thread = std::sync::Arc::clone(&run_result);
+
+        // Execute on a background OS thread so tokio process execution works
+        // regardless of the UI executor.
+        std::thread::spawn(move || {
+            let result =
+                hive_agents::automation::AutomationService::execute_run_commands_blocking(
+                    &workflow_for_thread,
+                    working_dir,
+                );
+            *run_result_for_thread.lock().unwrap() = Some(result);
+        });
+
+        let run_result_for_ui = std::sync::Arc::clone(&run_result);
+        let workflow_id_for_ui = workflow.id.clone();
+
+        cx.spawn(async move |this, app: &mut AsyncApp| {
+            // Poll until the thread writes the result.
+            loop {
+                if let Some(result) = run_result_for_ui.lock().unwrap().take() {
+                    let _ = this.update(app, |this, cx| {
+                        match result {
+                            Ok(run) => {
+                                let _ = cx.global_mut::<AppAutomation>().0.record_run(
+                                    &run.workflow_id,
+                                    run.success,
+                                    run.steps_completed,
+                                    run.error.clone(),
+                                );
+
+                                if cx.has_global::<AppNotifications>() {
+                                    let notif_type = if run.success {
+                                        NotificationType::Success
+                                    } else {
+                                        NotificationType::Error
+                                    };
+                                    let msg = if run.success {
+                                        format!(
+                                            "Workflow '{}' completed ({} steps)",
+                                            run.workflow_id, run.steps_completed
+                                        )
+                                    } else {
+                                        format!(
+                                            "Workflow '{}' failed after {} step(s)",
+                                            run.workflow_id, run.steps_completed
+                                        )
+                                    };
+                                    cx.global_mut::<AppNotifications>().0.push(
+                                        AppNotification::new(notif_type, msg).with_title(
+                                            if run.success {
+                                                "Workflow Complete"
+                                            } else {
+                                                "Workflow Failed"
+                                            },
+                                        ),
+                                    );
+                                }
+                            }
+                            Err(e) => {
+                                warn!("Agents: workflow run error ({workflow_id_for_ui}): {e}");
+                                if cx.has_global::<AppNotifications>() {
+                                    cx.global_mut::<AppNotifications>().0.push(
+                                        AppNotification::new(
+                                            NotificationType::Error,
+                                            format!("Workflow '{workflow_id_for_ui}' failed: {e}"),
+                                        )
+                                        .with_title("Workflow Run Failed"),
+                                    );
+                                }
+                            }
+                        }
+
+                        this.refresh_agents_data(cx);
+                        cx.notify();
+                    });
+                    break;
+                }
+
+                app.background_executor()
+                    .timer(std::time::Duration::from_millis(120))
+                    .await;
+            }
+        })
+        .detach();
+    }
+
+    fn make_workflow_for_run(
+        &self,
+        action: &AgentsRunWorkflow,
+        cx: &App,
+    ) -> Option<hive_agents::automation::Workflow> {
+        if !cx.has_global::<AppAutomation>() {
+            return None;
+        }
+
+        let requested_id = if action.workflow_id.trim().is_empty() {
+            hive_agents::automation::BUILTIN_DOGFOOD_WORKFLOW_ID.to_string()
+        } else {
+            action.workflow_id.clone()
+        };
+
+        let automation = &cx.global::<AppAutomation>().0;
+        let workflow = automation
+            .clone_workflow(&requested_id)
+            .or_else(|| automation.clone_workflow(hive_agents::automation::BUILTIN_DOGFOOD_WORKFLOW_ID))
+            .or_else(|| Some(Self::fallback_workflow(&requested_id)));
+
+        let Some(mut workflow) = workflow else {
+            warn!(
+                "Agents: unable to resolve workflow '{requested_id}' for planned execution"
+            );
+            return None;
+        };
+
+        let instruction = action.instruction.trim();
+        if !instruction.is_empty() {
+            let planned_steps =
+                self.workflow_steps_from_instruction(instruction, &action.source, &action.source_id, cx);
+            if !planned_steps.is_empty() {
+                workflow.steps = planned_steps;
+                workflow.name = if action.source.is_empty() {
+                    "Planned Workflow".to_string()
+                } else if action.source_id.is_empty() {
+                    format!("Planned Workflow ({})", action.source)
+                } else {
+                    format!("Planned Workflow ({}:{})", action.source, action.source_id)
+                };
+                workflow.description = format!(
+                    "Planned execution for {} {}",
+                    if action.source.is_empty() {
+                        "manual action"
+                    } else {
+                        action.source.as_str()
+                    },
+                    if action.source_id.is_empty() {
+                        "request"
+                    } else {
+                        action.source_id.as_str()
+                    }
+                );
+            }
+        }
+
+        if workflow.steps.is_empty() {
+            workflow.steps = self.fallback_workflow_steps();
+        }
+
+        Some(workflow)
+    }
+
+    fn workflow_steps_from_instruction(
+        &self,
+        instruction: &str,
+        source: &str,
+        source_id: &str,
+        cx: &App,
+    ) -> Vec<hive_agents::automation::WorkflowStep> {
+        let explicit = Self::extract_explicit_commands(instruction);
+        let mut commands = if explicit.is_empty() {
+            self.extract_keyword_commands(instruction)
+                .into_iter()
+                .chain(self.extract_source_commands(source, source_id, cx))
+                .collect::<Vec<_>>()
+        } else {
+            explicit
+        };
+
+        commands = Self::dedupe_preserve_order(commands);
+        if commands.is_empty() {
+            commands = self.fallback_workflow_commands();
+        }
+
+        commands
+            .into_iter()
+            .enumerate()
+            .map(|(idx, command)| hive_agents::automation::WorkflowStep {
+                id: format!("runtime:{idx}"),
+                name: format!("Run command {idx}"),
+                action: hive_agents::automation::ActionType::RunCommand { command },
+                conditions: Vec::new(),
+                timeout_secs: Some(900),
+                retry_count: 0,
+            })
+            .collect()
+    }
+
+    fn extract_explicit_commands(instruction: &str) -> Vec<String> {
+        let mut commands = Vec::new();
+        let mut in_fence = false;
+
+        for line in instruction.lines() {
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
+            }
+
+            if line.starts_with("```") {
+                in_fence = !in_fence;
+                continue;
+            }
+
+            if in_fence {
+                Self::add_command_if_valid(line, &mut commands);
+                continue;
+            }
+
+            let mut remaining = line;
+            while let Some(start) = remaining.find('`') {
+                let after = &remaining[start + 1..];
+                let Some(end) = after.find('`') else {
+                    break;
+                };
+                let candidate = &after[..end];
+                Self::add_command_if_valid(candidate, &mut commands);
+                remaining = &after[end + 1..];
+            }
+
+            if let Some((prefix, rest)) = line.split_once(':') {
+                let normalized = prefix.trim().to_ascii_lowercase();
+                if matches!(
+                    normalized.as_str(),
+                    "run" | "command" | "run command" | "execute"
+                ) {
+                    Self::add_command_if_valid(rest, &mut commands);
+                    continue;
+                }
+            }
+
+            Self::add_command_if_valid(line, &mut commands);
+        }
+
+        commands
+    }
+
+    fn extract_keyword_commands(&self, instruction: &str) -> Vec<String> {
+        let lower = instruction.to_lowercase();
+        let mut commands = Vec::new();
+
+        if lower.contains("build") {
+            commands.push("cargo check --quiet".to_string());
+        }
+
+        if lower.contains("test") {
+            commands.push("cargo test --quiet -p hive_app".to_string());
+        }
+
+        if lower.contains("lint") || lower.contains("format") {
+            commands.push("cargo fmt --check".to_string());
+            commands.push("cargo clippy --all-targets -- -D warnings".to_string());
+        }
+
+        if lower.contains("release") {
+            commands.push("cargo build --release".to_string());
+        }
+
+        if lower.contains("docs") {
+            commands.push("cargo doc --no-deps --all-features".to_string());
+        }
+
+        if lower.contains("status") {
+            commands.push("git status --short".to_string());
+        }
+
+        if lower.contains("diff") {
+            commands.push("git diff --stat".to_string());
+        }
+
+        Self::dedupe_preserve_order(commands)
+    }
+
+    fn extract_source_commands(&self, source: &str, source_id: &str, cx: &App) -> Vec<String> {
+        let source = source.to_lowercase();
+        let mut commands = Vec::new();
+
+        if source == "spec" && !source_id.is_empty() && cx.has_global::<AppSpecs>() {
+            if let Some(spec) = cx.global::<AppSpecs>().0.specs.get(source_id) {
+                if spec.entry_count() == 0 || spec.checked_count() < spec.entry_count() {
+                    commands.push("cargo check --quiet".to_string());
+                }
+                commands.push("cargo test --quiet -p hive_app".to_string());
+            }
+        }
+
+        if source == "kanban-task" && !source_id.is_empty() {
+            let task_id: u64 = source_id.parse().unwrap_or(0);
+            if task_id > 0 {
+                for col in &self.kanban_data.columns {
+                    if let Some(task) = col.tasks.iter().find(|task| task.id == task_id) {
+                        let title = task.title.to_lowercase();
+                        let desc = task.description.to_lowercase();
+                        if title.contains("build") || desc.contains("build") {
+                            commands.push("cargo check --quiet".to_string());
+                        }
+                        if title.contains("test") || desc.contains("test") {
+                            commands.push("cargo test --quiet -p hive_app".to_string());
+                        }
+                        if title.contains("lint") || desc.contains("lint") {
+                            commands.push("cargo fmt --check".to_string());
+                            commands.push("cargo clippy --all-targets -- -D warnings".to_string());
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        Self::dedupe_preserve_order(commands)
+    }
+
+    fn add_command_if_valid(raw: &str, out: &mut Vec<String>) {
+        let Some(command) = Self::normalize_command(raw) else {
+            return;
+        };
+        out.push(command);
+    }
+
+    fn normalize_command(raw: &str) -> Option<String> {
+        let command = raw
+            .trim()
+            .trim_matches(['"', '\'', '`'])
+            .trim_end_matches(';')
+            .trim();
+        if command.is_empty() || !Self::is_command_like(command) {
+            return None;
+        }
+        Some(command.to_string())
+    }
+
+    fn is_command_like(text: &str) -> bool {
+        let lower = text.to_lowercase();
+        const PREFIXES: [&str; 11] = [
+            "cargo ",
+            "git ",
+            "npm ",
+            "pnpm ",
+            "yarn ",
+            "make ",
+            "python ",
+            "pytest ",
+            "cargo.exe ",
+            "./",
+            "bash ",
+        ];
+        PREFIXES.iter().any(|prefix| lower.starts_with(prefix))
+            || lower == "cargo"
+            || lower == "git"
+    }
+
+    fn dedupe_preserve_order(commands: Vec<String>) -> Vec<String> {
+        let mut seen = HashSet::new();
+        commands
+            .into_iter()
+            .filter(|command| seen.insert(command.clone()))
+            .collect()
+    }
+
+    fn fallback_workflow(workflow_id: &str) -> hive_agents::automation::Workflow {
+        Self::fallback_workflow_with_id(workflow_id)
+    }
+
+    fn fallback_workflow_with_id(workflow_id: &str) -> hive_agents::automation::Workflow {
+        let now = chrono::Utc::now();
+        hive_agents::automation::Workflow {
+            id: workflow_id.to_string(),
+            name: "Local Build Check".to_string(),
+            description: "Fallback local validation loop.".to_string(),
+            trigger: hive_agents::automation::TriggerType::ManualTrigger,
+            steps: Self::fallback_workflow_steps_static(),
+            status: hive_agents::automation::WorkflowStatus::Active,
+            created_at: now,
+            updated_at: now,
+            last_run: None,
+            run_count: 0,
+        }
+    }
+
+    fn fallback_workflow_steps(&self) -> Vec<hive_agents::automation::WorkflowStep> {
+        Self::fallback_workflow_steps_static()
+    }
+
+    fn fallback_workflow_steps_static() -> Vec<hive_agents::automation::WorkflowStep> {
+        vec![
+            hive_agents::automation::WorkflowStep {
+                id: "fallback:check".to_string(),
+                name: "Cargo check".to_string(),
+                action: hive_agents::automation::ActionType::RunCommand {
+                    command: "cargo check --quiet".to_string(),
+                },
+                conditions: Vec::new(),
+                timeout_secs: Some(900),
+                retry_count: 0,
+            },
+            hive_agents::automation::WorkflowStep {
+                id: "fallback:test".to_string(),
+                name: "Cargo test".to_string(),
+                action: hive_agents::automation::ActionType::RunCommand {
+                    command: "cargo test --quiet -p hive_app".to_string(),
+                },
+                conditions: Vec::new(),
+                timeout_secs: Some(1200),
+                retry_count: 0,
+            },
+            hive_agents::automation::WorkflowStep {
+                id: "fallback:status".to_string(),
+                name: "Git status".to_string(),
+                action: hive_agents::automation::ActionType::RunCommand {
+                    command: "git status --short".to_string(),
+                },
+                conditions: Vec::new(),
+                timeout_secs: Some(120),
+                retry_count: 0,
+            },
+            hive_agents::automation::WorkflowStep {
+                id: "fallback:diff".to_string(),
+                name: "Git diff".to_string(),
+                action: hive_agents::automation::ActionType::RunCommand {
+                    command: "git diff --stat".to_string(),
+                },
+                conditions: Vec::new(),
+                timeout_secs: Some(120),
+                retry_count: 0,
+            },
+        ]
+    }
+
+    fn fallback_workflow_commands(&self) -> Vec<String> {
+        Self::fallback_workflow_steps_static()
+            .into_iter()
+            .filter_map(|step| match step.action {
+                hive_agents::automation::ActionType::RunCommand { command } => Some(command),
+                _ => None,
+            })
+            .collect()
+    }
+
     // -- Files panel handlers ------------------------------------------------
 
     fn handle_files_navigate_back(
@@ -1085,6 +1811,7 @@ impl HiveWorkspace {
         if let Some(parent) = self.files_data.current_path.parent() {
             let parent = parent.to_path_buf();
             info!("Files: navigate back to {}", parent.display());
+            self.apply_project_context(&parent, cx);
             self.files_data = FilesData::from_path(&parent);
             cx.notify();
         }
@@ -1098,6 +1825,7 @@ impl HiveWorkspace {
     ) {
         let path = PathBuf::from(&action.path);
         info!("Files: navigate to {}", path.display());
+        self.apply_project_context(&path, cx);
         self.files_data = FilesData::from_path(&path);
         cx.notify();
     }
@@ -1111,6 +1839,7 @@ impl HiveWorkspace {
         if action.is_directory {
             let new_path = self.files_data.current_path.join(&action.name);
             info!("Files: open directory {}", new_path.display());
+            self.apply_project_context(&new_path, cx);
             self.files_data = FilesData::from_path(&new_path);
         } else {
             let file_path = self.files_data.current_path.join(&action.name);
@@ -1929,6 +2658,9 @@ impl Render for HiveWorkspace {
             .on_action(cx.listener(Self::handle_settings_save))
             // Monitor
             .on_action(cx.listener(Self::handle_monitor_refresh))
+            // Agents
+            .on_action(cx.listener(Self::handle_agents_reload_workflows))
+            .on_action(cx.listener(Self::handle_agents_run_workflow))
             // Titlebar
             .child(Titlebar::render(theme, window))
             // Main content area: sidebar + panel
@@ -1964,60 +2696,173 @@ impl HiveWorkspace {
         div()
             .flex()
             .flex_col()
-            .w(px(52.0))
+            .w(px(196.0))
             .h_full()
             .bg(theme.bg_secondary)
             .border_r_1()
             .border_color(theme.border)
-            .pt(theme.space_2)
-            .gap(theme.space_1)
-            .children(Panel::ALL.into_iter().map(|panel| {
-                let is_active = panel == active;
-                let bg = if is_active {
-                    theme.bg_tertiary
-                } else {
-                    Hsla::transparent_black()
-                };
-                let text_color = if is_active {
-                    theme.accent_aqua
-                } else {
-                    theme.text_secondary
-                };
-                let left_border = if is_active {
-                    theme.accent_aqua
-                } else {
-                    Hsla::transparent_black()
-                };
-
+            .child(
                 div()
-                    .id(ElementId::Name(panel.label().into()))
-                    .flex()
-                    .flex_col()
-                    .items_center()
-                    .justify_center()
-                    .w_full()
-                    .h(px(44.0))
-                    .bg(bg)
-                    .border_l_2()
-                    .border_color(left_border)
-                    .cursor_pointer()
-                    .on_mouse_down(
-                        MouseButton::Left,
-                        cx.listener(move |this, _event, _window, cx| {
-                            info!("Sidebar click: {:?}", panel);
-                            this.set_active_panel(panel);
-                            cx.notify();
-                        }),
-                    )
-                    .child(Icon::new(panel.icon()).size_4().text_color(text_color))
+                    .px(theme.space_3)
+                    .pt(theme.space_3)
+                    .pb(theme.space_2)
                     .child(
                         div()
                             .text_size(theme.font_size_xs)
-                            .text_color(text_color)
-                            .child(panel.label()),
-                    )
-            }))
+                            .text_color(theme.text_muted)
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .child("NAVIGATION"),
+                    ),
+            )
+            .child(
+                div()
+                    .flex()
+                    .flex_col()
+                    .flex_1()
+                    .overflow_y_scrollbar()
+                    .px(theme.space_2)
+                    .pb(theme.space_2)
+                    .gap(theme.space_3)
+                    .child(render_sidebar_section(
+                        "Core",
+                        &[Panel::Chat, Panel::History, Panel::Files, Panel::Specs],
+                        active,
+                        theme,
+                        cx,
+                    ))
+                    .child(render_sidebar_section(
+                        "Build",
+                        &[
+                            Panel::Agents,
+                            Panel::Kanban,
+                            Panel::Review,
+                            Panel::Skills,
+                            Panel::Routing,
+                            Panel::Learning,
+                        ],
+                        active,
+                        theme,
+                        cx,
+                    ))
+                    .child(render_sidebar_section(
+                        "Observe",
+                        &[Panel::Monitor, Panel::Logs, Panel::Costs, Panel::Shield],
+                        active,
+                        theme,
+                        cx,
+                    ))
+                    .child(render_sidebar_section(
+                        "Platform",
+                        &[Panel::Assistant, Panel::TokenLaunch],
+                        active,
+                        theme,
+                        cx,
+                    )),
+            )
+            .child(
+                div()
+                    .px(theme.space_2)
+                    .py(theme.space_2)
+                    .border_t_1()
+                    .border_color(theme.border)
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap(theme.space_1)
+                            .child(render_sidebar_item(Panel::Settings, active, theme, cx))
+                            .child(render_sidebar_item(Panel::Help, active, theme, cx)),
+                    ),
+            )
     }
+}
+
+fn render_sidebar_section(
+    title: &'static str,
+    panels: &[Panel],
+    active: Panel,
+    theme: &HiveTheme,
+    cx: &mut Context<HiveWorkspace>,
+) -> AnyElement {
+    div()
+        .flex()
+        .flex_col()
+        .gap(theme.space_1)
+        .child(
+            div()
+                .px(theme.space_2)
+                .pb(px(2.0))
+                .text_size(theme.font_size_xs)
+                .text_color(theme.text_muted)
+                .font_weight(FontWeight::SEMIBOLD)
+                .child(title),
+        )
+        .children(
+            panels
+                .iter()
+                .copied()
+                .map(|panel| render_sidebar_item(panel, active, theme, cx)),
+        )
+        .into_any_element()
+}
+
+fn render_sidebar_item(
+    panel: Panel,
+    active: Panel,
+    theme: &HiveTheme,
+    cx: &mut Context<HiveWorkspace>,
+) -> AnyElement {
+    let is_active = panel == active;
+    let bg = if is_active {
+        theme.bg_tertiary
+    } else {
+        Hsla::transparent_black()
+    };
+    let text_color = if is_active {
+        theme.accent_aqua
+    } else {
+        theme.text_secondary
+    };
+    let left_border = if is_active {
+        theme.accent_aqua
+    } else {
+        Hsla::transparent_black()
+    };
+
+    div()
+        .id(ElementId::Name(panel.label().into()))
+        .flex()
+        .flex_row()
+        .items_center()
+        .gap(theme.space_2)
+        .w_full()
+        .h(px(34.0))
+        .px(theme.space_2)
+        .rounded(theme.radius_sm)
+        .bg(bg)
+        .border_l_2()
+        .border_color(left_border)
+        .cursor_pointer()
+        .on_mouse_down(
+            MouseButton::Left,
+            cx.listener(move |this, _event, _window, cx| {
+                info!("Sidebar click: {:?}", panel);
+                this.switch_to_panel(panel, cx);
+            }),
+        )
+        .child(Icon::new(panel.icon()).size_3p5().text_color(text_color))
+        .child(
+            div()
+                .text_size(theme.font_size_sm)
+                .text_color(text_color)
+                .font_weight(if is_active {
+                    FontWeight::SEMIBOLD
+                } else {
+                    FontWeight::NORMAL
+                })
+                .child(panel.label()),
+        )
+        .into_any_element()
 }
 
 // ---------------------------------------------------------------------------

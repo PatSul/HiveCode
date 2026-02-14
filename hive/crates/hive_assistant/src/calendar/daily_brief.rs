@@ -104,6 +104,7 @@ mod tests {
             title: title.to_string(),
             description: String::new(),
             trigger: ReminderTrigger::At(now),
+            project_root: None,
             status: ReminderStatus::Active,
             created_at: now.to_rfc3339(),
             updated_at: now.to_rfc3339(),

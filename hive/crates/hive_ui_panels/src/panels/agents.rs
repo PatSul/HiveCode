@@ -1,6 +1,7 @@
 use gpui::*;
 use gpui_component::{Icon, IconName};
 
+use hive_ui_core::{AgentsReloadWorkflows, AgentsRunWorkflow};
 use hive_ui_core::HiveTheme;
 
 // ---------------------------------------------------------------------------
@@ -52,12 +53,30 @@ impl RunDisplay {
     }
 }
 
+/// Display information for a runnable automation workflow.
+#[derive(Debug, Clone)]
+pub struct WorkflowDisplay {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub commands: Vec<String>,
+    pub source: String,
+    pub status: String,
+    pub trigger: String,
+    pub steps: usize,
+    pub run_count: usize,
+    pub last_run: Option<String>,
+}
+
 /// All data needed to render the agents panel.
 #[derive(Debug, Clone)]
 pub struct AgentsPanelData {
     pub personas: Vec<PersonaDisplay>,
+    pub workflows: Vec<WorkflowDisplay>,
     pub active_runs: Vec<RunDisplay>,
     pub run_history: Vec<RunDisplay>,
+    pub workflow_source_dir: String,
+    pub workflow_hint: Option<String>,
 }
 
 impl AgentsPanelData {
@@ -65,8 +84,11 @@ impl AgentsPanelData {
     pub fn empty() -> Self {
         Self {
             personas: Vec::new(),
+            workflows: Vec::new(),
             active_runs: Vec::new(),
             run_history: Vec::new(),
+            workflow_source_dir: ".hive/workflows".into(),
+            workflow_hint: None,
         }
     }
 
@@ -123,6 +145,42 @@ impl AgentsPanelData {
                     active: false,
                 },
             ],
+            workflows: vec![
+                WorkflowDisplay {
+                    id: "builtin:hive-dogfood-v1".into(),
+                    name: "Local Build Check".into(),
+                    description: "Run a local validation loop: check, test, and inspect state."
+                        .into(),
+                    commands: vec![
+                        "cargo check --quiet".into(),
+                        "cargo test --quiet -p hive_app".into(),
+                        "git status --short".into(),
+                        "git diff --stat".into(),
+                    ],
+                    source: "Built-in".into(),
+                    status: "Active".into(),
+                    trigger: "Manual".into(),
+                    steps: 4,
+                    run_count: 2,
+                    last_run: Some("2026-02-13 13:44".into()),
+                },
+                WorkflowDisplay {
+                    id: "file:project-ci".into(),
+                    name: "Project CI".into(),
+                    description: "Run lint/check/test before merge.".into(),
+                    commands: vec![
+                        "cargo fmt --check".into(),
+                        "cargo test --all".into(),
+                        "cargo clippy".into(),
+                    ],
+                    source: "User file".into(),
+                    status: "Draft".into(),
+                    trigger: "Manual".into(),
+                    steps: 3,
+                    run_count: 0,
+                    last_run: None,
+                },
+            ],
             active_runs: vec![RunDisplay {
                 id: "run-001".into(),
                 spec_title: "Authentication Overhaul".into(),
@@ -145,6 +203,8 @@ impl AgentsPanelData {
                     elapsed: "1m 47s".into(),
                 },
             ],
+            workflow_source_dir: ".hive/workflows".into(),
+            workflow_hint: Some("2 workflows loaded (1 active)".into()),
         }
     }
 }
@@ -166,8 +226,10 @@ impl AgentsPanel {
             .overflow_y_scroll()
             .p(theme.space_4)
             .gap(theme.space_4)
-            .child(render_header(theme))
+            .child(render_header(data, theme))
+            .child(render_workflows_section(data, theme))
             .child(render_active_runs_section(&data.active_runs, theme))
+            .child(render_run_history_section(&data.run_history, theme))
             .child(render_personas_section(&data.personas, theme))
     }
 }
@@ -176,16 +238,32 @@ impl AgentsPanel {
 // Header
 // ---------------------------------------------------------------------------
 
-fn render_header(theme: &HiveTheme) -> AnyElement {
+fn render_header(data: &AgentsPanelData, theme: &HiveTheme) -> AnyElement {
     div()
         .flex()
-        .flex_row()
-        .items_center()
+        .flex_col()
         .gap(theme.space_3)
-        .child(header_icon(theme))
-        .child(header_title(theme))
-        .child(div().flex_1())
-        .child(run_spec_button(theme))
+        .child(
+            div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap(theme.space_3)
+                .child(header_icon(theme))
+                .child(header_title(theme))
+                .child(div().flex_1())
+                .child(reload_workflows_button(theme)),
+        )
+        .child(
+            div()
+                .text_size(theme.font_size_sm)
+                .text_color(theme.text_muted)
+                .child(
+                    data.workflow_hint.clone().unwrap_or_else(|| {
+                        format!("User workflows are loaded from {}", data.workflow_source_dir)
+                    }),
+                ),
+        )
         .into_any_element()
 }
 
@@ -223,8 +301,9 @@ fn header_title(theme: &HiveTheme) -> Div {
         )
 }
 
-fn run_spec_button(theme: &HiveTheme) -> Div {
+fn reload_workflows_button(theme: &HiveTheme) -> AnyElement {
     div()
+        .id("agents-reload-workflows")
         .flex()
         .items_center()
         .justify_center()
@@ -235,7 +314,225 @@ fn run_spec_button(theme: &HiveTheme) -> Div {
         .text_size(theme.font_size_sm)
         .font_weight(FontWeight::MEDIUM)
         .text_color(theme.text_on_accent)
-        .child("Run Spec")
+        .hover(|style| style.bg(theme.accent_aqua))
+        .on_mouse_down(MouseButton::Left, |_event, window, cx| {
+            window.dispatch_action(Box::new(AgentsReloadWorkflows), cx);
+        })
+        .child("Reload Workflows")
+        .into_any_element()
+}
+
+// ---------------------------------------------------------------------------
+// Workflows
+// ---------------------------------------------------------------------------
+
+fn render_workflows_section(data: &AgentsPanelData, theme: &HiveTheme) -> AnyElement {
+    let mut section = div()
+        .flex()
+        .flex_col()
+        .gap(theme.space_3)
+        .child(section_title("Automation Workflows", data.workflows.len(), theme));
+
+    if data.workflows.is_empty() {
+        section = section.child(
+            div()
+                .flex()
+                .flex_col()
+                .gap(theme.space_1)
+                .p(theme.space_4)
+                .rounded(theme.radius_md)
+                .bg(theme.bg_surface)
+                .border_1()
+                .border_color(theme.border)
+                .child(
+                    div()
+                        .text_size(theme.font_size_sm)
+                        .text_color(theme.text_secondary)
+                        .child("No workflows loaded."),
+                )
+                .child(
+                    div()
+                        .text_size(theme.font_size_xs)
+                        .text_color(theme.text_muted)
+                        .child(format!(
+                            "Add JSON files to {} and click Reload Workflows.",
+                            data.workflow_source_dir
+                        )),
+                ),
+        );
+    } else {
+        let mut list = div().flex().flex_col().gap(theme.space_2);
+        for workflow in &data.workflows {
+            list = list.child(render_workflow_card(workflow, theme));
+        }
+        section = section.child(list);
+    }
+
+    section.into_any_element()
+}
+
+fn render_workflow_card(workflow: &WorkflowDisplay, theme: &HiveTheme) -> AnyElement {
+    let status_color = match workflow.status.as_str() {
+        "Active" => theme.accent_green,
+        "Draft" => theme.accent_yellow,
+        "Paused" => theme.accent_cyan,
+        "Failed" => theme.accent_red,
+        _ => theme.text_muted,
+    };
+
+    let run_id = workflow.id.clone();
+    let source_id = workflow.id.clone();
+    let safe_id = workflow.id.replace(':', "-");
+
+    div()
+        .id(ElementId::Name(format!("workflow-{safe_id}").into()))
+        .flex()
+        .flex_col()
+        .p(theme.space_3)
+        .gap(theme.space_2)
+        .rounded(theme.radius_md)
+        .bg(theme.bg_surface)
+        .border_1()
+        .border_color(theme.border)
+        .child(
+            div()
+                .flex()
+                .flex_row()
+                .items_center()
+                .gap(theme.space_2)
+                .child(
+                    div()
+                        .text_size(theme.font_size_base)
+                        .text_color(theme.text_primary)
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .child(workflow.name.clone()),
+                )
+                .child(
+                    div()
+                        .px(theme.space_2)
+                        .py(px(2.0))
+                        .rounded(theme.radius_full)
+                        .bg(theme.bg_tertiary)
+                        .text_size(theme.font_size_xs)
+                        .font_weight(FontWeight::MEDIUM)
+                        .text_color(status_color)
+                        .child(workflow.status.clone()),
+                )
+                .child(div().flex_1())
+                .child(
+                    div()
+                        .px(theme.space_2)
+                        .py(px(2.0))
+                        .rounded(theme.radius_full)
+                        .bg(theme.bg_primary)
+                        .text_size(theme.font_size_xs)
+                        .text_color(theme.text_muted)
+                        .child(workflow.source.clone()),
+                )
+                        .child(
+                            div()
+                                .id(ElementId::Name(format!("run-workflow-{safe_id}").into()))
+                                .px(theme.space_2)
+                                .py(px(3.0))
+                        .rounded(theme.radius_sm)
+                        .bg(theme.accent_aqua)
+                        .text_size(theme.font_size_xs)
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .text_color(theme.text_on_accent)
+                        .hover(|style| style.bg(theme.accent_cyan))
+                                .on_mouse_down(MouseButton::Left, move |_event, window, cx| {
+                                    window.dispatch_action(
+                                        Box::new(AgentsRunWorkflow {
+                                            workflow_id: run_id.clone(),
+                                            instruction: String::new(),
+                                            source: "workflow".into(),
+                                            source_id: source_id.clone(),
+                                        }),
+                                        cx,
+                                    );
+                                })
+                                .child("Run"),
+                ),
+        )
+        .child(
+            div()
+                .text_size(theme.font_size_sm)
+                .text_color(theme.text_secondary)
+                .child(workflow.description.clone()),
+        )
+        .child(render_workflow_commands(workflow, theme))
+        .child(workflow_meta_row(workflow, theme))
+        .into_any_element()
+}
+
+fn render_workflow_commands(workflow: &WorkflowDisplay, theme: &HiveTheme) -> Div {
+    if workflow.commands.is_empty() {
+        return div()
+            .text_size(theme.font_size_xs)
+            .text_color(theme.text_muted)
+            .child("No command steps defined.");
+    }
+
+    let mut command_rows = div()
+        .flex()
+        .flex_col()
+        .gap(px(2.0))
+        .text_size(theme.font_size_xs)
+        .text_color(theme.text_muted)
+        .child("Commands:");
+
+    for command in &workflow.commands {
+        command_rows = command_rows.child(
+            div()
+                .flex()
+                .flex_row()
+                .gap(px(6.0))
+                .child(
+                    div()
+                        .text_size(theme.font_size_xs)
+                        .text_color(theme.text_muted)
+                        .child("•"),
+                )
+                .child(div().text_color(theme.text_secondary).child(command.clone())),
+        );
+    }
+
+    command_rows
+}
+
+fn workflow_meta_row(workflow: &WorkflowDisplay, theme: &HiveTheme) -> Div {
+    div()
+        .flex()
+        .flex_row()
+        .items_center()
+        .gap(theme.space_3)
+        .child(
+            div()
+                .text_size(theme.font_size_xs)
+                .text_color(theme.text_muted)
+                .child(format!("Trigger: {}", workflow.trigger)),
+        )
+        .child(
+            div()
+                .text_size(theme.font_size_xs)
+                .text_color(theme.text_muted)
+                .child(format!("Steps: {}", workflow.steps)),
+        )
+        .child(
+            div()
+                .text_size(theme.font_size_xs)
+                .text_color(theme.text_muted)
+                .child(format!("Runs: {}", workflow.run_count)),
+        )
+        .child(
+            div()
+                .text_size(theme.font_size_xs)
+                .text_color(theme.text_muted)
+                .child(format!(
+                    "Last Run: {}",
+                    workflow.last_run.clone().unwrap_or_else(|| "Never".into())
+                )),
+        )
 }
 
 // ---------------------------------------------------------------------------
@@ -412,6 +709,38 @@ fn render_empty_runs(theme: &HiveTheme) -> AnyElement {
                 .child("No active runs. Click \"Run Spec\" to start one."),
         )
         .into_any_element()
+}
+
+fn render_run_history_section(runs: &[RunDisplay], theme: &HiveTheme) -> AnyElement {
+    let mut section = div()
+        .flex()
+        .flex_col()
+        .gap(theme.space_3)
+        .child(section_title("Recent Workflow Runs", runs.len(), theme));
+
+    if runs.is_empty() {
+        section = section.child(
+            div()
+                .flex()
+                .items_center()
+                .justify_center()
+                .py(theme.space_4)
+                .child(
+                    div()
+                        .text_size(theme.font_size_sm)
+                        .text_color(theme.text_muted)
+                        .child("No workflow runs yet."),
+                ),
+        );
+    } else {
+        let mut list = div().flex().flex_col().gap(theme.space_2);
+        for run in runs {
+            list = list.child(render_run_card(run, theme));
+        }
+        section = section.child(list);
+    }
+
+    section.into_any_element()
 }
 
 // ---------------------------------------------------------------------------
@@ -682,14 +1011,17 @@ mod tests {
     fn agents_panel_data_empty() {
         let data = AgentsPanelData::empty();
         assert!(data.personas.is_empty());
+        assert!(data.workflows.is_empty());
         assert!(data.active_runs.is_empty());
         assert!(data.run_history.is_empty());
+        assert_eq!(data.workflow_source_dir, ".hive/workflows");
     }
 
     #[test]
     fn agents_panel_data_sample() {
         let data = AgentsPanelData::sample();
         assert_eq!(data.personas.len(), 6);
+        assert_eq!(data.workflows.len(), 2);
         assert_eq!(data.active_runs.len(), 1);
         assert_eq!(data.run_history.len(), 1);
     }

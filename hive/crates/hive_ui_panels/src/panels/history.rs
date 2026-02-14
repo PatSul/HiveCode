@@ -128,21 +128,33 @@ impl HistoryPanel {
         let total = data.total_count();
 
         div()
+            .id("history-panel")
             .flex()
             .flex_col()
             .flex_1()
             .size_full()
-            .w(px(280.0))
-            .border_l_1()
-            .border_color(theme.border)
-            .bg(theme.bg_secondary)
-            .child(render_header(&data.search_query, theme))
-            .child(render_conversation_list(
-                &filtered,
-                data.selected_id.as_deref(),
-                theme,
-            ))
-            .child(render_stats_footer(filtered_count, total, theme))
+            .bg(theme.bg_primary)
+            .p(theme.space_4)
+            .child(
+                div()
+                    .w_full()
+                    .max_w(px(1080.0))
+                    .mx_auto()
+                    .flex()
+                    .flex_col()
+                    .flex_1()
+                    .rounded(theme.radius_lg)
+                    .bg(theme.bg_surface)
+                    .border_1()
+                    .border_color(theme.border)
+                    .child(render_header(&data.search_query, theme))
+                    .child(render_conversation_list(
+                        &filtered,
+                        data.selected_id.as_deref(),
+                        theme,
+                    ))
+                    .child(render_stats_footer(filtered_count, total, theme)),
+            )
     }
 }
 
@@ -212,7 +224,7 @@ fn render_search_field(search_query: &str, theme: &HiveTheme) -> impl IntoElemen
         .px(theme.space_2)
         .py(theme.space_1)
         .rounded(theme.radius_md)
-        .bg(theme.bg_surface)
+        .bg(theme.bg_primary)
         .border_1()
         .border_color(theme.border)
         .hover(|style: StyleRefinement| style.border_color(theme.border_focus))

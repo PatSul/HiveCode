@@ -61,8 +61,8 @@ impl Panel {
             Self::Routing => "Routing",
             Self::Learning => "Learning",
             Self::Shield => "Shield",
-            Self::Assistant => "Assist",
-            Self::TokenLaunch => "Token",
+            Self::Assistant => "Assistant",
+            Self::TokenLaunch => "Launch",
             Self::Settings => "Settings",
             Self::Help => "Help",
         }

@@ -18,15 +18,23 @@ impl HelpPanel {
             .flex_1()
             .size_full()
             .p(theme.space_4)
-            .gap(theme.space_4)
             .overflow_y_scroll()
-            .child(render_header(theme))
-            .child(render_quick_start(theme))
-            .child(render_keyboard_shortcuts(theme))
-            .child(render_features_overview(theme))
-            .child(render_open_source_credits(theme))
-            .child(render_about_section(theme))
-            .child(render_support_section(theme))
+            .child(
+                div()
+                    .w_full()
+                    .max_w(px(1260.0))
+                    .mx_auto()
+                    .flex()
+                    .flex_col()
+                    .gap(theme.space_4)
+                    .child(render_header(theme))
+                    .child(render_quick_start(theme))
+                    .child(render_keyboard_shortcuts(theme))
+                    .child(render_features_overview(theme))
+                    .child(render_open_source_credits(theme))
+                    .child(render_about_section(theme))
+                    .child(render_support_section(theme)),
+            )
     }
 }
 
@@ -103,8 +111,8 @@ fn card(theme: &HiveTheme) -> Div {
     div()
         .flex()
         .flex_col()
-        .p(theme.space_4)
-        .gap(theme.space_3)
+        .p(theme.space_6)
+        .gap(theme.space_4)
         .rounded(theme.radius_md)
         .bg(theme.bg_surface)
         .border_1()
@@ -310,8 +318,17 @@ fn render_quick_start(theme: &HiveTheme) -> AnyElement {
         .child(step_row(
             4,
             "Explore features",
-            "Browse the sidebar panels: Files, Git Review, Costs, Skills, \
-             Token Launch, and more.",
+            "Use the grouped navigation: Core, Build, Observe, and Platform. \
+             Open Agents to run built-in workflows and reload custom ones from \
+             .hive/workflows/*.json.",
+            theme,
+        ))
+        .child(step_row(
+            5,
+            "Keep Hive running in background",
+            "Closing the window hides it from the taskbar and keeps Hive alive \
+             in the system tray / menu bar indicator so scheduled tasks and reminders \
+             can keep running.",
             theme,
         ))
         .into_any_element()
@@ -332,13 +349,9 @@ fn render_keyboard_shortcuts(theme: &HiveTheme) -> AnyElement {
         .child(shortcut_row("Ctrl + Q", "Quit Hive", theme))
         .child(shortcut_row("Ctrl + ,", "Open Settings", theme))
         .child(shortcut_row("Ctrl + P", "Toggle Privacy Mode", theme))
-        .child(shortcut_row("Ctrl + F", "Search files", theme))
-        .child(shortcut_row("Ctrl + G", "Git operations", theme))
-        .child(shortcut_row_coming_soon(
-            "Ctrl + K",
-            "Command palette",
-            theme,
-        ))
+        .child(shortcut_row("Ctrl + N", "New conversation", theme))
+        .child(shortcut_row("Ctrl + L", "Clear chat", theme))
+        .child(shortcut_row("Ctrl + 1..0", "Switch major panels", theme))
         .child(separator(theme))
         .child(shortcut_row("Enter", "Send message", theme))
         .child(shortcut_row("Shift + Enter", "New line in chat", theme))
@@ -347,39 +360,6 @@ fn render_keyboard_shortcuts(theme: &HiveTheme) -> AnyElement {
             "Cancel streaming / close modal",
             theme,
         ))
-        .into_any_element()
-}
-
-/// A shortcut row with a "coming soon" badge after the description.
-fn shortcut_row_coming_soon(key: &str, desc: &str, theme: &HiveTheme) -> AnyElement {
-    div()
-        .flex()
-        .items_center()
-        .gap(theme.space_3)
-        .child(div().min_w(px(140.0)).child(key_pill(key, theme)))
-        .child(
-            div()
-                .flex()
-                .flex_row()
-                .items_center()
-                .gap(theme.space_2)
-                .child(
-                    div()
-                        .text_size(theme.font_size_base)
-                        .text_color(theme.text_secondary)
-                        .child(desc.to_string()),
-                )
-                .child(
-                    div()
-                        .px(theme.space_1)
-                        .py(px(1.0))
-                        .rounded(theme.radius_sm)
-                        .bg(theme.bg_tertiary)
-                        .text_size(theme.font_size_xs)
-                        .text_color(theme.accent_yellow)
-                        .child("coming soon"),
-                ),
-        )
         .into_any_element()
 }
 
@@ -409,11 +389,20 @@ fn render_features_overview(theme: &HiveTheme) -> AnyElement {
             "Agent System",
             "9-role HiveMind with autonomous iteration",
         ),
-        ("\u{1FA99}", "Token Launch", "Deploy SPL and ERC-20 tokens"),
+        (
+            "\u{1FA99}",
+            "Launch Workflow",
+            "Token launch flow with deployment validation",
+        ),
         (
             "\u{1F6D2}",
             "Skills Marketplace",
             "Extend with community skills",
+        ),
+        (
+            "\u{2699}",
+            "Custom Workflows",
+            "Define JSON workflows in .hive/workflows and run them from Agents",
         ),
         (
             "\u{1F50D}",
@@ -760,9 +749,9 @@ fn render_about_section(theme: &HiveTheme) -> AnyElement {
                 .flex()
                 .flex_col()
                 .gap(theme.space_2)
-                .child(link_label("GitHub", "github.com/AirglowStudios/Hive", theme))
-                .child(link_label("Documentation", "docs.hive.dev", theme))
-                .child(link_label("Changelog", "github.com/AirglowStudios/Hive/releases", theme)),
+                .child(link_label("GitHub", "github.com/PatSul/Hive", theme))
+                .child(link_label("Documentation", "github.com/PatSul/Hive/tree/main/docs", theme))
+                .child(link_label("Changelog", "github.com/PatSul/Hive/releases", theme)),
         )
         .into_any_element()
 }
@@ -786,12 +775,12 @@ fn render_support_section(theme: &HiveTheme) -> AnyElement {
                 .gap(theme.space_2)
                 .child(link_label(
                     "\u{1F41B} Report a Bug",
-                    "github.com/AirglowStudios/Hive/issues/new",
+                    "github.com/PatSul/Hive/issues/new",
                     theme,
                 ))
                 .child(link_label(
                     "\u{1F4A1} Request a Feature",
-                    "github.com/AirglowStudios/Hive/discussions/new",
+                    "github.com/PatSul/Hive/discussions/new",
                     theme,
                 )),
         )

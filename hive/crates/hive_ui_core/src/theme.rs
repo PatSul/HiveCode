@@ -58,10 +58,10 @@ impl HiveTheme {
     pub fn dark() -> Self {
         Self {
             // Base palette
-            bg_primary: hex_to_hsla(0x1A, 0x1A, 0x2E),
-            bg_secondary: hex_to_hsla(0x16, 0x21, 0x3E),
-            bg_tertiary: hex_to_hsla(0x0F, 0x34, 0x60),
-            bg_surface: hex_to_hsla(0x1E, 0x1E, 0x3A),
+            bg_primary: hex_to_hsla(0x12, 0x16, 0x2A),
+            bg_secondary: hex_to_hsla(0x15, 0x1B, 0x34),
+            bg_tertiary: hex_to_hsla(0x1F, 0x2A, 0x4A),
+            bg_surface: hex_to_hsla(0x18, 0x1F, 0x3A),
 
             // Accents
             accent_aqua: hex_to_hsla(0x00, 0xFF, 0xF0),
@@ -73,13 +73,13 @@ impl HiveTheme {
             accent_pink: hex_to_hsla(0xF5, 0xC2, 0xE7),
 
             // Text
-            text_primary: hex_to_hsla(0xE0, 0xE0, 0xE0),
-            text_secondary: hex_to_hsla(0xA0, 0xA0, 0xB8),
-            text_muted: hex_to_hsla(0x6C, 0x70, 0x86),
+            text_primary: hex_to_hsla(0xE7, 0xEC, 0xFF),
+            text_secondary: hex_to_hsla(0xBE, 0xC7, 0xE7),
+            text_muted: hex_to_hsla(0x8A, 0x96, 0xBC),
             text_on_accent: hex_to_hsla(0x0A, 0x0A, 0x14),
 
             // Borders
-            border: hex_to_hsla(0x2A, 0x2A, 0x4A),
+            border: hex_to_hsla(0x2D, 0x3A, 0x5E),
             border_focus: hsla(174.0 / 360.0, 1.0, 0.5, 0.5),
 
             // Typography

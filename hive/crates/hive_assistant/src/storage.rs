@@ -51,7 +51,8 @@ impl AssistantStorage {
                 recurring_cron TEXT,
                 status TEXT NOT NULL DEFAULT 'active',
                 created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
+                updated_at TEXT NOT NULL,
+                project_root TEXT
             );
 
             CREATE TABLE IF NOT EXISTS email_poll_state (
@@ -82,6 +83,42 @@ impl AssistantStorage {
             ",
         )
         .map_err(|e| format!("Failed to initialize tables: {e}"))?;
+
+        Self::ensure_reminders_project_root_column(conn)?;
+        Ok(())
+    }
+
+    fn ensure_reminders_project_root_column(conn: &Connection) -> Result<(), String> {
+        let mut stmt = conn
+            .prepare("PRAGMA table_info(reminders)")
+            .map_err(|e| format!("Failed to inspect reminders schema: {e}"))?;
+
+        let rows = stmt
+            .query_map([], |row| row.get::<_, String>(1))
+            .map_err(|e| format!("Failed to read reminders schema: {e}"))?;
+
+        let mut has_project_root = false;
+        for row in rows {
+            let name = row.map_err(|e| format!("Failed to read reminder column name: {e}"))?;
+            if name == "project_root" {
+                has_project_root = true;
+                break;
+            }
+        }
+
+        if !has_project_root {
+            conn.execute("ALTER TABLE reminders ADD COLUMN project_root TEXT", [])
+                .map_err(|e| {
+                    format!("Failed to add reminders.project_root migration column: {e}")
+                })?;
+        }
+
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_reminders_status_project_root ON reminders(status, project_root)",
+            [],
+        )
+        .map_err(|e| format!("Failed to create reminders index: {e}"))?;
+
         Ok(())
     }
 
@@ -98,8 +135,8 @@ impl AssistantStorage {
         let (trigger_type, trigger_at, recurring_cron) = serialize_trigger(&reminder.trigger);
         let status_str = serialize_status(&reminder.status);
         conn.execute(
-            "INSERT INTO reminders (id, title, description, trigger_type, trigger_at, recurring_cron, status, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            "INSERT INTO reminders (id, title, description, trigger_type, trigger_at, recurring_cron, status, created_at, updated_at, project_root)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             params![
                 reminder.id,
                 reminder.title,
@@ -110,6 +147,7 @@ impl AssistantStorage {
                 status_str,
                 reminder.created_at,
                 reminder.updated_at,
+                reminder.project_root,
             ],
         )
         .map_err(|e| format!("Failed to insert reminder: {e}"))?;
@@ -124,7 +162,7 @@ impl AssistantStorage {
             .map_err(|e| format!("Lock poisoned: {e}"))?;
         let mut stmt = conn
             .prepare(
-                "SELECT id, title, description, trigger_type, trigger_at, recurring_cron, status, created_at, updated_at
+                "SELECT id, title, description, trigger_type, trigger_at, recurring_cron, status, created_at, updated_at, project_root
                  FROM reminders WHERE id = ?1",
             )
             .map_err(|e| format!("Failed to prepare query: {e}"))?;
@@ -143,26 +181,45 @@ impl AssistantStorage {
 
     /// List reminders filtered by status.
     pub fn list_reminders_by_status(&self, status: &str) -> Result<Vec<Reminder>, String> {
+        self.list_reminders_by_project_root(status, None)
+    }
+
+    /// List reminders filtered by status and optional project root.
+    pub fn list_reminders_by_project_root(
+        &self,
+        status: &str,
+        project_root: Option<&str>,
+    ) -> Result<Vec<Reminder>, String> {
         let conn = self
             .conn
             .lock()
             .map_err(|e| format!("Lock poisoned: {e}"))?;
+
         let mut stmt = conn
             .prepare(
-                "SELECT id, title, description, trigger_type, trigger_at, recurring_cron, status, created_at, updated_at
-                 FROM reminders WHERE status = ?1 ORDER BY created_at ASC",
+                if project_root.is_some() {
+                    "SELECT id, title, description, trigger_type, trigger_at, recurring_cron, status, created_at, updated_at, project_root
+                 FROM reminders WHERE status = ?1 AND project_root = ?2 ORDER BY created_at ASC"
+                } else {
+                    "SELECT id, title, description, trigger_type, trigger_at, recurring_cron, status, created_at, updated_at, project_root
+                 FROM reminders WHERE status = ?1 ORDER BY created_at ASC"
+                },
             )
             .map_err(|e| format!("Failed to prepare query: {e}"))?;
 
-        let rows = stmt
-            .query_map(params![status], |row| row_to_reminder(row))
-            .map_err(|e| format!("Failed to query reminders: {e}"))?;
+        let reminders = if let Some(project_root) = project_root {
+            stmt.query_map(params![status, project_root], row_to_reminder)
+                .map_err(|e| format!("Failed to query reminders: {e}"))?
+                .collect::<rusqlite::Result<Vec<_>>>()
+                .map_err(|e| format!("Failed to read reminder row: {e}"))?
+        } else {
+            stmt.query_map(params![status], row_to_reminder)
+                .map_err(|e| format!("Failed to query reminders: {e}"))?
+                .collect::<rusqlite::Result<Vec<_>>>()
+                .map_err(|e| format!("Failed to read reminder row: {e}"))?
+        };
 
-        let mut results = Vec::new();
-        for row in rows {
-            results.push(row.map_err(|e| format!("Failed to read reminder row: {e}"))?);
-        }
-        Ok(results)
+        Ok(reminders)
     }
 
     /// Update reminder status.
@@ -504,6 +561,7 @@ fn row_to_reminder(row: &rusqlite::Row) -> rusqlite::Result<Reminder> {
         description: row.get(2)?,
         trigger: deserialize_trigger(&trigger_type, trigger_at, recurring_cron),
         status: deserialize_status(&status_str),
+        project_root: row.get(9)?,
         created_at: row.get(7)?,
         updated_at: row.get(8)?,
     })
@@ -531,6 +589,7 @@ mod tests {
             title: "Standup meeting".to_string(),
             description: "Daily standup at 9am".to_string(),
             trigger: ReminderTrigger::At(now),
+            project_root: None,
             status: ReminderStatus::Active,
             created_at: now.to_rfc3339(),
             updated_at: now.to_rfc3339(),
@@ -559,6 +618,7 @@ mod tests {
                 title: format!("Task {i}"),
                 description: String::new(),
                 trigger: ReminderTrigger::At(now),
+                project_root: None,
                 status: if i < 2 {
                     ReminderStatus::Active
                 } else {
@@ -587,6 +647,7 @@ mod tests {
             title: "Update me".to_string(),
             description: String::new(),
             trigger: ReminderTrigger::At(now),
+            project_root: None,
             status: ReminderStatus::Active,
             created_at: now.to_rfc3339(),
             updated_at: now.to_rfc3339(),
@@ -620,6 +681,7 @@ mod tests {
             title: "Weekly review".to_string(),
             description: String::new(),
             trigger: ReminderTrigger::Recurring("0 9 * * MON".to_string()),
+            project_root: None,
             status: ReminderStatus::Active,
             created_at: now.to_rfc3339(),
             updated_at: now.to_rfc3339(),
@@ -643,6 +705,7 @@ mod tests {
             title: "After deploy".to_string(),
             description: String::new(),
             trigger: ReminderTrigger::OnEvent("deploy_complete".to_string()),
+            project_root: None,
             status: ReminderStatus::Active,
             created_at: now.to_rfc3339(),
             updated_at: now.to_rfc3339(),

@@ -59,6 +59,8 @@ actions!(
         SettingsSave,
         // Monitor panel
         MonitorRefresh,
+        // Agents panel
+        AgentsReloadWorkflows,
     ]
 );
 
@@ -121,4 +123,18 @@ pub struct TokenLaunchSetStep {
 #[action(namespace = hive_workspace, no_json)]
 pub struct TokenLaunchSelectChain {
     pub chain: String,
+}
+
+/// Run a specific automation workflow by ID from the Agents panel.
+///
+/// `instruction` is optional free-form text describing the task for this run.
+/// When provided, the workflow runtime will be planned against that instruction
+/// before execution.
+#[derive(Clone, PartialEq, gpui::Action)]
+#[action(namespace = hive_workspace, no_json)]
+pub struct AgentsRunWorkflow {
+    pub workflow_id: String,
+    pub instruction: String,
+    pub source: String,
+    pub source_id: String,
 }

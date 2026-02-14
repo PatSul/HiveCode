@@ -299,15 +299,29 @@ impl FilesPanel {
             .flex()
             .flex_col()
             .size_full()
-            .bg(theme.bg_secondary)
-            // 1. Header (title + breadcrumb)
-            .child(Self::header(data, theme))
-            // 2. Search bar
-            .child(Self::search_bar(&data.search_query, theme))
-            // 3. File tree (scrollable)
-            .child(Self::file_tree(&entries, &data.selected_file, &now, theme))
-            // 4. Action bar
-            .child(Self::action_bar(dir_count, file_count, theme))
+            .bg(theme.bg_primary)
+            .p(theme.space_4)
+            .child(
+                div()
+                    .w_full()
+                    .max_w(px(1260.0))
+                    .mx_auto()
+                    .flex()
+                    .flex_col()
+                    .flex_1()
+                    .rounded(theme.radius_lg)
+                    .bg(theme.bg_surface)
+                    .border_1()
+                    .border_color(theme.border)
+                    // 1. Header (title + breadcrumb)
+                    .child(Self::header(data, theme))
+                    // 2. Search bar
+                    .child(Self::search_bar(&data.search_query, theme))
+                    // 3. File tree (scrollable)
+                    .child(Self::file_tree(&entries, &data.selected_file, &now, theme))
+                    // 4. Action bar
+                    .child(Self::action_bar(dir_count, file_count, theme)),
+            )
     }
 
     // ------------------------------------------------------------------
@@ -475,7 +489,7 @@ impl FilesPanel {
                     .px(theme.space_3)
                     .py(theme.space_2)
                     .rounded(theme.radius_md)
-                    .bg(theme.bg_surface)
+                    .bg(theme.bg_primary)
                     .border_1()
                     .border_color(theme.border)
                     .gap(theme.space_2)
@@ -784,7 +798,7 @@ impl FilesPanel {
             .gap(theme.space_2)
             .border_t_1()
             .border_color(theme.border)
-            .bg(theme.bg_secondary)
+            .bg(theme.bg_surface)
             // New File button
             .child(
                 Self::bottom_action_btn(IconName::File, "New File", "files-new-file-btn", theme)

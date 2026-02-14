@@ -3,9 +3,11 @@
 mod tray;
 
 use std::borrow::Cow;
+use std::sync::mpsc;
+use std::time::Duration;
 
 use gpui::*;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use hive_ai::service::AiServiceConfig;
 use hive_ai::tts::TtsProviderType;
@@ -196,20 +198,30 @@ fn init_services(cx: &mut App) -> anyhow::Result<()> {
     cx.set_global(AppMarketplace(hive_agents::SkillMarketplace::new()));
     info!("SkillMarketplace initialized");
 
-    // Built-in MCP tool server — file I/O, command exec, search, git.
-    let workspace_root = std::env::current_dir().unwrap_or_default();
-    cx.set_global(AppMcpServer(hive_agents::mcp_server::McpServer::new(
-        workspace_root,
-    )));
-    info!("McpServer initialized (6 built-in tools)");
-
     // Persona registry — built-in agent roles.
     cx.set_global(AppPersonas(hive_agents::personas::PersonaRegistry::new()));
     info!("PersonaRegistry initialized (6 built-in personas)");
 
     // Automation service — workflow engine.
-    cx.set_global(AppAutomation(hive_agents::AutomationService::new()));
-    info!("AutomationService initialized");
+    let workspace_root = std::env::current_dir().unwrap_or_default();
+    let mut automation = hive_agents::AutomationService::new();
+    let workflow_report = automation.initialize_workflows(&workspace_root);
+    if workflow_report.failed > 0 {
+        for load_error in &workflow_report.errors {
+            warn!("Workflow load error: {load_error}");
+        }
+    }
+    cx.set_global(AppAutomation(automation));
+    info!(
+        "AutomationService initialized (loaded={}, failed={}, skipped={})",
+        workflow_report.loaded, workflow_report.failed, workflow_report.skipped
+    );
+
+    // Built-in MCP tool server — file I/O, command exec, search, git.
+    cx.set_global(AppMcpServer(hive_agents::mcp_server::McpServer::new(
+        workspace_root,
+    )));
+    info!("McpServer initialized (6 built-in tools)");
 
     // Spec manager — project specifications.
     cx.set_global(AppSpecs(hive_agents::SpecManager::new()));
@@ -341,6 +353,133 @@ fn window_options(cx: &App) -> WindowOptions {
     }
 }
 
+/// Update tray menu toggle text for current window visibility.
+fn set_tray_window_visible(cx: &App, visible: bool) {
+    if let Some(tray) = cx.global::<AppTray>().0.as_ref() {
+        tray.set_visible(visible);
+    }
+}
+
+/// Platform-specific wording for where the background icon lives.
+#[cfg(target_os = "windows")]
+fn close_to_tray_target() -> &'static str {
+    "system tray"
+}
+
+/// Platform-specific wording for where the background icon lives.
+#[cfg(target_os = "macos")]
+fn close_to_tray_target() -> &'static str {
+    "menu bar"
+}
+
+/// Platform-specific wording for where the background icon lives.
+#[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
+fn close_to_tray_target() -> &'static str {
+    "tray area / app indicator"
+}
+
+/// Prompt body shown when the user closes the app for the first time.
+fn close_to_tray_prompt_detail() -> String {
+    format!(
+        "Closing Hive hides the window and keeps it running in the {}. \
+Use that icon to reopen Hive or quit it.",
+        close_to_tray_target()
+    )
+}
+
+fn should_show_close_to_tray_notice(cx: &App) -> bool {
+    cx.has_global::<AppConfig>() && !cx.global::<AppConfig>().0.get().close_to_tray_notice_seen
+}
+
+fn mark_close_to_tray_notice_seen(cx: &mut App) {
+    if !cx.has_global::<AppConfig>() {
+        return;
+    }
+
+    if let Err(e) = cx
+        .global_mut::<AppConfig>()
+        .0
+        .update(|config| config.close_to_tray_notice_seen = true)
+    {
+        error!("Failed to persist close-to-tray notice state: {e}");
+    }
+}
+
+/// Close all open windows while keeping the app/tray process alive.
+fn hide_all_windows(cx: &mut App) {
+    let windows = cx.windows();
+    for handle in windows {
+        let _ = handle.update(cx, |_, window, _| {
+            window.remove_window();
+        });
+    }
+    set_tray_window_visible(cx, false);
+}
+
+fn prompt_close_to_tray_notice(window: &mut Window, cx: &mut App) {
+    let detail = close_to_tray_prompt_detail();
+    let response = window.prompt(
+        PromptLevel::Info,
+        "Hive keeps running in the background",
+        Some(&detail),
+        &["Close to Tray", "Quit Hive", "Cancel"],
+        cx,
+    );
+
+    cx.spawn(async move |app: &mut AsyncApp| {
+        if let Ok(choice) = response.await {
+            let _ = app.update(|cx| match choice {
+                0 => hide_all_windows(cx),
+                1 => cx.quit(),
+                _ => {}
+            });
+        }
+    })
+    .detach();
+}
+
+fn handle_main_window_close(window: &mut Window, cx: &mut App) -> bool {
+    if cx.global::<AppTray>().0.is_none() {
+        return true;
+    }
+
+    if should_show_close_to_tray_notice(cx) {
+        mark_close_to_tray_notice_seen(cx);
+        prompt_close_to_tray_notice(window, cx);
+        return false;
+    }
+
+    hide_all_windows(cx);
+    false
+}
+
+/// Open the main application window and wire close-to-tray behavior.
+fn open_main_window(cx: &mut App) -> anyhow::Result<()> {
+    cx.open_window(window_options(cx), |window, cx| {
+        // Keep the app alive for background tasks when the user closes the
+        // window (Alt+F4 / titlebar close / platform close request).
+        // Returning `false` vetoes the platform close while we remove the
+        // window ourselves so the taskbar button disappears.
+        window.on_window_should_close(cx, handle_main_window_close);
+
+        let workspace = cx.new(|cx| HiveWorkspace::new(window, cx));
+
+        cx.subscribe(&workspace, |workspace, event: &SwitchPanel, cx| {
+            workspace.update(cx, |ws, cx| {
+                ws.set_active_panel(event.0);
+                cx.notify();
+            });
+        })
+        .detach();
+
+        cx.new(|cx| gpui_component::Root::new(workspace.clone(), window, cx))
+    })?;
+
+    set_tray_window_visible(cx, true);
+    info!("Hive v{VERSION} window opened");
+    Ok(())
+}
+
 /// Post an error notification into the global store.
 fn notify_error(cx: &mut App, message: impl Into<String>) {
     if cx.has_global::<AppNotifications>() {
@@ -370,30 +509,66 @@ fn main() {
 
         register_actions(cx);
 
-        // System tray — stored as a GPUI global to prevent drop.
-        let tray = tray::try_create_tray(|event| {
-            info!("Tray event: {event:?}");
-            if event == tray::TrayEvent::Quit {
-                std::process::exit(0);
+        // Keep tray label synchronized even when windows are closed by means
+        // other than the tray event loop.
+        cx.on_window_closed(|cx| {
+            if cx.windows().is_empty() {
+                set_tray_window_visible(cx, false);
             }
+        })
+        .detach();
+
+        let (tray_tx, tray_rx) = mpsc::channel::<tray::TrayEvent>();
+
+        // System tray — stored as a GPUI global to prevent drop.
+        let tray = tray::try_create_tray(move |event| {
+            let _ = tray_tx.send(event);
         });
         cx.set_global(AppTray(tray));
 
-        cx.open_window(window_options(cx), |window, cx| {
-            let workspace = cx.new(|cx| HiveWorkspace::new(window, cx));
+        // Poll tray events on the main thread and mutate GPUI state there.
+        cx.spawn(async move |app: &mut AsyncApp| {
+            loop {
+                loop {
+                    match tray_rx.try_recv() {
+                        Ok(event) => {
+                            let _ = app.update(|cx| {
+                                info!("Tray event: {event:?}");
+                                match event {
+                                    tray::TrayEvent::ToggleVisibility => {
+                                        if cx.windows().is_empty() {
+                                            if let Err(e) = open_main_window(cx) {
+                                                error!("Failed to open window from tray: {e:#}");
+                                                notify_error(
+                                                    cx,
+                                                    format!(
+                                                        "Failed to open window from tray: {e}"
+                                                    ),
+                                                );
+                                            } else {
+                                                cx.activate(true);
+                                            }
+                                        } else {
+                                            hide_all_windows(cx);
+                                        }
+                                    }
+                                    tray::TrayEvent::Quit => cx.quit(),
+                                }
+                            });
+                        }
+                        Err(mpsc::TryRecvError::Empty) => break,
+                        Err(mpsc::TryRecvError::Disconnected) => return,
+                    }
+                }
 
-            cx.subscribe(&workspace, |workspace, event: &SwitchPanel, cx| {
-                workspace.update(cx, |ws, cx| {
-                    ws.set_active_panel(event.0);
-                    cx.notify();
-                });
-            })
-            .detach();
-
-            cx.new(|cx| gpui_component::Root::new(workspace.clone(), window, cx))
+                app.background_executor()
+                    .timer(Duration::from_millis(80))
+                    .await;
+            }
         })
-        .expect("Failed to open window");
+        .detach();
 
-        info!("Hive v{VERSION} window opened");
+        open_main_window(cx).expect("Failed to open window");
+
     });
 }
