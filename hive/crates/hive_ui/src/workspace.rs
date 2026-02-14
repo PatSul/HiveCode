@@ -1,6 +1,6 @@
 use gpui::prelude::FluentBuilder;
 use gpui::*;
-use gpui_component::Icon;
+use gpui_component::{Icon, IconName};
 use gpui_component::scroll::ScrollableElement;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -2692,11 +2692,12 @@ impl HiveWorkspace {
     fn render_sidebar(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = &self.theme;
         let active = self.sidebar.active_panel;
+        let project = self.project_label();
 
         div()
             .flex()
             .flex_col()
-            .w(px(196.0))
+            .w(px(232.0))
             .h_full()
             .bg(theme.bg_secondary)
             .border_r_1()
@@ -2704,14 +2705,46 @@ impl HiveWorkspace {
             .child(
                 div()
                     .px(theme.space_3)
-                    .pt(theme.space_3)
-                    .pb(theme.space_2)
+                    .py(theme.space_2)
+                    .border_b_1()
+                    .border_color(theme.border)
                     .child(
                         div()
-                            .text_size(theme.font_size_xs)
-                            .text_color(theme.text_muted)
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .child("NAVIGATION"),
+                            .flex()
+                            .flex_row()
+                            .items_center()
+                            .gap(theme.space_2)
+                            .child(
+                                div()
+                                    .w(px(26.0))
+                                    .h(px(26.0))
+                                    .rounded(theme.radius_full)
+                                    .bg(theme.bg_tertiary)
+                                    .flex()
+                                    .items_center()
+                                    .justify_center()
+                                    .child(Icon::new(IconName::Folder).size_3p5().text_color(theme.accent_aqua)),
+                            )
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .child(
+                                        div()
+                                            .text_size(theme.font_size_xs)
+                                            .text_color(theme.text_muted)
+                                            .child("Workspace"),
+                                    )
+                                    .child(
+                                        div()
+                                            .text_size(theme.font_size_sm)
+                                            .text_color(theme.text_secondary)
+                                            .font_weight(FontWeight::SEMIBOLD)
+                                            .max_w(px(150.0))
+                                            .overflow_hidden()
+                                            .child(project),
+                                    ),
+                            ),
                     ),
             )
             .child(
@@ -2721,8 +2754,8 @@ impl HiveWorkspace {
                     .flex_1()
                     .overflow_y_scrollbar()
                     .px(theme.space_2)
-                    .pb(theme.space_2)
-                    .gap(theme.space_3)
+                    .py(theme.space_2)
+                    .gap(theme.space_2)
                     .child(render_sidebar_section(
                         "Core",
                         &[Panel::Chat, Panel::History, Panel::Files, Panel::Specs],
@@ -2731,7 +2764,7 @@ impl HiveWorkspace {
                         cx,
                     ))
                     .child(render_sidebar_section(
-                        "Build",
+                        "Flow",
                         &[
                             Panel::Agents,
                             Panel::Kanban,
@@ -2752,29 +2785,22 @@ impl HiveWorkspace {
                         cx,
                     ))
                     .child(render_sidebar_section(
-                        "Platform",
+                        "Project",
                         &[Panel::Assistant, Panel::TokenLaunch],
                         active,
                         theme,
                         cx,
-                    )),
-            )
-            .child(
-                div()
-                    .px(theme.space_2)
-                    .py(theme.space_2)
-                    .border_t_1()
-                    .border_color(theme.border)
-                    .child(
-                        div()
-                            .flex()
-                            .flex_col()
-                            .gap(theme.space_1)
-                            .child(render_sidebar_item(Panel::Settings, active, theme, cx))
-                            .child(render_sidebar_item(Panel::Help, active, theme, cx)),
-                    ),
-            )
+                    ))
+            .child(render_sidebar_section(
+                "System",
+                &[Panel::Settings, Panel::Help],
+                active,
+                theme,
+                cx,
+            )),
+    )
     }
+
 }
 
 fn render_sidebar_section(
@@ -2795,6 +2821,7 @@ fn render_sidebar_section(
                 .text_size(theme.font_size_xs)
                 .text_color(theme.text_muted)
                 .font_weight(FontWeight::SEMIBOLD)
+                
                 .child(title),
         )
         .children(
@@ -2823,8 +2850,8 @@ fn render_sidebar_item(
     } else {
         theme.text_secondary
     };
-    let left_border = if is_active {
-        theme.accent_aqua
+    let border_color = if is_active {
+        theme.accent_cyan
     } else {
         Hsla::transparent_black()
     };
@@ -2836,13 +2863,14 @@ fn render_sidebar_item(
         .items_center()
         .gap(theme.space_2)
         .w_full()
-        .h(px(34.0))
+        .h(px(32.0))
         .px(theme.space_2)
-        .rounded(theme.radius_sm)
+        .rounded(theme.radius_md)
         .bg(bg)
         .border_l_2()
-        .border_color(left_border)
+        .border_color(border_color)
         .cursor_pointer()
+        .hover(|style| style.bg(theme.bg_primary).text_color(theme.text_primary))
         .on_mouse_down(
             MouseButton::Left,
             cx.listener(move |this, _event, _window, cx| {
@@ -2850,7 +2878,15 @@ fn render_sidebar_item(
                 this.switch_to_panel(panel, cx);
             }),
         )
-        .child(Icon::new(panel.icon()).size_3p5().text_color(text_color))
+        .child(
+            div()
+                .w(px(16.0))
+                .h(px(16.0))
+                .flex()
+                .items_center()
+                .justify_center()
+                .child(Icon::new(panel.icon()).size_3p5().text_color(text_color)),
+        )
         .child(
             div()
                 .text_size(theme.font_size_sm)

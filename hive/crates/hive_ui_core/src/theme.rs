@@ -1,15 +1,14 @@
 use gpui::{Hsla, Pixels, SharedString, hsla, px};
 
 /// Complete design system with all color tokens, typography, spacing, and radii.
-/// Fluent Design (Windows 11) + warm rustic dark palette.
 pub struct HiveTheme {
-    // Base (warm rustic dark)
+    // Base
     pub bg_primary: Hsla,
     pub bg_secondary: Hsla,
     pub bg_tertiary: Hsla,
     pub bg_surface: Hsla,
 
-    // Accent (modern contrast colors)
+    // Accent
     pub accent_aqua: Hsla,
     pub accent_powder: Hsla,
     pub accent_cyan: Hsla,
@@ -57,40 +56,40 @@ pub struct HiveTheme {
 impl HiveTheme {
     pub fn dark() -> Self {
         Self {
-            // Base palette
-            bg_primary: hex_to_hsla(0x12, 0x16, 0x2A),
-            bg_secondary: hex_to_hsla(0x15, 0x1B, 0x34),
-            bg_tertiary: hex_to_hsla(0x1F, 0x2A, 0x4A),
-            bg_surface: hex_to_hsla(0x18, 0x1F, 0x3A),
+            // Base palette (deep navy + electric cyan contrast)
+            bg_primary: hex_to_hsla(0x0B, 0x10, 0x1F),
+            bg_secondary: hex_to_hsla(0x12, 0x19, 0x2B),
+            bg_tertiary: hex_to_hsla(0x1A, 0x26, 0x44),
+            bg_surface: hex_to_hsla(0x14, 0x1E, 0x38),
 
             // Accents
-            accent_aqua: hex_to_hsla(0x00, 0xFF, 0xF0),
-            accent_powder: hex_to_hsla(0xB8, 0xE3, 0xE9),
+            accent_aqua: hex_to_hsla(0x00, 0xF3, 0xFF),
+            accent_powder: hex_to_hsla(0xB5, 0xE8, 0xFF),
             accent_cyan: hex_to_hsla(0x00, 0xD4, 0xFF),
-            accent_green: hex_to_hsla(0xA6, 0xE3, 0xA1),
-            accent_red: hex_to_hsla(0xF3, 0x8B, 0xA8),
-            accent_yellow: hex_to_hsla(0xF9, 0xE2, 0xAF),
-            accent_pink: hex_to_hsla(0xF5, 0xC2, 0xE7),
+            accent_green: hex_to_hsla(0xA7, 0xE4, 0x98),
+            accent_red: hex_to_hsla(0xFF, 0x8F, 0xA6),
+            accent_yellow: hex_to_hsla(0xF9, 0xDE, 0x8C),
+            accent_pink: hex_to_hsla(0xF5, 0xB8, 0xDD),
 
             // Text
-            text_primary: hex_to_hsla(0xE7, 0xEC, 0xFF),
-            text_secondary: hex_to_hsla(0xBE, 0xC7, 0xE7),
-            text_muted: hex_to_hsla(0x8A, 0x96, 0xBC),
-            text_on_accent: hex_to_hsla(0x0A, 0x0A, 0x14),
+            text_primary: hex_to_hsla(0xEF, 0xF4, 0xFF),
+            text_secondary: hex_to_hsla(0xC0, 0xCD, 0xEF),
+            text_muted: hex_to_hsla(0x8D, 0x98, 0xB8),
+            text_on_accent: hex_to_hsla(0x08, 0x08, 0x12),
 
             // Borders
-            border: hex_to_hsla(0x2D, 0x3A, 0x5E),
-            border_focus: hsla(174.0 / 360.0, 1.0, 0.5, 0.5),
+            border: hex_to_hsla(0x2A, 0x39, 0x62),
+            border_focus: hsla(186.0 / 360.0, 1.0, 0.50, 0.45),
 
             // Typography
             font_ui: SharedString::from("Inter"),
             font_mono: SharedString::from("JetBrains Mono"),
             font_size_xs: px(11.0),
-            font_size_sm: px(12.0),
-            font_size_base: px(14.0),
-            font_size_lg: px(16.0),
+            font_size_sm: px(12.5),
+            font_size_base: px(14.5),
+            font_size_lg: px(16.5),
             font_size_xl: px(20.0),
-            font_size_2xl: px(28.0),
+            font_size_2xl: px(30.0),
 
             // Spacing (4px grid)
             space_1: px(4.0),
@@ -101,10 +100,10 @@ impl HiveTheme {
             space_8: px(32.0),
 
             // Radii
-            radius_sm: px(4.0),
-            radius_md: px(8.0),
-            radius_lg: px(12.0),
-            radius_xl: px(16.0),
+            radius_sm: px(6.0),
+            radius_md: px(10.0),
+            radius_lg: px(14.0),
+            radius_xl: px(18.0),
             radius_full: px(9999.0),
         }
     }

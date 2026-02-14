@@ -5,23 +5,17 @@ use hive_ui_core::HiveTheme;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-const TITLE_BAR_HEIGHT: Pixels = px(34.0);
+const TITLE_BAR_HEIGHT: Pixels = px(42.0);
 
-/// Custom titlebar with app branding, version badge, and platform window controls.
-///
-/// Uses `occlude()` to prevent the workspace's `track_focus` handler from
-/// calling `prevent_default()` on titlebar clicks. Without this, ALL Win32 NC
-/// behavior (drag, button actions) is blocked because the workspace's focus
-/// handler runs on every click and sets `default_prevented = true`.
-///
-/// Window drag and window controls are handled by the OS via
-/// `window_control_area` → WM_NCHITTEST → DefWindowProcW.
+/// Custom titlebar with app branding, workflow context, and platform controls.
 pub struct Titlebar;
 
 impl Titlebar {
-    /// Render the full titlebar: left-side branding + window control buttons.
+    /// Render the full titlebar: left-side branding + optional project context +
+    /// window control buttons.
     ///
-    /// Requires `window` to check maximized state for the correct restore/maximize icon.
+    /// Requires `window` to check maximized state for the correct
+    /// restore/maximize icon.
     pub fn render(theme: &HiveTheme, window: &Window) -> impl IntoElement {
         let is_maximized = window.is_maximized();
 
@@ -29,21 +23,20 @@ impl Titlebar {
             .id("hive-title-bar")
             // Occlude prevents the workspace's track_focus handler from
             // seeing titlebar clicks, which would call prevent_default() and
-            // kill all Win32 non-client (NC) behavior.
+            // disable native non-client behavior.
             .occlude()
             .flex()
             .flex_row()
             .items_center()
             .justify_between()
             .h(TITLE_BAR_HEIGHT)
-            .pl(px(12.0))
+            .px(theme.space_2)
             .border_b_1()
             .border_color(theme.border)
-            .bg(theme.bg_primary)
+            .bg(theme.bg_secondary)
             .child(
                 // Drag region: NCHITTEST → HTCAPTION → DefWindowProcW handles drag.
-                // Double-click maximize is also handled natively by Windows via
-                // WM_NCLBUTTONDBLCLK on HTCAPTION areas.
+                // Double-click maximize is also handled natively.
                 div()
                     .id("titlebar-drag")
                     .window_control_area(WindowControlArea::Drag)
@@ -51,10 +44,36 @@ impl Titlebar {
                     .flex_1()
                     .h_full()
                     .items_center()
-                    .child(branding(theme)),
+                    .justify_between()
+                    .gap(theme.space_3)
+                    .child(branding(theme))
+                    .child(workspace_chip(theme)),
             )
             .child(window_controls(theme, is_maximized))
     }
+}
+
+fn workspace_chip(theme: &HiveTheme) -> impl IntoElement {
+    div()
+        .flex()
+        .items_center()
+        .gap(theme.space_1)
+        .px(theme.space_2)
+        .py(px(3.0))
+        .rounded(theme.radius_full)
+        .bg(theme.bg_primary)
+        .border_1()
+        .border_color(theme.border)
+        .text_size(theme.font_size_xs)
+        .text_color(theme.text_secondary)
+        .child(
+            div()
+                .w(px(6.0))
+                .h(px(6.0))
+                .rounded(theme.radius_full)
+                .bg(theme.accent_green),
+        )
+        .child("Project Space")
 }
 
 /// Bee icon + "Hive" + version badge.
@@ -73,19 +92,21 @@ fn branding(theme: &HiveTheme) -> impl IntoElement {
             div()
                 .text_size(theme.font_size_base)
                 .text_color(theme.text_primary)
-                .font_weight(FontWeight::SEMIBOLD)
+                .font_weight(FontWeight::BOLD)
                 .child("Hive"),
         )
         .child(version_badge(theme))
 }
 
-/// Compact version badge styled consistently with other badges in the app.
+/// Compact version badge.
 fn version_badge(theme: &HiveTheme) -> impl IntoElement {
     div()
         .px(theme.space_2)
         .py(px(2.0))
-        .rounded(theme.radius_sm)
-        .bg(theme.bg_tertiary)
+        .rounded(theme.radius_full)
+        .bg(theme.bg_primary)
+        .border_1()
+        .border_color(theme.border)
         .text_size(theme.font_size_xs)
         .text_color(theme.accent_cyan)
         .child(format!("v{VERSION}"))
@@ -97,8 +118,8 @@ fn version_badge(theme: &HiveTheme) -> impl IntoElement {
 /// maximize/restore toggle via the Win32 NC handler).
 fn window_controls(theme: &HiveTheme, is_maximized: bool) -> impl IntoElement {
     let fg = theme.text_primary;
-    let hover_bg = hsla(0.0, 0.0, 1.0, 0.1);
-    let active_bg = hsla(0.0, 0.0, 1.0, 0.05);
+    let hover_bg = hsla(0.0, 0.0, 1.0, 0.08);
+    let active_bg = hsla(0.0, 0.0, 1.0, 0.02);
     let close_hover_bg = theme.accent_red;
 
     div()
@@ -111,7 +132,7 @@ fn window_controls(theme: &HiveTheme, is_maximized: bool) -> impl IntoElement {
             div()
                 .id("minimize")
                 .flex()
-                .w(TITLE_BAR_HEIGHT)
+                .w(px(38.0))
                 .h_full()
                 .flex_shrink_0()
                 .justify_center()
@@ -127,14 +148,13 @@ fn window_controls(theme: &HiveTheme, is_maximized: bool) -> impl IntoElement {
                 })
                 .child(Icon::new(IconName::WindowMinimize).small()),
         )
-        // Maximize / Restore — no on_click; NC handler toggles correctly.
-        // zoom_window() only maximizes (SW_MAXIMIZE), so an on_click fallback
-        // would conflict with the NC handler's SW_NORMAL restore path.
+        // Maximize / Restore — no on_click; NC handler performs restore
+        // correctly so this avoids conflicts with state transitions.
         .child(
             div()
                 .id("maximize")
                 .flex()
-                .w(TITLE_BAR_HEIGHT)
+                .w(px(38.0))
                 .h_full()
                 .flex_shrink_0()
                 .justify_center()
@@ -158,14 +178,17 @@ fn window_controls(theme: &HiveTheme, is_maximized: bool) -> impl IntoElement {
             div()
                 .id("close")
                 .flex()
-                .w(TITLE_BAR_HEIGHT)
+                .w(px(38.0))
                 .h_full()
                 .flex_shrink_0()
                 .justify_center()
                 .content_center()
                 .items_center()
                 .text_color(fg)
-                .hover(|s| s.bg(close_hover_bg).text_color(hsla(0.0, 0.0, 1.0, 1.0)))
+                .hover(|s| {
+                    s.bg(close_hover_bg)
+                        .text_color(hsla(0.0, 0.0, 1.0, 1.0))
+                })
                 .active(|s| s.bg(close_hover_bg))
                 .window_control_area(WindowControlArea::Close)
                 .child(Icon::new(IconName::WindowClose).small()),

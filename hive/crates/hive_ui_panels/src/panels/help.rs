@@ -29,6 +29,7 @@ impl HelpPanel {
                     .gap(theme.space_4)
                     .child(render_header(theme))
                     .child(render_quick_start(theme))
+                    .child(render_project_workflow(theme))
                     .child(render_keyboard_shortcuts(theme))
                     .child(render_features_overview(theme))
                     .child(render_open_source_credits(theme))
@@ -331,6 +332,58 @@ fn render_quick_start(theme: &HiveTheme) -> AnyElement {
              can keep running.",
             theme,
         ))
+        .into_any_element()
+}
+
+// ---------------------------------------------------------------------------
+// Section 1b: Project Workflow
+// ---------------------------------------------------------------------------
+
+fn render_project_workflow(theme: &HiveTheme) -> AnyElement {
+    let rows = [
+        "Project becomes context",
+        "Plan + Spec + Kanban",
+        "Operational loop",
+        "Close without stopping",
+    ];
+
+    card(theme)
+        .child(section_title("(P)", "Project-Oriented Flow", theme))
+        .child(section_desc(
+            "Every major feature is tied to the active project so work does not get lost.",
+            theme,
+        ))
+        .child(separator(theme))
+        .child(
+            div()
+                .flex()
+                .flex_col()
+                .gap(theme.space_2)
+                .child(step_row(
+                    1,
+                    rows[0],
+                    "Your active folder is your workspace boundary. Reminders and workflow actions are scoped to the selected project root.",
+                    theme,
+                ))
+                .child(step_row(
+                    2,
+                    rows[1],
+                    "Use Specs to capture intent, Agents for execution, and Kanban to track each action until completion.",
+                    theme,
+                ))
+                .child(step_row(
+                    3,
+                    rows[2],
+                    "Monitor logs, costs, and model state from the side navigation while staying in one project context.",
+                    theme,
+                ))
+                .child(step_row(
+                    4,
+                    rows[3],
+                    "Window close keeps Hive in tray/menu bar so scheduled tasks and reminders continue.",
+                    theme,
+                )),
+        )
         .into_any_element()
 }
 

@@ -4,7 +4,7 @@ use gpui_component::{Icon, IconName};
 use hive_ui_core::{HiveTheme, SwitchToSettings};
 
 /// Status bar at the bottom of the window.
-/// Shows connectivity, model, privacy mode, cost, and version.
+/// Shows connectivity, model, privacy mode, project scope, cost, and version.
 pub struct StatusBar {
     pub connectivity: ConnectivityDisplay,
     pub current_model: String,
@@ -74,15 +74,14 @@ impl StatusBar {
             .items_center()
             .justify_between()
             .w_full()
-            .h(px(30.0))
+            .h(px(32.0))
             .bg(theme.bg_secondary)
             .border_t_1()
             .border_color(theme.border)
-            .px(theme.space_3)
-            .text_size(theme.font_size_xs)
+            .px(theme.space_2)
             .text_color(theme.text_muted)
             .child(
-                // Left: connectivity + model
+                // Left summary area
                 div()
                     .flex()
                     .items_center()
@@ -96,8 +95,6 @@ impl StatusBar {
                             .py(px(2.0))
                             .rounded(theme.radius_sm)
                             .bg(theme.bg_surface)
-                            .border_1()
-                            .border_color(theme.border)
                             .child(
                                 div()
                                     .w(px(8.0))
@@ -105,7 +102,12 @@ impl StatusBar {
                                     .rounded(theme.radius_full)
                                     .bg(conn_color),
                             )
-                            .child(div().child(conn_label)),
+                            .child(
+                                div()
+                                    .text_size(theme.font_size_xs)
+                                    .text_color(theme.text_secondary)
+                                    .child(conn_label),
+                            ),
                     )
                     .child(
                         div()
@@ -113,10 +115,10 @@ impl StatusBar {
                             .px(theme.space_2)
                             .py(px(2.0))
                             .rounded(theme.radius_sm)
-                            .bg(theme.bg_surface)
-                            .border_1()
-                            .border_color(theme.border)
+                            .bg(theme.bg_tertiary)
                             .text_color(theme.accent_cyan)
+                            .text_size(theme.font_size_xs)
+                            .font_weight(FontWeight::SEMIBOLD)
                             .cursor_pointer()
                             .on_mouse_down(MouseButton::Left, |_event, window, cx| {
                                 window.dispatch_action(Box::new(SwitchToSettings), cx);
@@ -129,17 +131,15 @@ impl StatusBar {
                             .py(px(2.0))
                             .rounded(theme.radius_sm)
                             .bg(theme.bg_surface)
-                            .border_1()
-                            .border_color(theme.border)
-                            .text_color(theme.text_muted)
                             .text_size(theme.font_size_xs)
+                            .text_color(theme.text_muted)
                             .overflow_hidden()
-                            .max_w(px(220.0))
+                            .max_w(px(230.0))
                             .child(format!("Project: {project}")),
                     ),
             )
             .child(
-                // Right: privacy + cost + version
+                // Right controls
                 div()
                     .flex()
                     .items_center()
@@ -153,10 +153,13 @@ impl StatusBar {
                             .py(px(2.0))
                             .rounded(theme.radius_sm)
                             .bg(theme.bg_surface)
-                            .border_1()
-                            .border_color(theme.border)
+                            .text_size(theme.font_size_xs)
                             .child(Icon::new(privacy_icon).size_3p5())
-                            .child(privacy),
+                            .child(
+                                div()
+                                    .text_size(theme.font_size_xs)
+                                    .child(privacy),
+                            ),
                     )
                     .child(
                         div()
@@ -164,12 +167,22 @@ impl StatusBar {
                             .py(px(2.0))
                             .rounded(theme.radius_sm)
                             .bg(theme.bg_surface)
-                            .border_1()
-                            .border_color(theme.border)
                             .text_color(theme.accent_green)
+                            .text_size(theme.font_size_xs)
+                            .font_weight(FontWeight::SEMIBOLD)
                             .child(cost_str),
                     )
-                    .child(div().child(version)),
+                    .child(
+                        div()
+                            .px(theme.space_2)
+                            .py(px(2.0))
+                            .rounded(theme.radius_sm)
+                            .bg(theme.bg_surface)
+                            .text_size(theme.font_size_xs)
+                            .text_color(theme.text_secondary)
+                            .font_weight(FontWeight::MEDIUM)
+                            .child(version),
+                    ),
             )
     }
 }
