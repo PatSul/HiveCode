@@ -641,6 +641,72 @@ impl ModelsBrowserView {
             _ => {}
         }
     }
+
+    /// Force-refresh all catalogs by invalidating their caches and re-fetching.
+    fn refresh_all_catalogs(&mut self, cx: &mut Context<Self>) {
+        // Invalidate server-side caches so the next fetch hits the API.
+        hive_ai::providers::openrouter_catalog::invalidate_cache();
+        hive_ai::providers::openai_catalog::invalidate_cache();
+        hive_ai::providers::anthropic_catalog::invalidate_cache();
+        hive_ai::providers::google_catalog::invalidate_cache();
+        hive_ai::providers::groq_catalog::invalidate_cache();
+        hive_ai::providers::huggingface_catalog::invalidate_cache();
+
+        // Reset local fetch state so they re-trigger.
+        self.or_fetch_status = FetchStatus::Idle;
+        self.openai_fetch_status = FetchStatus::Idle;
+        self.anthropic_fetch_status = FetchStatus::Idle;
+        self.google_fetch_status = FetchStatus::Idle;
+        self.groq_fetch_status = FetchStatus::Idle;
+        self.hf_fetch_status = FetchStatus::Idle;
+
+        self.fetched_or_models.clear();
+        self.fetched_openai_models.clear();
+        self.fetched_anthropic_models.clear();
+        self.fetched_google_models.clear();
+        self.fetched_groq_models.clear();
+        self.fetched_hf_models.clear();
+
+        // Re-trigger all fetches.
+        self.trigger_fetches(cx);
+        cx.notify();
+    }
+
+    /// Returns true if any enabled catalog is currently loading.
+    fn any_catalog_loading(&self) -> bool {
+        let statuses = [
+            (self.or_fetch_status, ProviderType::OpenRouter),
+            (self.openai_fetch_status, ProviderType::OpenAI),
+            (self.anthropic_fetch_status, ProviderType::Anthropic),
+            (self.google_fetch_status, ProviderType::Google),
+            (self.groq_fetch_status, ProviderType::Groq),
+            (self.hf_fetch_status, ProviderType::HuggingFace),
+        ];
+        statuses.iter().any(|(status, ptype)| {
+            self.enabled_providers.contains(ptype) && *status == FetchStatus::Loading
+        })
+    }
+
+    /// Returns the count of enabled catalogs that have finished loading.
+    fn catalogs_done_count(&self) -> (usize, usize) {
+        let statuses = [
+            (self.or_fetch_status, ProviderType::OpenRouter),
+            (self.openai_fetch_status, ProviderType::OpenAI),
+            (self.anthropic_fetch_status, ProviderType::Anthropic),
+            (self.google_fetch_status, ProviderType::Google),
+            (self.groq_fetch_status, ProviderType::Groq),
+            (self.hf_fetch_status, ProviderType::HuggingFace),
+        ];
+        let enabled: Vec<_> = statuses
+            .iter()
+            .filter(|(_, ptype)| self.enabled_providers.contains(ptype))
+            .collect();
+        let done = enabled
+            .iter()
+            .filter(|(status, _)| *status == FetchStatus::Done)
+            .count();
+        (done, enabled.len())
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -658,6 +724,8 @@ impl Render for ModelsBrowserView {
             .count();
 
         let view_mode = self.view_mode;
+        let is_loading = self.any_catalog_loading();
+        let (done, total) = self.catalogs_done_count();
 
         // Header
         let header = div()
@@ -670,10 +738,51 @@ impl Render for ModelsBrowserView {
             .border_color(theme.border)
             .child(
                 div()
-                    .text_size(theme.font_size_lg)
-                    .text_color(theme.text_primary)
-                    .font_weight(FontWeight::BOLD)
-                    .child("Models"),
+                    .flex()
+                    .items_center()
+                    .gap(theme.space_3)
+                    .child(
+                        div()
+                            .text_size(theme.font_size_lg)
+                            .text_color(theme.text_primary)
+                            .font_weight(FontWeight::BOLD)
+                            .child("Models"),
+                    )
+                    // Refresh button
+                    .child(
+                        div()
+                            .id("refresh-catalogs-btn")
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .w(px(28.0))
+                            .h(px(28.0))
+                            .rounded(theme.radius_md)
+                            .bg(theme.bg_tertiary)
+                            .text_size(theme.font_size_sm)
+                            .text_color(if is_loading {
+                                theme.text_muted
+                            } else {
+                                theme.accent_cyan
+                            })
+                            .cursor(if is_loading {
+                                CursorStyle::default()
+                            } else {
+                                CursorStyle::PointingHand
+                            })
+                            .when(!is_loading, |el| {
+                                el.hover(|s| s.bg(theme.bg_surface).text_color(theme.accent_aqua))
+                            })
+                            .on_mouse_down(
+                                MouseButton::Left,
+                                cx.listener(move |this, _e, _w, cx| {
+                                    if !this.any_catalog_loading() {
+                                        this.refresh_all_catalogs(cx);
+                                    }
+                                }),
+                            )
+                            .child(if is_loading { "\u{21BB}" } else { "\u{21BB}" }),
+                    ),
             )
             .child(
                 div()
@@ -689,12 +798,58 @@ impl Render for ModelsBrowserView {
                     )),
             );
 
-        // Search bar
-        let search_bar = div().px(theme.space_4).py(theme.space_2).child(
-            Input::new(&self.search_input)
-                .appearance(true)
-                .cleanable(false),
-        );
+        // Search bar + catalog status line
+        let catalog_status_text = if is_loading {
+            format!(
+                "Refreshing catalogs\u{2026} ({done}/{total} providers loaded)",
+            )
+        } else if total > 0 && done == total {
+            "Live catalogs loaded \u{2014} showing latest available models".to_string()
+        } else if total > 0 {
+            format!("{done}/{total} provider catalogs loaded")
+        } else {
+            String::new()
+        };
+
+        let search_bar = div()
+            .flex()
+            .flex_col()
+            .px(theme.space_4)
+            .py(theme.space_2)
+            .gap(theme.space_1)
+            .child(
+                Input::new(&self.search_input)
+                    .appearance(true)
+                    .cleanable(false),
+            )
+            .when(!catalog_status_text.is_empty(), |el| {
+                el.child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap(theme.space_1)
+                        .child(
+                            div()
+                                .text_size(theme.font_size_xs)
+                                .text_color(if is_loading {
+                                    theme.accent_yellow
+                                } else {
+                                    theme.accent_green
+                                })
+                                .child(if is_loading {
+                                    "\u{25CF}"
+                                } else {
+                                    "\u{25CF}"
+                                }),
+                        )
+                        .child(
+                            div()
+                                .text_size(theme.font_size_xs)
+                                .text_color(theme.text_muted)
+                                .child(catalog_status_text),
+                        ),
+                )
+            });
 
         // Tier coverage guide — convert to AnyElement to release the cx borrow
         // before render_model_list needs it.
