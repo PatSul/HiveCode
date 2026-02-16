@@ -97,6 +97,7 @@ impl AssistantPanelData {
         }
     }
 
+    #[allow(dead_code)]
     pub fn sample() -> Self {
         Self {
             briefing: Some(BriefingSummary {

@@ -110,7 +110,9 @@ impl EmailService {
 
         // Use tokio Handle to run async code from sync context.
         let handle = Handle::try_current().map_err(|e| format!("No tokio runtime: {e}"))?;
-        let result = handle.block_on(async {
+        
+
+        handle.block_on(async {
             let client = GmailClient::new(&token);
             let list = client
                 .list_messages(None, 20)
@@ -144,9 +146,7 @@ impl EmailService {
                 }
             }
             Ok(emails)
-        });
-
-        result
+        })
     }
 
     /// Fetch emails from an Outlook inbox.
@@ -160,7 +160,9 @@ impl EmailService {
         };
 
         let handle = Handle::try_current().map_err(|e| format!("No tokio runtime: {e}"))?;
-        let result = handle.block_on(async {
+        
+
+        handle.block_on(async {
             let client = OutlookEmailClient::new(&token);
             let messages = client
                 .list_messages("inbox", 20)
@@ -194,9 +196,7 @@ impl EmailService {
                 })
                 .collect();
             Ok(emails)
-        });
-
-        result
+        })
     }
 
     /// Build a digest summarizing a collection of emails.

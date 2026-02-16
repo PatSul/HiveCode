@@ -152,7 +152,7 @@ impl SlackProvider {
             .unwrap_or(0);
         Utc.timestamp_opt(secs, 0)
             .single()
-            .unwrap_or_else(|| Utc::now())
+            .unwrap_or_else(Utc::now)
     }
 
     fn convert_message(&self, msg: &SlackMessage, fallback_channel: &str) -> IncomingMessage {

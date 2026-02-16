@@ -115,22 +115,22 @@ impl SettingsData {
             has_anthropic_key: cfg
                 .anthropic_api_key
                 .as_ref()
-                .map_or(false, |k| !k.is_empty()),
-            has_openai_key: cfg.openai_api_key.as_ref().map_or(false, |k| !k.is_empty()),
+                .is_some_and(|k| !k.is_empty()),
+            has_openai_key: cfg.openai_api_key.as_ref().is_some_and(|k| !k.is_empty()),
             has_openrouter_key: cfg
                 .openrouter_api_key
                 .as_ref()
-                .map_or(false, |k| !k.is_empty()),
-            has_google_key: cfg.google_api_key.as_ref().map_or(false, |k| !k.is_empty()),
-            has_groq_key: cfg.groq_api_key.as_ref().map_or(false, |k| !k.is_empty()),
+                .is_some_and(|k| !k.is_empty()),
+            has_google_key: cfg.google_api_key.as_ref().is_some_and(|k| !k.is_empty()),
+            has_groq_key: cfg.groq_api_key.as_ref().is_some_and(|k| !k.is_empty()),
             has_huggingface_key: cfg
                 .huggingface_api_key
                 .as_ref()
-                .map_or(false, |k| !k.is_empty()),
+                .is_some_and(|k| !k.is_empty()),
             has_litellm_key: cfg
                 .litellm_api_key
                 .as_ref()
-                .map_or(false, |k| !k.is_empty()),
+                .is_some_and(|k| !k.is_empty()),
             ollama_url: cfg.ollama_url.clone(),
             lmstudio_url: cfg.lmstudio_url.clone(),
             local_provider_url: cfg.local_provider_url.clone(),
@@ -147,8 +147,8 @@ impl SettingsData {
             has_elevenlabs_key: cfg
                 .elevenlabs_api_key
                 .as_ref()
-                .map_or(false, |k| !k.is_empty()),
-            has_telnyx_key: cfg.telnyx_api_key.as_ref().map_or(false, |k| !k.is_empty()),
+                .is_some_and(|k| !k.is_empty()),
+            has_telnyx_key: cfg.telnyx_api_key.as_ref().is_some_and(|k| !k.is_empty()),
             tts_enabled: cfg.tts_enabled,
             tts_auto_speak: cfg.tts_auto_speak,
             tts_provider: cfg.tts_provider.clone(),
@@ -267,27 +267,27 @@ impl SettingsView {
         let had_anthropic = cfg
             .anthropic_api_key
             .as_ref()
-            .map_or(false, |k| !k.is_empty());
-        let had_openai = cfg.openai_api_key.as_ref().map_or(false, |k| !k.is_empty());
+            .is_some_and(|k| !k.is_empty());
+        let had_openai = cfg.openai_api_key.as_ref().is_some_and(|k| !k.is_empty());
         let had_openrouter = cfg
             .openrouter_api_key
             .as_ref()
-            .map_or(false, |k| !k.is_empty());
-        let had_google = cfg.google_api_key.as_ref().map_or(false, |k| !k.is_empty());
-        let had_groq = cfg.groq_api_key.as_ref().map_or(false, |k| !k.is_empty());
+            .is_some_and(|k| !k.is_empty());
+        let had_google = cfg.google_api_key.as_ref().is_some_and(|k| !k.is_empty());
+        let had_groq = cfg.groq_api_key.as_ref().is_some_and(|k| !k.is_empty());
         let had_huggingface = cfg
             .huggingface_api_key
             .as_ref()
-            .map_or(false, |k| !k.is_empty());
+            .is_some_and(|k| !k.is_empty());
         let had_litellm = cfg
             .litellm_api_key
             .as_ref()
-            .map_or(false, |k| !k.is_empty());
+            .is_some_and(|k| !k.is_empty());
         let had_elevenlabs = cfg
             .elevenlabs_api_key
             .as_ref()
-            .map_or(false, |k| !k.is_empty());
-        let had_telnyx = cfg.telnyx_api_key.as_ref().map_or(false, |k| !k.is_empty());
+            .is_some_and(|k| !k.is_empty());
+        let had_telnyx = cfg.telnyx_api_key.as_ref().is_some_and(|k| !k.is_empty());
 
         // API key inputs — always start empty, placeholder indicates status
         let anthropic_key_input = cx.new(|cx| {
@@ -614,22 +614,22 @@ impl SettingsView {
             tts_auto_speak: self.tts_auto_speak,
             clawdtalk_enabled: self.clawdtalk_enabled,
             google_oauth_client_id: non_empty_trimmed(
-                &self.google_client_id_input.read(cx).value().to_string(),
+                self.google_client_id_input.read(cx).value().as_ref(),
             ),
             microsoft_oauth_client_id: non_empty_trimmed(
-                &self.microsoft_client_id_input.read(cx).value().to_string(),
+                self.microsoft_client_id_input.read(cx).value().as_ref(),
             ),
             github_oauth_client_id: non_empty_trimmed(
-                &self.github_client_id_input.read(cx).value().to_string(),
+                self.github_client_id_input.read(cx).value().as_ref(),
             ),
             slack_oauth_client_id: non_empty_trimmed(
-                &self.slack_client_id_input.read(cx).value().to_string(),
+                self.slack_client_id_input.read(cx).value().as_ref(),
             ),
             discord_oauth_client_id: non_empty_trimmed(
-                &self.discord_client_id_input.read(cx).value().to_string(),
+                self.discord_client_id_input.read(cx).value().as_ref(),
             ),
             telegram_oauth_client_id: non_empty_trimmed(
-                &self.telegram_client_id_input.read(cx).value().to_string(),
+                self.telegram_client_id_input.read(cx).value().as_ref(),
             ),
         }
     }

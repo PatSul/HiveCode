@@ -490,8 +490,8 @@ impl WorkflowBuilderView {
         // Walk nodes in topological order (simplified: just iterate non-trigger
         // action nodes in the order they appear).
         for node in &self.canvas.nodes {
-            if node.kind == NodeKind::Action {
-                if let Some(ref action) = node.action {
+            if node.kind == NodeKind::Action
+                && let Some(ref action) = node.action {
                     steps.push(WorkflowStep {
                         id: node.id.clone(),
                         name: node.label.clone(),
@@ -501,7 +501,6 @@ impl WorkflowBuilderView {
                         retry_count: node.retry_count,
                     });
                 }
-            }
         }
 
         // Find trigger
@@ -841,7 +840,7 @@ impl WorkflowBuilderView {
                                     .text_color(theme.text_muted)
                                     .child(format!(
                                         "{:?}",
-                                        node.persona.as_ref().unwrap()
+                                        node.persona.as_ref().expect("guarded by is_some check")
                                     )),
                             )
                         }),
@@ -972,7 +971,7 @@ impl WorkflowBuilderView {
                         div()
                             .text_size(theme.font_size_xs)
                             .text_color(theme.text_secondary)
-                            .child(format!("Action: {:?}", node.action.as_ref().unwrap())),
+                            .child(format!("Action: {:?}", node.action.as_ref().expect("guarded by is_some check"))),
                     )
                 })
                 .when(node.persona.is_some(), |el| {
@@ -982,7 +981,7 @@ impl WorkflowBuilderView {
                             .text_color(theme.accent_aqua)
                             .child(format!(
                                 "Agent: {:?}",
-                                node.persona.as_ref().unwrap()
+                                node.persona.as_ref().expect("guarded by is_some check")
                             )),
                     )
                 })

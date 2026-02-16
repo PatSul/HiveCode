@@ -152,15 +152,13 @@ impl SubscriptionManager {
         // RFC 8058: if List-Unsubscribe-Post is present and contains
         // "List-Unsubscribe=One-Click" alongside an HTTPS URL, prefer
         // one-click unsubscribe.
-        if let Some(post) = list_unsubscribe_post {
-            if post.to_lowercase().contains("list-unsubscribe=one-click") {
-                if let Some(url) = http_url {
+        if let Some(post) = list_unsubscribe_post
+            && post.to_lowercase().contains("list-unsubscribe=one-click")
+                && let Some(url) = http_url {
                     return Some(UnsubscribeMethod::OneClick {
                         url: url.to_string(),
                     });
                 }
-            }
-        }
 
         // Prefer HTTP link over mailto.
         if let Some(url) = http_url {

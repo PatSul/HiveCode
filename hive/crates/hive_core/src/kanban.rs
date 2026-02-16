@@ -53,6 +53,7 @@ pub enum Priority {
 }
 
 impl Priority {
+    /// Returns a human-readable display label for the priority level.
     pub fn label(&self) -> &'static str {
         match self {
             Self::Low => "Low",
@@ -209,6 +210,7 @@ impl KanbanBoard {
     }
 
     /// Updates mutable fields on a task. Pass `None` to leave a field unchanged.
+    #[allow(clippy::too_many_arguments)]
     pub fn update_task(
         &mut self,
         id: &str,
@@ -429,10 +431,10 @@ impl KanbanBoard {
                 done_count += 1;
             }
 
-            if let Some(due) = task.due_date {
-                if due < now && task.column != KanbanColumn::Done {
-                    overdue_count += 1;
-                }
+            if let Some(due) = task.due_date
+                && due < now && task.column != KanbanColumn::Done
+            {
+                overdue_count += 1;
             }
         }
 

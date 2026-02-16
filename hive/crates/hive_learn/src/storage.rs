@@ -112,7 +112,7 @@ impl LearningStorage {
             .conn
             .lock()
             .map_err(|e| format!("Lock poisoned: {e}"))?;
-        let outcome_str = serde_json::to_value(&record.outcome)
+        let outcome_str = serde_json::to_value(record.outcome)
             .map_err(|e| format!("Failed to serialize outcome: {e}"))?
             .as_str()
             .unwrap_or("unknown")

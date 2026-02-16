@@ -148,7 +148,7 @@ impl MatrixProvider {
         let nsecs = ((ts % 1000) * 1_000_000) as u32;
         Utc.timestamp_opt(secs, nsecs)
             .single()
-            .unwrap_or_else(|| Utc::now())
+            .unwrap_or_else(Utc::now)
     }
 
     fn convert_event(&self, event: &MatrixEvent, fallback_room: &str) -> IncomingMessage {
@@ -417,11 +417,10 @@ impl MessagingProvider for MatrixProvider {
             .and_then(|r| r.as_array())
         {
             for result in room_events.iter().take(limit as usize) {
-                if let Some(event_val) = result.get("result") {
-                    if let Ok(event) = serde_json::from_value::<MatrixEvent>(event_val.clone()) {
+                if let Some(event_val) = result.get("result")
+                    && let Ok(event) = serde_json::from_value::<MatrixEvent>(event_val.clone()) {
                         results.push(self.convert_event(&event, ""));
                     }
-                }
             }
         }
 

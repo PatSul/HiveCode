@@ -118,7 +118,8 @@ impl TaskPlan {
             visited += 1;
             for task in &self.tasks {
                 if task.dependencies.iter().any(|d| d == current) {
-                    let deg = in_deg.get_mut(task.id.as_str()).unwrap();
+                    let deg = in_deg.get_mut(task.id.as_str())
+                        .ok_or_else(|| format!("Task '{}' missing from in-degree map", task.id))?;
                     *deg -= 1;
                     if *deg == 0 {
                         queue.push(task.id.as_str());

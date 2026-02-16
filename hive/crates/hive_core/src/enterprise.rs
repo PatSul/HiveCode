@@ -9,14 +9,20 @@ use uuid::Uuid;
 // Data types
 // ---------------------------------------------------------------------------
 
+/// Permission level of a team member within an enterprise team.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TeamRole {
+    /// Full control over the team; cannot be removed or demoted.
     Owner,
+    /// Can manage members and team settings.
     Admin,
+    /// Standard team member with read/write access.
     Member,
+    /// Read-only access to team resources.
     Viewer,
 }
 
+/// A member of an enterprise team with role and join timestamp.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TeamMember {
     pub id: String,
@@ -26,6 +32,7 @@ pub struct TeamMember {
     pub joined_at: DateTime<Utc>,
 }
 
+/// An enterprise team with members and metadata.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Team {
     pub id: String,
@@ -36,22 +43,36 @@ pub struct Team {
     pub created_by: String,
 }
 
+/// Auditable action types recorded in the enterprise audit log.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AuditAction {
+    /// User signed in.
     Login,
+    /// User signed out.
     Logout,
+    /// A new team was created.
     CreateTeam,
+    /// Team settings were modified.
     UpdateTeam,
+    /// A team was deleted.
     DeleteTeam,
+    /// A member was added to a team.
     AddMember,
+    /// A member was removed from a team.
     RemoveMember,
+    /// A team member's role was changed.
     ChangeRole,
+    /// Application configuration was modified.
     ConfigChange,
+    /// An API key was accessed or rotated.
     ApiKeyAccess,
+    /// Data was exported from the system.
     DataExport,
+    /// A security-related event occurred.
     SecurityEvent,
 }
 
+/// A single entry in the enterprise audit log.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuditEntry {
     pub id: String,
@@ -65,6 +86,7 @@ pub struct AuditEntry {
     pub ip_address: Option<String>,
 }
 
+/// A recorded usage metric tracking token consumption and cost.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UsageMetric {
     pub id: String,
@@ -89,6 +111,7 @@ pub struct EnterpriseService {
 }
 
 impl EnterpriseService {
+    /// Creates a new, empty enterprise service.
     pub fn new() -> Self {
         Self {
             teams: Vec::new(),
@@ -256,6 +279,7 @@ impl EnterpriseService {
     // -----------------------------------------------------------------------
 
     /// Creates an audit log entry and returns a clone of it.
+    #[allow(clippy::too_many_arguments)]
     pub fn log_audit(
         &mut self,
         user_id: impl Into<String>,

@@ -10,7 +10,7 @@ use hive_ui_core::AgentsRunWorkflow;
 // ---------------------------------------------------------------------------
 
 /// Task workflow status. Each variant maps to one board column.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum TaskStatus {
     Todo,
     InProgress,
@@ -36,7 +36,7 @@ impl TaskStatus {
 }
 
 /// Priority level for a task, ordered from lowest to highest urgency.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
 pub enum Priority {
     Low,
     Medium,
@@ -56,7 +56,7 @@ impl Priority {
 }
 
 /// A single task on the Kanban board.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct KanbanTask {
     pub id: u64,
     pub title: String,
@@ -67,10 +67,11 @@ pub struct KanbanTask {
 }
 
 /// A single column on the board, holding an ordered list of tasks.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct KanbanColumn {
     pub status: TaskStatus,
     pub title: String,
+    #[serde(skip)]
     pub color: Hsla,
     pub tasks: Vec<KanbanTask>,
 }
@@ -79,7 +80,7 @@ pub struct KanbanColumn {
 ///
 /// `next_id` is a monotonically increasing counter used to assign unique IDs
 /// to newly created tasks.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct KanbanData {
     pub columns: Vec<KanbanColumn>,
     next_id: u64,
@@ -113,6 +114,7 @@ impl Default for KanbanData {
 impl KanbanData {
     /// Creates a board pre-populated with sample tasks so the UI has something
     /// to display before real persistence is wired in.
+    #[allow(dead_code)]
     pub fn sample() -> Self {
         let mut data = Self::default();
 

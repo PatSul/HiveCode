@@ -86,7 +86,7 @@ impl SupabaseClient {
         if table.contains('/') || table.contains('\\') {
             anyhow::bail!("Invalid table name: must not contain path separators");
         }
-        let sanitized_params = params.replace('#', "").replace('/', "");
+        let sanitized_params = params.replace(['#', '/'], "");
         let url = if sanitized_params.is_empty() {
             format!("{}/rest/v1/{table}", self.url)
         } else {

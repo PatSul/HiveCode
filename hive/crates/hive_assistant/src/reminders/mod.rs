@@ -235,15 +235,14 @@ impl ReminderService {
         let mut triggered = Vec::new();
 
         for reminder in &active {
-            if let ReminderTrigger::OnEvent(ref trigger_event) = reminder.trigger {
-                if trigger_event == event_name {
+            if let ReminderTrigger::OnEvent(ref trigger_event) = reminder.trigger
+                && trigger_event == event_name {
                     triggered.push(TriggeredReminder {
                         reminder_id: reminder.id.clone(),
                         title: reminder.title.clone(),
                         triggered_at: now.to_rfc3339(),
                     });
                 }
-            }
         }
 
         Ok(triggered)

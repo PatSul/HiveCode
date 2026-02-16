@@ -196,13 +196,12 @@ impl SemanticSearchService {
                 let dir_results =
                     self.search_directory(path, &query_terms, &query_ctx, context_lines);
                 all_results.extend(dir_results);
-            } else if path.is_file() {
-                if let Some(results) =
+            } else if path.is_file()
+                && let Some(results) =
                     self.search_file(path, &query_terms, &query_ctx, context_lines)
                 {
                     all_results.extend(results);
                 }
-            }
         }
 
         // Sort by descending score
@@ -254,13 +253,12 @@ impl SemanticSearchService {
 
             if path.is_dir() {
                 results.extend(self.search_directory(&path, query_terms, query_ctx, context_lines));
-            } else if path.is_file() {
-                if let Some(file_results) =
+            } else if path.is_file()
+                && let Some(file_results) =
                     self.search_file(&path, query_terms, query_ctx, context_lines)
                 {
                     results.extend(file_results);
                 }
-            }
         }
         results
     }

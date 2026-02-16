@@ -166,6 +166,7 @@ fn parse_range(s: &str, min: u32, max: u32) -> anyhow::Result<(u32, u32)> {
 // ScheduledJob
 // ---------------------------------------------------------------------------
 
+/// A registered scheduled job with its cron schedule and execution metadata.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScheduledJob {
     pub id: String,
@@ -193,6 +194,7 @@ pub struct Scheduler {
 }
 
 impl Scheduler {
+    /// Creates a new, empty scheduler with no registered jobs.
     pub fn new() -> Self {
         Self { jobs: Vec::new() }
     }
@@ -276,13 +278,12 @@ impl Scheduler {
             }
 
             // Skip if we already ran during this same minute
-            if let Some(last) = job.last_run {
-                if last.format("%Y-%m-%d %H:%M").to_string()
+            if let Some(last) = job.last_run
+                && last.format("%Y-%m-%d %H:%M").to_string()
                     == now.format("%Y-%m-%d %H:%M").to_string()
                 {
                     continue;
                 }
-            }
 
             if job.schedule.matches(&now) {
                 job.last_run = Some(now);

@@ -158,7 +158,8 @@ impl SwarmPlan {
             visited += 1;
             for team in &self.teams {
                 if team.dependencies.iter().any(|d| d == current) {
-                    let deg = in_deg.get_mut(team.id.as_str()).unwrap();
+                    let deg = in_deg.get_mut(team.id.as_str())
+                        .ok_or_else(|| format!("Team '{}' missing from in-degree map", team.id))?;
                     *deg -= 1;
                     if *deg == 0 {
                         queue.push(team.id.as_str());

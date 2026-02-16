@@ -53,6 +53,12 @@ pub struct MarkdownCache {
     entries: HashMap<u64, MarkdownIR>,
 }
 
+impl Default for MarkdownCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MarkdownCache {
     pub fn new() -> Self {
         Self {
@@ -274,6 +280,12 @@ pub struct CachedChatData {
     pub markdown_cache: MarkdownCache,
 }
 
+impl Default for CachedChatData {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CachedChatData {
     pub fn new() -> Self {
         Self {
@@ -375,6 +387,12 @@ pub struct ChatPanel {
     pub total_cost: f64,
     pub total_tokens: u32,
     pub current_model: String,
+}
+
+impl Default for ChatPanel {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ChatPanel {
@@ -658,11 +676,10 @@ fn render_message_bubble(msg: &DisplayMessage, theme: &HiveTheme) -> AnyElement 
     }
 
     // Cost badge
-    if let Some(cost) = msg.cost {
-        if cost > 0.0 {
+    if let Some(cost) = msg.cost
+        && cost > 0.0 {
             header = header.child(render_cost_badge(cost, msg.tokens, theme));
         }
-    }
 
     bubble = bubble.child(header);
 
@@ -765,11 +782,10 @@ fn render_message_bubble_cached(
         header = header.child(render_model_badge(model, theme));
     }
 
-    if let Some(cost) = msg.cost {
-        if cost > 0.0 {
+    if let Some(cost) = msg.cost
+        && cost > 0.0 {
             header = header.child(render_cost_badge(cost, msg.tokens, theme));
         }
-    }
 
     bubble = bubble.child(header);
 

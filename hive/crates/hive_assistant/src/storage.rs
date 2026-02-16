@@ -168,7 +168,7 @@ impl AssistantStorage {
             .map_err(|e| format!("Failed to prepare query: {e}"))?;
 
         let mut rows = stmt
-            .query_map(params![id], |row| row_to_reminder(row))
+            .query_map(params![id], row_to_reminder)
             .map_err(|e| format!("Failed to query reminder: {e}"))?;
 
         match rows.next() {
@@ -490,11 +490,10 @@ fn deserialize_trigger(
 ) -> ReminderTrigger {
     match trigger_type {
         "at" => {
-            if let Some(ref at_str) = trigger_at {
-                if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(at_str) {
+            if let Some(ref at_str) = trigger_at
+                && let Ok(dt) = chrono::DateTime::parse_from_rfc3339(at_str) {
                     return ReminderTrigger::At(dt.with_timezone(&chrono::Utc));
                 }
-            }
             // Fallback: use epoch if parsing fails
             ReminderTrigger::At(chrono::DateTime::UNIX_EPOCH)
         }

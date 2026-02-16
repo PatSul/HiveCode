@@ -6,12 +6,18 @@ use uuid::Uuid;
 // Task status
 // ---------------------------------------------------------------------------
 
+/// Lifecycle state of a background task.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TaskStatus {
+    /// Task is queued and waiting for an available slot.
     Pending,
+    /// Task is currently executing.
     Running,
+    /// Task finished successfully.
     Completed,
+    /// Task terminated with an error.
     Failed,
+    /// Task was cancelled before completion.
     Cancelled,
 }
 
@@ -19,6 +25,7 @@ pub enum TaskStatus {
 // BackgroundTask
 // ---------------------------------------------------------------------------
 
+/// A tracked background task with lifecycle timestamps and error reporting.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BackgroundTask {
     pub id: String,
@@ -93,6 +100,7 @@ pub struct BackgroundService {
 }
 
 impl BackgroundService {
+    /// Creates a new background service with the given concurrency limit.
     pub fn new(max_concurrent: usize) -> Self {
         Self {
             tasks: Vec::new(),

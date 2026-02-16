@@ -129,7 +129,7 @@ pub fn cosine_similarity(a: &HashMap<String, f32>, b: &HashMap<String, f32>) -> 
 
 /// Rough token estimate (~4 chars per token).
 fn estimate_tokens(text: &str) -> usize {
-    (text.len() + 3) / 4
+    text.len().div_ceil(4)
 }
 
 // ---------------------------------------------------------------------------

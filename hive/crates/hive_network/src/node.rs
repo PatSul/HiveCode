@@ -373,11 +373,10 @@ impl HiveNode {
                                 // Send response back.
                                 let key = from_addr.to_string();
                                 let mut conns = connections.write().await;
-                                if let Some(conn) = conns.get_mut(&key) {
-                                    if let Err(e) = conn.send(&response).await {
+                                if let Some(conn) = conns.get_mut(&key)
+                                    && let Err(e) = conn.send(&response).await {
                                         warn!("Failed to send response to {key}: {e}");
                                     }
-                                }
                             }
                         }
                         TransportEvent::Disconnected { addr } => {
@@ -429,7 +428,7 @@ impl HiveNode {
             let addr: SocketAddr = ann
                 .listen_addr
                 .parse()
-                .unwrap_or_else(|_| discovered.source_addr);
+                .unwrap_or(discovered.source_addr);
 
             let peer_info = PeerInfo {
                 id: ann.peer_id.clone(),

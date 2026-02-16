@@ -100,11 +100,11 @@ impl LearningService {
         let count = self.interaction_count.fetch_add(1, Ordering::Relaxed) + 1;
 
         // 5. Periodic analysis
-        if count % 50 == 0 {
+        if count.is_multiple_of(50) {
             info!("Running routing analysis at interaction {count}");
             let _ = self.routing_learner.analyze();
         }
-        if count % 200 == 0 {
+        if count.is_multiple_of(200) {
             info!("Running self-evaluation at interaction {count}");
             let _ = self.self_evaluator.evaluate();
         }

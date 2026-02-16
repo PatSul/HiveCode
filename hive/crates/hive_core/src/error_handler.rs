@@ -38,15 +38,22 @@ pub enum HiveError {
 /// Classification of errors for logging and user display.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ErrorCategory {
+    /// Error caused by user action (e.g., exceeding budget).
     UserError,
+    /// Error from an AI provider (e.g., model unavailable).
     ProviderError,
+    /// Network connectivity or timeout issue.
     NetworkError,
+    /// Security or authentication failure.
     SecurityError,
+    /// Internal system error (storage, file I/O, etc.).
     SystemError,
+    /// Invalid or missing configuration.
     ConfigError,
 }
 
 impl HiveError {
+    /// Returns the broad error category for routing and display purposes.
     pub fn category(&self) -> ErrorCategory {
         match self {
             Self::Config(_) => ErrorCategory::ConfigError,

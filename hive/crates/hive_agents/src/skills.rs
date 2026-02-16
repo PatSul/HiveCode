@@ -100,6 +100,12 @@ pub struct SkillsRegistry {
     skills: HashMap<String, Skill>,
 }
 
+impl Default for SkillsRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SkillsRegistry {
     pub fn new() -> Self {
         let mut registry = Self {

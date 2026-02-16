@@ -204,7 +204,7 @@ fn validate_working_dir(dir: &Path) -> Result<()> {
             && stripped
                 .as_bytes()
                 .first()
-                .map_or(false, |b| b.is_ascii_alphabetic())
+                .is_some_and(|b| b.is_ascii_alphabetic())
             && stripped.as_bytes().get(1) == Some(&b':')
     } else {
         path_str == "/"

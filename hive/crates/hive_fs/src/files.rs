@@ -71,24 +71,22 @@ impl FileService {
             bail!("Writing to .hive/config.json is blocked for safety");
         }
 
-        if let Some(parent) = path.parent() {
-            if !parent.exists() {
+        if let Some(parent) = path.parent()
+            && !parent.exists() {
                 std::fs::create_dir_all(parent)
                     .with_context(|| format!("Failed to create directory: {}", parent.display()))?;
             }
-        }
 
         // If the path already exists, validate its canonical form to catch symlinks.
         // For new files, canonicalize the parent to detect symlink-based traversal.
         if path.exists() {
             let canonical = path.canonicalize()?;
             validate_canonical(&canonical)?;
-        } else if let Some(parent) = path.parent() {
-            if parent.exists() {
+        } else if let Some(parent) = path.parent()
+            && parent.exists() {
                 let canonical_parent = parent.canonicalize()?;
                 validate_canonical(&canonical_parent)?;
             }
-        }
 
         debug!("Writing file: {}", path.display());
         std::fs::write(path, content)
@@ -146,12 +144,11 @@ impl FileService {
         validate_canonical(&canonical_from)?;
 
         // Validate destination: canonicalize parent of `to` (file may not exist yet).
-        if let Some(to_parent) = to.parent() {
-            if to_parent.exists() {
+        if let Some(to_parent) = to.parent()
+            && to_parent.exists() {
                 let canonical_to_parent = to_parent.canonicalize()?;
                 validate_canonical(&canonical_to_parent)?;
             }
-        }
 
         debug!("Renaming {} -> {}", from.display(), to.display());
         std::fs::rename(&canonical_from, to)
@@ -249,11 +246,9 @@ fn is_system_root(path_str: &str) -> bool {
             .as_bytes()
             .first()
             .is_some_and(|b| b.is_ascii_alphabetic())
-    {
-        if trimmed.len() == 2 && trimmed.ends_with(':') {
+        && trimmed.len() == 2 && trimmed.ends_with(':') {
             return true;
         }
-    }
     false
 }
 

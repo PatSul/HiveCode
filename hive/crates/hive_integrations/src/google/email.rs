@@ -468,21 +468,18 @@ fn parse_raw_message(raw: RawGmailMessage) -> EmailMessage {
 fn extract_body(payload: &RawPayload) -> String {
     // Check multipart parts first (prefer text/plain)
     for part in &payload.parts {
-        if part.mime_type == "text/plain" {
-            if let Some(ref body) = part.body {
-                if let Some(ref data) = body.data {
+        if part.mime_type == "text/plain"
+            && let Some(ref body) = part.body
+                && let Some(ref data) = body.data {
                     return base64url_decode(data);
                 }
-            }
-        }
     }
 
     // Fall back to top-level body
-    if let Some(ref body) = payload.body {
-        if let Some(ref data) = body.data {
+    if let Some(ref body) = payload.body
+        && let Some(ref data) = body.data {
             return base64url_decode(data);
         }
-    }
 
     String::new()
 }

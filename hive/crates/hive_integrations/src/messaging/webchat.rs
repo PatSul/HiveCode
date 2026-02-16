@@ -115,7 +115,7 @@ impl WebChatProvider {
 
     /// Push an externally received message into the in-memory inbox.
     pub fn receive_message(&self, msg: IncomingMessage) {
-        let mut inbox = self.inbox.lock().unwrap();
+        let mut inbox = self.inbox.lock().unwrap_or_else(|e| e.into_inner());
         inbox.push(msg);
     }
 
@@ -147,12 +147,12 @@ impl WebChatProvider {
 
     /// Return the current count of messages in the inbox.
     pub fn inbox_count(&self) -> usize {
-        self.inbox.lock().unwrap().len()
+        self.inbox.lock().unwrap_or_else(|e| e.into_inner()).len()
     }
 
     /// Clear all messages from the inbox.
     pub fn clear_inbox(&self) {
-        self.inbox.lock().unwrap().clear();
+        self.inbox.lock().unwrap_or_else(|e| e.into_inner()).clear();
     }
 }
 
@@ -244,7 +244,7 @@ impl MessagingProvider for WebChatProvider {
 
     async fn get_messages(&self, channel: &str, limit: u32) -> Result<Vec<IncomingMessage>> {
         // Return messages from the in-memory inbox filtered by channel.
-        let inbox = self.inbox.lock().unwrap();
+        let inbox = self.inbox.lock().map_err(|e| anyhow::anyhow!("lock poisoned: {e}"))?;
         let messages: Vec<IncomingMessage> = inbox
             .iter()
             .filter(|m| m.channel_id == channel)
@@ -285,7 +285,7 @@ impl MessagingProvider for WebChatProvider {
 
     async fn search_messages(&self, query: &str, limit: u32) -> Result<Vec<IncomingMessage>> {
         // Search the in-memory inbox client-side.
-        let inbox = self.inbox.lock().unwrap();
+        let inbox = self.inbox.lock().map_err(|e| anyhow::anyhow!("lock poisoned: {e}"))?;
         let query_lower = query.to_lowercase();
 
         let messages: Vec<IncomingMessage> = inbox

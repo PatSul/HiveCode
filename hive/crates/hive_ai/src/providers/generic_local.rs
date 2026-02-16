@@ -237,8 +237,8 @@ impl AiProvider for GenericLocalProvider {
     /// `default_model` when the endpoint does not respond.
     async fn get_models(&self) -> Vec<ModelInfo> {
         // Try the remote endpoint first.
-        if let Some(entries) = self.fetch_remote_models().await {
-            if !entries.is_empty() {
+        if let Some(entries) = self.fetch_remote_models().await
+            && !entries.is_empty() {
                 return entries
                     .into_iter()
                     .map(|m| ModelInfo {
@@ -254,7 +254,6 @@ impl AiProvider for GenericLocalProvider {
                     })
                     .collect();
             }
-        }
 
         // Fall back to default_model if configured.
         match &self.default_model {

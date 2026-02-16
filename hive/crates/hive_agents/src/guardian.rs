@@ -208,27 +208,27 @@ struct PatternSet {
 static HARMFUL_PATTERNS: LazyLock<Vec<PatternSet>> = LazyLock::new(|| {
     vec![
         PatternSet {
-            regex: Regex::new(r"(?i)how\s+to\s+(hack|exploit|crack|break\s+into|bypass\s+security\s+of)\b").unwrap(),
+            regex: Regex::new(r"(?i)how\s+to\s+(hack|exploit|crack|break\s+into|bypass\s+security\s+of)\b").expect("valid regex"),
             description: "Output contains instructions on hacking or exploitation",
             suggestion: "Remove or rephrase harmful instructions",
         },
         PatternSet {
-            regex: Regex::new(r"(?i)how\s+to\s+(build|make|create|assemble|construct)\s+(a\s+)?(bomb|weapon|explosive|grenade|firearm)").unwrap(),
+            regex: Regex::new(r"(?i)how\s+to\s+(build|make|create|assemble|construct)\s+(a\s+)?(bomb|weapon|explosive|grenade|firearm)").expect("valid regex"),
             description: "Output contains instructions for building weapons or explosives",
             suggestion: "Remove dangerous weapon/explosive instructions",
         },
         PatternSet {
-            regex: Regex::new(r"(?i)how\s+to\s+(synthesize|manufacture|produce|cook)\s+(meth|cocaine|heroin|fentanyl|drugs)").unwrap(),
+            regex: Regex::new(r"(?i)how\s+to\s+(synthesize|manufacture|produce|cook)\s+(meth|cocaine|heroin|fentanyl|drugs)").expect("valid regex"),
             description: "Output contains instructions for manufacturing illegal drugs",
             suggestion: "Remove illegal drug manufacturing instructions",
         },
         PatternSet {
-            regex: Regex::new(r"(?i)step[\s-]*by[\s-]*step\s+(guide|instructions?|tutorial)\s+(to|for|on)\s+(hack|exploit|attack|phish)").unwrap(),
+            regex: Regex::new(r"(?i)step[\s-]*by[\s-]*step\s+(guide|instructions?|tutorial)\s+(to|for|on)\s+(hack|exploit|attack|phish)").expect("valid regex"),
             description: "Output contains step-by-step attack instructions",
             suggestion: "Remove step-by-step attack guidance",
         },
         PatternSet {
-            regex: Regex::new(r"(?i)(ddos|denial.of.service)\s+(attack|tool|script|method)").unwrap(),
+            regex: Regex::new(r"(?i)(ddos|denial.of.service)\s+(attack|tool|script|method)").expect("valid regex"),
             description: "Output contains DDoS attack information",
             suggestion: "Remove DDoS attack guidance",
         },
@@ -239,42 +239,42 @@ static HARMFUL_PATTERNS: LazyLock<Vec<PatternSet>> = LazyLock::new(|| {
 static DATA_LEAK_PATTERNS: LazyLock<Vec<PatternSet>> = LazyLock::new(|| {
     vec![
         PatternSet {
-            regex: Regex::new(r"(?i)\b(sk-[a-zA-Z0-9]{20,})\b").unwrap(),
+            regex: Regex::new(r"(?i)\b(sk-[a-zA-Z0-9]{20,})\b").expect("valid regex"),
             description: "Output contains what appears to be an OpenAI API key (sk-...)",
             suggestion: "Remove the API key from the output",
         },
         PatternSet {
-            regex: Regex::new(r"(?i)\b(AKIA[0-9A-Z]{16})\b").unwrap(),
+            regex: Regex::new(r"(?i)\b(AKIA[0-9A-Z]{16})\b").expect("valid regex"),
             description: "Output contains what appears to be an AWS access key (AKIA...)",
             suggestion: "Remove the AWS key from the output",
         },
         PatternSet {
-            regex: Regex::new(r"(?i)\b(ghp_[a-zA-Z0-9]{36})\b").unwrap(),
+            regex: Regex::new(r"(?i)\b(ghp_[a-zA-Z0-9]{36})\b").expect("valid regex"),
             description: "Output contains what appears to be a GitHub personal access token",
             suggestion: "Remove the GitHub token from the output",
         },
         PatternSet {
-            regex: Regex::new(r"\b\d{3}-\d{2}-\d{4}\b").unwrap(),
+            regex: Regex::new(r"\b\d{3}-\d{2}-\d{4}\b").expect("valid regex"),
             description: "Output contains what appears to be a Social Security Number",
             suggestion: "Remove or redact the SSN",
         },
         PatternSet {
-            regex: Regex::new(r"\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|6(?:011|5[0-9]{2})[0-9]{12})\b").unwrap(),
+            regex: Regex::new(r"\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|6(?:011|5[0-9]{2})[0-9]{12})\b").expect("valid regex"),
             description: "Output contains what appears to be a credit card number",
             suggestion: "Remove or redact the credit card number",
         },
         PatternSet {
-            regex: Regex::new(r#"(?i)\b(password|passwd|pwd)\s*[:=]\s*['"]?[^\s'"]{6,}"#).unwrap(),
+            regex: Regex::new(r#"(?i)\b(password|passwd|pwd)\s*[:=]\s*['"]?[^\s'"]{6,}"#).expect("valid regex"),
             description: "Output contains a plaintext password",
             suggestion: "Remove the password from the output",
         },
         PatternSet {
-            regex: Regex::new(r#"(?i)\b(api[_-]?key|apikey|secret[_-]?key|access[_-]?token)\s*[:=]\s*['"]?[a-zA-Z0-9_\-]{16,}"#).unwrap(),
+            regex: Regex::new(r#"(?i)\b(api[_-]?key|apikey|secret[_-]?key|access[_-]?token)\s*[:=]\s*['"]?[a-zA-Z0-9_\-]{16,}"#).expect("valid regex"),
             description: "Output contains what appears to be an API key or secret",
             suggestion: "Remove the secret from the output",
         },
         PatternSet {
-            regex: Regex::new(r"(?i)\b[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}\b").unwrap(),
+            regex: Regex::new(r"(?i)\b[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}\b").expect("valid regex"),
             description: "Output contains an email address that may be personal data",
             suggestion: "Consider redacting the email address",
         },
@@ -285,27 +285,27 @@ static DATA_LEAK_PATTERNS: LazyLock<Vec<PatternSet>> = LazyLock::new(|| {
 static PROMPT_INJECTION_PATTERNS: LazyLock<Vec<PatternSet>> = LazyLock::new(|| {
     vec![
         PatternSet {
-            regex: Regex::new(r"(?i)(ignore|disregard|forget)\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|prompts?|rules?|directions?)").unwrap(),
+            regex: Regex::new(r"(?i)(ignore|disregard|forget)\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|prompts?|rules?|directions?)").expect("valid regex"),
             description: "Output contains prompt override attempt (ignore previous instructions)",
             suggestion: "Remove prompt injection content",
         },
         PatternSet {
-            regex: Regex::new(r"(?i)you\s+are\s+now\s+(a|an|in)\s+\w+\s+mode").unwrap(),
+            regex: Regex::new(r"(?i)you\s+are\s+now\s+(a|an|in)\s+\w+\s+mode").expect("valid regex"),
             description: "Output contains role reassignment attempt (you are now in X mode)",
             suggestion: "Remove role reassignment content",
         },
         PatternSet {
-            regex: Regex::new(r"(?i)(system\s*:?\s*override|admin\s*:?\s*override|sudo\s+mode)").unwrap(),
+            regex: Regex::new(r"(?i)(system\s*:?\s*override|admin\s*:?\s*override|sudo\s+mode)").expect("valid regex"),
             description: "Output contains system override attempt",
             suggestion: "Remove override directive",
         },
         PatternSet {
-            regex: Regex::new(r"(?i)\[INST\]|\[\/INST\]|<\|im_start\|>|<\|im_end\|>|<\|system\|>").unwrap(),
+            regex: Regex::new(r"(?i)\[INST\]|\[\/INST\]|<\|im_start\|>|<\|im_end\|>|<\|system\|>").expect("valid regex"),
             description: "Output contains raw prompt template markers",
             suggestion: "Remove prompt template tokens",
         },
         PatternSet {
-            regex: Regex::new(r"(?i)new\s+instructions?:\s*you\s+(must|should|will|are)").unwrap(),
+            regex: Regex::new(r"(?i)new\s+instructions?:\s*you\s+(must|should|will|are)").expect("valid regex"),
             description: "Output contains injected instruction override",
             suggestion: "Remove injected instructions",
         },
@@ -316,12 +316,12 @@ static PROMPT_INJECTION_PATTERNS: LazyLock<Vec<PatternSet>> = LazyLock::new(|| {
 static CODE_QUALITY_PATTERNS: LazyLock<Vec<PatternSet>> = LazyLock::new(|| {
     vec![
         PatternSet {
-            regex: Regex::new(r"(?i)\beval\s*\(").unwrap(),
+            regex: Regex::new(r"(?i)\beval\s*\(").expect("valid regex"),
             description: "Output contains eval() usage which can lead to code injection",
             suggestion: "Replace eval() with a safer alternative",
         },
         PatternSet {
-            regex: Regex::new(r"(?i)\bexec\s*\(").unwrap(),
+            regex: Regex::new(r"(?i)\bexec\s*\(").expect("valid regex"),
             description: "Output contains exec() usage which can lead to command injection",
             suggestion: "Use parameterized execution or a safe subprocess API",
         },
@@ -329,28 +329,28 @@ static CODE_QUALITY_PATTERNS: LazyLock<Vec<PatternSet>> = LazyLock::new(|| {
             regex: Regex::new(
                 r#"(?i)(SELECT|INSERT|UPDATE|DELETE)\s+.*\+\s*['"]?\s*\w+\s*['"]?\s*\+"#,
             )
-            .unwrap(),
+            .expect("valid regex"),
             description: "Output contains potential SQL injection via string concatenation",
             suggestion: "Use parameterized queries instead of string concatenation",
         },
         PatternSet {
             regex: Regex::new(r"(?i)innerHTML\s*=\s*[^;]*\b(user|input|data|param|query|req\.)")
-                .unwrap(),
+                .expect("valid regex"),
             description: "Output contains potential XSS via innerHTML with user input",
             suggestion: "Use textContent or sanitize before inserting into DOM",
         },
         PatternSet {
-            regex: Regex::new(r"(?i)\bos\s*\.\s*system\s*\(").unwrap(),
+            regex: Regex::new(r"(?i)\bos\s*\.\s*system\s*\(").expect("valid regex"),
             description: "Output uses os.system() which is vulnerable to shell injection",
             suggestion: "Use subprocess.run() with a list of arguments instead",
         },
         PatternSet {
-            regex: Regex::new(r#"(?i)subprocess\s*\.\s*(call|run|Popen)\s*\(\s*['"]"#).unwrap(),
+            regex: Regex::new(r#"(?i)subprocess\s*\.\s*(call|run|Popen)\s*\(\s*['"]"#).expect("valid regex"),
             description: "Output uses subprocess with a shell string instead of argument list",
             suggestion: "Pass arguments as a list, not a shell string",
         },
         PatternSet {
-            regex: Regex::new(r"(?i)document\s*\.\s*write\s*\(").unwrap(),
+            regex: Regex::new(r"(?i)document\s*\.\s*write\s*\(").expect("valid regex"),
             description: "Output uses document.write() which can enable XSS",
             suggestion: "Use DOM manipulation methods instead of document.write()",
         },
@@ -361,27 +361,27 @@ static CODE_QUALITY_PATTERNS: LazyLock<Vec<PatternSet>> = LazyLock::new(|| {
 static HALLUCINATION_PATTERNS: LazyLock<Vec<PatternSet>> = LazyLock::new(|| {
     vec![
         PatternSet {
-            regex: Regex::new(r"(?i)as\s+an?\s+AI\s+(language\s+)?model").unwrap(),
+            regex: Regex::new(r"(?i)as\s+an?\s+AI\s+(language\s+)?model").expect("valid regex"),
             description: "Output contains self-referential AI disclaimer that may indicate hedging",
             suggestion: "Provide a direct answer instead of AI disclaimers",
         },
         PatternSet {
-            regex: Regex::new(r"(?i)I\s+don'?t\s+have\s+(access|the\s+ability)\s+to\s+(real[\s-]?time|current|live|browse)").unwrap(),
+            regex: Regex::new(r"(?i)I\s+don'?t\s+have\s+(access|the\s+ability)\s+to\s+(real[\s-]?time|current|live|browse)").expect("valid regex"),
             description: "Output disclaims access to information that was requested",
             suggestion: "Either provide the information or clearly state limitations",
         },
         PatternSet {
-            regex: Regex::new(r"(?i)(however|but)\s*,?\s*(it('?s|\s+is)\s+(important|worth)\s+to\s+note|I\s+should\s+(point\s+out|mention|note))\s+that\s+.{0,60}(actually|in\s+fact|contrary)").unwrap(),
+            regex: Regex::new(r"(?i)(however|but)\s*,?\s*(it('?s|\s+is)\s+(important|worth)\s+to\s+note|I\s+should\s+(point\s+out|mention|note))\s+that\s+.{0,60}(actually|in\s+fact|contrary)").expect("valid regex"),
             description: "Output contains self-contradicting statements that may indicate hallucination",
             suggestion: "Review for factual consistency and remove contradictions",
         },
         PatternSet {
-            regex: Regex::new(r"(?i)I'?m\s+not\s+(sure|certain|confident)\s+(if|whether|about|that)\s+.{0,80}(but|however|although)").unwrap(),
+            regex: Regex::new(r"(?i)I'?m\s+not\s+(sure|certain|confident)\s+(if|whether|about|that)\s+.{0,80}(but|however|although)").expect("valid regex"),
             description: "Output expresses uncertainty then proceeds to assert, possible confabulation",
             suggestion: "Clearly state what is known vs uncertain",
         },
         PatternSet {
-            regex: Regex::new(r"(?i)as\s+of\s+my\s+(last\s+)?(training|knowledge)\s+(data|cutoff|update)").unwrap(),
+            regex: Regex::new(r"(?i)as\s+of\s+my\s+(last\s+)?(training|knowledge)\s+(data|cutoff|update)").expect("valid regex"),
             description: "Output references training cutoff as a hedge for potentially outdated info",
             suggestion: "Provide the best available answer or recommend checking current sources",
         },
@@ -393,17 +393,17 @@ static SECURITY_RISK_PATTERNS: LazyLock<Vec<PatternSet>> = LazyLock::new(|| {
     vec![
         PatternSet {
             regex: Regex::new(r#"(?i)(password|secret|token|api_key)\s*=\s*['"][^'"]{4,}['"]"#)
-                .unwrap(),
+                .expect("valid regex"),
             description: "Output contains hardcoded credentials in code",
             suggestion: "Use environment variables or a secrets manager instead",
         },
         PatternSet {
-            regex: Regex::new(r"(?i)http://[a-zA-Z][\w.\-]+").unwrap(),
+            regex: Regex::new(r"(?i)http://[a-zA-Z][\w.\-]+").expect("valid regex"),
             description: "Output references an insecure HTTP URL (not HTTPS)",
             suggestion: "Use HTTPS for all external URLs",
         },
         PatternSet {
-            regex: Regex::new(r"(?i)chmod\s+777\b").unwrap(),
+            regex: Regex::new(r"(?i)chmod\s+777\b").expect("valid regex"),
             description: "Output sets overly permissive file permissions (777)",
             suggestion: "Use more restrictive permissions (e.g., 755 or 644)",
         },
@@ -411,17 +411,17 @@ static SECURITY_RISK_PATTERNS: LazyLock<Vec<PatternSet>> = LazyLock::new(|| {
             regex: Regex::new(
                 r"(?i)--no-verify|--no-check|verify\s*=\s*false|SSL_VERIFY\s*=\s*False",
             )
-            .unwrap(),
+            .expect("valid regex"),
             description: "Output disables security verification",
             suggestion: "Keep security verification enabled",
         },
         PatternSet {
-            regex: Regex::new(r"(?i)\b(BEGIN\s+(RSA\s+)?PRIVATE\s+KEY)\b").unwrap(),
+            regex: Regex::new(r"(?i)\b(BEGIN\s+(RSA\s+)?PRIVATE\s+KEY)\b").expect("valid regex"),
             description: "Output contains a private key",
             suggestion: "Never expose private keys in output",
         },
         PatternSet {
-            regex: Regex::new(r"(?i)disable[\s_-]*(firewall|antivirus|security|auth)").unwrap(),
+            regex: Regex::new(r"(?i)disable[\s_-]*(firewall|antivirus|security|auth)").expect("valid regex"),
             description: "Output suggests disabling security measures",
             suggestion: "Do not recommend disabling security features",
         },
@@ -544,12 +544,12 @@ fn check_confidentiality(output: &str) -> Vec<GuardianIssue> {
     static CONFIDENTIALITY_PATTERNS: LazyLock<Vec<PatternSet>> = LazyLock::new(|| {
         vec![
             PatternSet {
-                regex: Regex::new(r"(?i)\b(BEGIN\s+(RSA\s+|DSA\s+|EC\s+|OPENSSH\s+)?PRIVATE\s+KEY)\b").unwrap(),
+                regex: Regex::new(r"(?i)\b(BEGIN\s+(RSA\s+|DSA\s+|EC\s+|OPENSSH\s+)?PRIVATE\s+KEY)\b").expect("valid regex"),
                 description: "Output exposes a private key which is confidential",
                 suggestion: "Never include private keys in output",
             },
             PatternSet {
-                regex: Regex::new(r"(?i)\b(internal\s+use\s+only|confidential|do\s+not\s+distribute|proprietary)\b").unwrap(),
+                regex: Regex::new(r"(?i)\b(internal\s+use\s+only|confidential|do\s+not\s+distribute|proprietary)\b").expect("valid regex"),
                 description: "Output may contain content marked as confidential",
                 suggestion: "Review and remove confidential markings or content",
             },

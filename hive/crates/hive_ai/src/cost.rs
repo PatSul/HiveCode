@@ -20,7 +20,7 @@ use crate::model_registry::MODEL_REGISTRY;
 pub fn estimate_tokens(text: &str) -> usize {
     // ~4 chars per token for English, slightly less for code
     let chars = text.len();
-    (chars + 3) / 4 // round up
+    chars.div_ceil(4) // round up
 }
 
 /// Estimate tokens for a chat message (role + content).
@@ -105,19 +105,12 @@ pub struct CostRecord {
 
 /// Budget limits for cost control.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct BudgetLimits {
     pub daily_limit: Option<f64>,
     pub monthly_limit: Option<f64>,
 }
 
-impl Default for BudgetLimits {
-    fn default() -> Self {
-        Self {
-            daily_limit: None,
-            monthly_limit: None,
-        }
-    }
-}
 
 // ---------------------------------------------------------------------------
 // CostTracker

@@ -130,7 +130,7 @@ impl TelegramProvider {
     fn parse_unix_ts(ts: i64) -> DateTime<Utc> {
         Utc.timestamp_opt(ts, 0)
             .single()
-            .unwrap_or_else(|| Utc::now())
+            .unwrap_or_else(Utc::now)
     }
 
     fn convert_message(&self, msg: &TelegramMessage) -> IncomingMessage {

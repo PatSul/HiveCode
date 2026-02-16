@@ -183,7 +183,8 @@ impl BrowserPool {
             .find(|inst| !inst.is_busy)
             .map(|inst| inst.id.clone())
         {
-            let inst = self.instances.get_mut(&id).unwrap();
+            let inst = self.instances.get_mut(&id)
+                .context(format!("Browser instance disappeared unexpectedly: {id}"))?;
             inst.is_busy = true;
             inst.last_used = Utc::now();
             debug!(id = %id, "acquired existing browser instance");
@@ -341,8 +342,8 @@ impl CdpConnection {
         loop {
             match stream.next().await {
                 Some(Ok(Message::Text(text))) => {
-                    if let Ok(resp) = serde_json::from_str::<serde_json::Value>(&text) {
-                        if resp.get("id").and_then(|v| v.as_u64()) == Some(id) {
+                    if let Ok(resp) = serde_json::from_str::<serde_json::Value>(&text)
+                        && resp.get("id").and_then(|v| v.as_u64()) == Some(id) {
                             if let Some(error) = resp.get("error") {
                                 let msg = error
                                     .get("message")
@@ -353,7 +354,6 @@ impl CdpConnection {
                             return Ok(resp.get("result").cloned().unwrap_or(serde_json::json!({})));
                         }
                         // Not our response — event or different command response; skip.
-                    }
                 }
                 Some(Ok(_)) => continue,
                 Some(Err(e)) => bail!("WebSocket error: {e}"),
@@ -621,11 +621,9 @@ impl CdpBrowserManager {
                 if let Ok(output) = std::process::Command::new("which")
                     .arg(candidate)
                     .output()
-                {
-                    if output.status.success() {
+                    && output.status.success() {
                         return Ok(candidate.to_string());
                     }
-                }
             } else if std::path::Path::new(candidate).exists() {
                 return Ok(candidate.to_string());
             }

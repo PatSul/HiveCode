@@ -430,7 +430,8 @@ impl StdioTransport {
                 .ok_or_else(|| anyhow::anyhow!("Child process closed stdout before responding"))?;
 
             if msg.is_notification() {
-                let notification = msg.into_notification().unwrap();
+                let notification = msg.into_notification()
+                    .expect("is_notification() was true so into_notification() must succeed");
                 debug!(
                     method = %notification.method,
                     "Received notification while waiting for response (discarding)"
@@ -744,8 +745,8 @@ impl Drop for McpClient {
     fn drop(&mut self) {
         // Best-effort: if we still have a transport, try to kill the child.
         // We can't do async cleanup in Drop, so we just attempt a sync kill.
-        if let Ok(mut guard) = self.transport.try_lock() {
-            if let Some(ref mut transport) = *guard {
+        if let Ok(mut guard) = self.transport.try_lock()
+            && let Some(ref mut transport) = *guard {
                 // Attempt to start a kill. The OS will clean up the zombie.
                 let _ = transport.child.start_kill();
                 error!(
@@ -753,7 +754,6 @@ impl Drop for McpClient {
                     "McpClient dropped without calling disconnect() — child process killed"
                 );
             }
-        }
     }
 }
 

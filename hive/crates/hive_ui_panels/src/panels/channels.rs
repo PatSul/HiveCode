@@ -142,11 +142,10 @@ impl ChannelsView {
             .collect();
 
         // Auto-select first channel if none selected
-        if self.active_channel_id.is_none() {
-            if let Some(first) = self.channels.first() {
+        if self.active_channel_id.is_none()
+            && let Some(first) = self.channels.first() {
                 self.active_channel_id = Some(first.id.clone());
             }
-        }
         cx.notify();
     }
 
@@ -166,27 +165,25 @@ impl ChannelsView {
             .collect();
 
         // Auto-select first channel if none selected
-        if self.active_channel_id.is_none() {
-            if let Some(first) = self.channels.first() {
+        if self.active_channel_id.is_none()
+            && let Some(first) = self.channels.first() {
                 self.active_channel_id = Some(first.id.clone());
                 self.load_channel_messages(store);
             }
-        }
         cx.notify();
     }
 
     /// Load messages for the active channel.
     pub fn load_channel_messages(&mut self, store: &ChannelStore) {
         self.messages.clear();
-        if let Some(ref id) = self.active_channel_id {
-            if let Some(channel) = store.get_channel(id) {
+        if let Some(ref id) = self.active_channel_id
+            && let Some(channel) = store.get_channel(id) {
                 self.messages = channel
                     .messages
                     .iter()
                     .map(|m| self.message_to_display(m))
                     .collect();
             }
-        }
     }
 
     /// Switch to a different channel.
@@ -581,8 +578,8 @@ impl ChannelsView {
         }
 
         // Streaming indicator
-        if self.is_streaming {
-            if let Some(ref agent) = self.streaming_agent {
+        if self.is_streaming
+            && let Some(ref agent) = self.streaming_agent {
                 let color = self.agent_color(agent);
                 message_elements.push(
                     div()
@@ -625,7 +622,6 @@ impl ChannelsView {
                         .into_any_element(),
                 );
             }
-        }
 
         // Empty state
         if self.messages.is_empty() && !self.is_streaming {

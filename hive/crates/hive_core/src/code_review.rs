@@ -8,31 +8,48 @@ use uuid::Uuid;
 // Data types
 // ---------------------------------------------------------------------------
 
+/// Lifecycle status of a code review.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ReviewStatus {
+    /// Initial state, not yet submitted for review.
     Draft,
+    /// Submitted and awaiting reviewer feedback.
     Pending,
+    /// Approved by all required reviewers.
     Approved,
+    /// Reviewer requested modifications before approval.
     ChangesRequested,
+    /// Successfully merged into the target branch.
     Merged,
+    /// Closed without merging.
     Closed,
 }
 
+/// Resolution status of a review comment.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CommentStatus {
+    /// Awaiting resolution.
     Pending,
+    /// Issue has been addressed.
     Resolved,
+    /// Acknowledged but intentionally not addressed.
     WontFix,
 }
 
+/// Type of file change in a code review diff.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ChangeType {
+    /// New file added.
     Added,
+    /// Existing file modified.
     Modified,
+    /// File removed.
     Deleted,
+    /// File renamed (possibly with modifications).
     Renamed,
 }
 
+/// A review comment attached to a specific file and optionally a line number.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReviewComment {
     pub id: String,
@@ -46,6 +63,7 @@ pub struct ReviewComment {
 }
 
 impl ReviewComment {
+    /// Creates a new pending review comment on a file, optionally at a specific line.
     pub fn new(
         file_path: impl Into<String>,
         line_number: Option<u32>,
@@ -65,6 +83,7 @@ impl ReviewComment {
     }
 }
 
+/// A file affected by a code review, with addition/deletion line counts.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileChange {
     pub path: String,
@@ -73,6 +92,7 @@ pub struct FileChange {
     pub deletions: u32,
 }
 
+/// A complete code review with metadata, file changes, comments, and review status.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CodeReview {
     pub id: String,
@@ -111,6 +131,7 @@ pub struct CodeReviewStore {
 }
 
 impl CodeReviewStore {
+    /// Creates an empty code review store.
     pub fn new() -> Self {
         Self {
             reviews: Vec::new(),

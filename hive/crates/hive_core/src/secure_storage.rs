@@ -94,14 +94,13 @@ impl SecureStorage {
 
     /// Load a salt from disk, or generate and persist a new one.
     fn load_or_create_salt(salt_path: &Path) -> Result<[u8; SALT_LEN]> {
-        if let Ok(data) = fs::read(salt_path) {
-            if data.len() == SALT_LEN {
+        if let Ok(data) = fs::read(salt_path)
+            && data.len() == SALT_LEN {
                 let mut salt = [0u8; SALT_LEN];
                 salt.copy_from_slice(&data);
                 return Ok(salt);
             }
             // Salt file exists but has wrong length -- regenerate.
-        }
 
         let salt: [u8; SALT_LEN] = rand::random();
 

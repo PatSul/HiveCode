@@ -4,14 +4,20 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use uuid::Uuid;
 
+/// Severity level of an application notification.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum NotificationType {
+    /// Informational message.
     Info,
+    /// Successful operation.
     Success,
+    /// Non-critical warning.
     Warning,
+    /// Error requiring attention.
     Error,
 }
 
+/// A user-facing notification with optional title and read/unread state.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppNotification {
     pub id: String,
@@ -23,6 +29,7 @@ pub struct AppNotification {
 }
 
 impl AppNotification {
+    /// Creates a new unread notification with the given type and message.
     pub fn new(notification_type: NotificationType, message: impl Into<String>) -> Self {
         Self {
             id: Uuid::new_v4().to_string(),
@@ -34,6 +41,7 @@ impl AppNotification {
         }
     }
 
+    /// Attaches a title to this notification (builder pattern).
     pub fn with_title(mut self, title: impl Into<String>) -> Self {
         self.title = Some(title.into());
         self
@@ -48,6 +56,7 @@ pub struct NotificationStore {
 }
 
 impl NotificationStore {
+    /// Creates a new, empty notification store with a default capacity of 100.
     pub fn new() -> Self {
         Self {
             notifications: Vec::new(),
@@ -55,6 +64,7 @@ impl NotificationStore {
         }
     }
 
+    /// Inserts a notification at the front and truncates if over capacity.
     pub fn push(&mut self, notification: AppNotification) {
         self.notifications.insert(0, notification);
         if self.notifications.len() > self.max_notifications {
@@ -62,26 +72,31 @@ impl NotificationStore {
         }
     }
 
+    /// Marks a single notification as read by its ID. No-op if not found.
     pub fn mark_read(&mut self, id: &str) {
         if let Some(n) = self.notifications.iter_mut().find(|n| n.id == id) {
             n.read = true;
         }
     }
 
+    /// Marks every notification in the store as read.
     pub fn mark_all_read(&mut self) {
         for n in &mut self.notifications {
             n.read = true;
         }
     }
 
+    /// Returns the number of unread notifications.
     pub fn unread_count(&self) -> usize {
         self.notifications.iter().filter(|n| !n.read).count()
     }
 
+    /// Returns a slice of all notifications, newest first.
     pub fn all(&self) -> &[AppNotification] {
         &self.notifications
     }
 
+    /// Removes all notifications from the store.
     pub fn clear(&mut self) {
         self.notifications.clear();
     }

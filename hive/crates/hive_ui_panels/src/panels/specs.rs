@@ -56,6 +56,7 @@ impl SpecPanelData {
     }
 
     /// Return a sample dataset for preview / testing.
+    #[allow(dead_code)]
     pub fn sample() -> Self {
         Self {
             specs: vec![

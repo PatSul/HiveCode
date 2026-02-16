@@ -37,7 +37,7 @@ pub struct NetworkConfig {
 impl Default for NetworkConfig {
     fn default() -> Self {
         Self {
-            listen_addr: "0.0.0.0:9470".parse().unwrap(),
+            listen_addr: "0.0.0.0:9470".parse().expect("valid default listen address"),
             discovery_enabled: true,
             discovery_port: 9471,
             max_peers: 32,

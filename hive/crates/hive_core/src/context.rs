@@ -15,7 +15,7 @@ const CHARS_PER_TOKEN: usize = 4;
 pub fn estimate_tokens(text: &str) -> usize {
     // Use character count / 4 as a rough approximation.
     // More accurate would be tiktoken, but this avoids a heavy dependency.
-    (text.len() + CHARS_PER_TOKEN - 1) / CHARS_PER_TOKEN
+    text.len().div_ceil(CHARS_PER_TOKEN)
 }
 
 // ---------------------------------------------------------------------------
@@ -32,6 +32,7 @@ pub struct ContextMessage {
 }
 
 impl ContextMessage {
+    /// Creates a new context message with an automatically estimated token count.
     pub fn new(role: impl Into<String>, content: impl Into<String>) -> Self {
         let content = content.into();
         let tokens = estimate_tokens(&content);
@@ -43,6 +44,7 @@ impl ContextMessage {
         }
     }
 
+    /// Marks this message as pinned so it survives context pruning.
     pub fn pinned(mut self) -> Self {
         self.pinned = true;
         self
@@ -60,6 +62,7 @@ pub struct ContextWindow {
 }
 
 impl ContextWindow {
+    /// Creates a new context window with the given maximum token budget.
     pub fn new(max_tokens: usize) -> Self {
         Self {
             messages: Vec::new(),

@@ -108,7 +108,7 @@ impl CrossChannelService {
         platform_b: Platform,
         channel_b: &str,
     ) -> ChannelLink {
-        let mut state = self.state.lock().unwrap();
+        let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
         let id = format!("cl-{}", state.next_link_id);
         state.next_link_id += 1;
 
@@ -136,7 +136,7 @@ impl CrossChannelService {
 
     /// List all channel links.
     pub fn list_channel_links(&self) -> Vec<ChannelLink> {
-        self.state.lock().unwrap().channel_links.clone()
+        self.state.lock().unwrap_or_else(|e| e.into_inner()).channel_links.clone()
     }
 
     /// Find channels linked to the given platform+channel.
@@ -145,7 +145,7 @@ impl CrossChannelService {
         platform: Platform,
         channel: &str,
     ) -> Vec<(Platform, String)> {
-        let state = self.state.lock().unwrap();
+        let state = self.state.lock().unwrap_or_else(|e| e.into_inner());
         let mut results = Vec::new();
 
         for link in &state.channel_links {
@@ -161,7 +161,7 @@ impl CrossChannelService {
 
     /// Remove a channel link by its ID.
     pub fn unlink_channels(&self, link_id: &str) -> bool {
-        let mut state = self.state.lock().unwrap();
+        let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
         let before = state.channel_links.len();
         state.channel_links.retain(|l| l.id != link_id);
         state.channel_links.len() < before
@@ -179,7 +179,7 @@ impl CrossChannelService {
         linked_channel_id: &str,
         linked_thread_id: &str,
     ) -> ThreadLink {
-        let mut state = self.state.lock().unwrap();
+        let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
         let id = format!("tl-{}", state.next_link_id);
         state.next_link_id += 1;
 
@@ -209,7 +209,7 @@ impl CrossChannelService {
 
     /// List all thread links.
     pub fn list_thread_links(&self) -> Vec<ThreadLink> {
-        self.state.lock().unwrap().thread_links.clone()
+        self.state.lock().unwrap_or_else(|e| e.into_inner()).thread_links.clone()
     }
 
     // ── Conversation tracking ────────────────────────────────────
@@ -232,7 +232,7 @@ impl CrossChannelService {
             "tracking cross-channel message"
         );
 
-        self.state.lock().unwrap().conversations.push(entry);
+        self.state.lock().unwrap_or_else(|e| e.into_inner()).conversations.push(entry);
     }
 
     /// Track multiple messages at once.
@@ -244,12 +244,12 @@ impl CrossChannelService {
 
     /// Return the total number of tracked conversation entries.
     pub fn conversation_count(&self) -> usize {
-        self.state.lock().unwrap().conversations.len()
+        self.state.lock().unwrap_or_else(|e| e.into_inner()).conversations.len()
     }
 
     /// Get recent conversation entries, newest first.
     pub fn recent_conversations(&self, limit: usize) -> Vec<ConversationEntry> {
-        let state = self.state.lock().unwrap();
+        let state = self.state.lock().unwrap_or_else(|e| e.into_inner());
         state
             .conversations
             .iter()
@@ -261,7 +261,7 @@ impl CrossChannelService {
 
     /// Get conversation entries for a specific platform.
     pub fn conversations_by_platform(&self, platform: Platform) -> Vec<ConversationEntry> {
-        let state = self.state.lock().unwrap();
+        let state = self.state.lock().unwrap_or_else(|e| e.into_inner());
         state
             .conversations
             .iter()
@@ -274,7 +274,7 @@ impl CrossChannelService {
 
     /// Search conversations across all tracked platforms.
     pub fn search_all(&self, query: &str, limit: usize) -> Vec<CrossSearchResult> {
-        let state = self.state.lock().unwrap();
+        let state = self.state.lock().unwrap_or_else(|e| e.into_inner());
         let query_lower = query.to_lowercase();
         let query_words: Vec<&str> = query_lower.split_whitespace().collect();
 
@@ -340,7 +340,7 @@ impl CrossChannelService {
 
     /// Return per-platform message counts.
     pub fn platform_stats(&self) -> HashMap<Platform, usize> {
-        let state = self.state.lock().unwrap();
+        let state = self.state.lock().unwrap_or_else(|e| e.into_inner());
         let mut stats = HashMap::new();
         for entry in &state.conversations {
             *stats.entry(entry.platform).or_insert(0) += 1;
@@ -350,7 +350,7 @@ impl CrossChannelService {
 
     /// Clear all data.
     pub fn clear(&self) {
-        let mut state = self.state.lock().unwrap();
+        let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
         state.channel_links.clear();
         state.thread_links.clear();
         state.conversations.clear();
@@ -360,7 +360,7 @@ impl CrossChannelService {
 
     /// Persist the cross-channel service state to a JSON file.
     pub fn save_to_file(&self, path: &Path) -> Result<()> {
-        let state = self.state.lock().unwrap();
+        let state = self.state.lock().map_err(|e| anyhow::anyhow!("lock poisoned: {e}"))?;
         let json = serde_json::to_string_pretty(&*state)?;
         std::fs::write(path, json)?;
         Ok(())

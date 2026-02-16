@@ -69,7 +69,7 @@ use hive_ui_panels::panels::{
     learning::{LearningPanel, LearningPanelData},
     logs::{LogsData, LogsPanel},
     models_browser::{ModelsBrowserView, ProjectModelsChanged},
-    monitor::{MonitorData, MonitorPanel, ProviderStatus, SystemResources},
+    monitor::{MonitorData, MonitorPanel, SystemResources},
     review::{AiCommitState, BranchEntry, GitOpsTab, LfsFileEntry, PrForm, PrSummary, ReviewData, ReviewPanel},
     routing::{RoutingData, RoutingPanel},
     settings::{SettingsSaved, SettingsView},
@@ -694,6 +694,121 @@ impl HiveWorkspace {
     fn refresh_routing_data(&mut self, cx: &App) {
         if cx.has_global::<AppAiService>() {
             self.routing_data = RoutingData::from_router(cx.global::<AppAiService>().0.router());
+        }
+    }
+
+    /// Populate the monitor panel with real system metrics and provider status.
+    ///
+    /// Reads CPU, memory, and disk stats via macOS-compatible commands (`sysctl`,
+    /// `ps`, `df`) and falls back to zero values when a metric cannot be read.
+    /// Provider status is derived from the current `AppConfig` API key fields.
+    fn refresh_monitor_data(&mut self, cx: &App) {
+        use hive_ui_panels::panels::monitor::ProviderStatus;
+
+        // -- System resources --------------------------------------------------
+        let resources = self.gather_system_resources();
+        self.monitor_data.resources = resources;
+
+        // -- Provider status ---------------------------------------------------
+        if cx.has_global::<AppConfig>() {
+            let config = cx.global::<AppConfig>().0.get();
+            let mut providers: Vec<ProviderStatus> = Vec::new();
+
+            let has_anthropic = config.anthropic_api_key.as_ref().is_some_and(|k| !k.is_empty());
+            providers.push(ProviderStatus::new("Anthropic", has_anthropic, if has_anthropic { Some(0) } else { None }));
+
+            let has_openai = config.openai_api_key.as_ref().is_some_and(|k| !k.is_empty());
+            providers.push(ProviderStatus::new("OpenAI", has_openai, if has_openai { Some(0) } else { None }));
+
+            let has_google = config.google_api_key.as_ref().is_some_and(|k| !k.is_empty());
+            providers.push(ProviderStatus::new("Google Gemini", has_google, if has_google { Some(0) } else { None }));
+
+            let has_openrouter = config.openrouter_api_key.as_ref().is_some_and(|k| !k.is_empty());
+            providers.push(ProviderStatus::new("OpenRouter", has_openrouter, if has_openrouter { Some(0) } else { None }));
+
+            let has_groq = config.groq_api_key.as_ref().is_some_and(|k| !k.is_empty());
+            providers.push(ProviderStatus::new("Groq", has_groq, if has_groq { Some(0) } else { None }));
+
+            let has_ollama = !config.ollama_url.is_empty();
+            providers.push(ProviderStatus::new("Ollama (local)", has_ollama, if has_ollama { Some(0) } else { None }));
+
+            let has_lmstudio = !config.lmstudio_url.is_empty();
+            providers.push(ProviderStatus::new("LM Studio", has_lmstudio, if has_lmstudio { Some(0) } else { None }));
+
+            if let Some(ref url) = config.local_provider_url {
+                if !url.is_empty() {
+                    providers.push(ProviderStatus::new("Custom Local", true, Some(0)));
+                }
+            }
+
+            self.monitor_data.providers = providers;
+        }
+
+        // -- Uptime (seconds since process start) -----------------------------
+        if let Ok(output) = std::process::Command::new("ps")
+            .args(["-o", "etime=", "-p", &std::process::id().to_string()])
+            .output()
+        {
+            if output.status.success() {
+                let raw = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                self.monitor_data.uptime_secs = parse_etime(&raw);
+            }
+        }
+    }
+
+    /// Refresh the logs panel.  Logs are appended in real-time via
+    /// `add_log_entry()` calls throughout the application.  This refresh is a
+    /// no-op placeholder — the logs panel already accumulates entries as they
+    /// arrive.  It is wired into `switch_to_panel` so we have a hook to add
+    /// future behaviour (e.g. pulling persisted logs from disk on first visit).
+    fn refresh_logs_data(&mut self, _cx: &App) {
+        // Logs accumulate via push; nothing to pull from a global yet.
+        // TODO: When a persistent log store is added, load recent entries here.
+    }
+
+    /// Load Kanban board state from `~/.hive/kanban.json`.  If the file does
+    /// not exist or cannot be parsed the board starts empty.
+    fn refresh_kanban_data(&mut self) {
+        let path = match hive_core::config::HiveConfig::base_dir() {
+            Ok(d) => d.join("kanban.json"),
+            Err(_) => return,
+        };
+        if !path.exists() {
+            return;
+        }
+        match std::fs::read_to_string(&path) {
+            Ok(json) => match serde_json::from_str::<hive_ui_panels::panels::kanban::KanbanData>(&json) {
+                Ok(data) => {
+                    self.kanban_data = data;
+                }
+                Err(e) => {
+                    warn!("Failed to parse kanban.json: {e}");
+                }
+            },
+            Err(e) => {
+                warn!("Failed to read kanban.json: {e}");
+            }
+        }
+    }
+
+    /// Persist Kanban board state to `~/.hive/kanban.json`.
+    fn save_kanban_data(&self) {
+        let path = match hive_core::config::HiveConfig::base_dir() {
+            Ok(d) => d.join("kanban.json"),
+            Err(e) => {
+                warn!("Cannot save kanban: {e}");
+                return;
+            }
+        };
+        match serde_json::to_string_pretty(&self.kanban_data) {
+            Ok(json) => {
+                if let Err(e) = std::fs::write(&path, json) {
+                    warn!("Failed to write kanban.json: {e}");
+                }
+            }
+            Err(e) => {
+                warn!("Failed to serialize kanban data: {e}");
+            }
         }
     }
 
@@ -1710,6 +1825,15 @@ impl HiveWorkspace {
                 self.refresh_assistant_data(cx);
                 self.refresh_assistant_connected_data(cx);
             }
+            Panel::Monitor => {
+                self.refresh_monitor_data(cx);
+            }
+            Panel::Logs => {
+                self.refresh_logs_data(cx);
+            }
+            Panel::Kanban => {
+                self.refresh_kanban_data();
+            }
             _ => {}
         }
 
@@ -2033,7 +2157,7 @@ impl HiveWorkspace {
                     &workflow_for_thread,
                     working_dir,
                 );
-            *run_result_for_thread.lock().unwrap() = Some(result);
+            *run_result_for_thread.lock().unwrap_or_else(|e| e.into_inner()) = Some(result);
         });
 
         let run_result_for_ui = std::sync::Arc::clone(&run_result);
@@ -2042,7 +2166,7 @@ impl HiveWorkspace {
         cx.spawn(async move |this, app: &mut AsyncApp| {
             // Poll until the thread writes the result.
             loop {
-                if let Some(result) = run_result_for_ui.lock().unwrap().take() {
+                if let Some(result) = run_result_for_ui.lock().unwrap_or_else(|e| e.into_inner()).take() {
                     let _ = this.update(app, |this, cx| {
                         match result {
                             Ok(run) => {
@@ -2714,6 +2838,7 @@ impl HiveWorkspace {
             assigned_model: None,
         };
         self.kanban_data.columns[0].tasks.push(task);
+        self.save_kanban_data();
         cx.notify();
     }
 
@@ -4797,67 +4922,9 @@ impl HiveWorkspace {
         cx.notify();
     }
 
-    /// Gather real system metrics and update `self.monitor_data`.
-    ///
-    /// Focuses on macOS-compatible approaches using `sysctl` and `ps`.
-    /// Falls back to placeholder values when a metric cannot be read.
-    fn refresh_monitor_data(&mut self, cx: &Context<Self>) {
-        // -- System resources --------------------------------------------------
-        let resources = self.gather_system_resources();
-        self.monitor_data.resources = resources;
-
-        // -- Provider status ---------------------------------------------------
-        // If the AI service global is present, probe each configured provider
-        // key to see if it is reachable. We approximate "online" by checking
-        // whether the provider has a configured API key.
-        if cx.has_global::<AppConfig>() {
-            let config = cx.global::<AppConfig>().0.get();
-            let mut providers: Vec<ProviderStatus> = Vec::new();
-
-            // Check individual API key fields on HiveConfig.
-            let has_anthropic = config.anthropic_api_key.as_ref().is_some_and(|k| !k.is_empty());
-            providers.push(ProviderStatus::new("Anthropic", has_anthropic, if has_anthropic { Some(0) } else { None }));
-
-            let has_openai = config.openai_api_key.as_ref().is_some_and(|k| !k.is_empty());
-            providers.push(ProviderStatus::new("OpenAI", has_openai, if has_openai { Some(0) } else { None }));
-
-            let has_google = config.google_api_key.as_ref().is_some_and(|k| !k.is_empty());
-            providers.push(ProviderStatus::new("Google Gemini", has_google, if has_google { Some(0) } else { None }));
-
-            let has_openrouter = config.openrouter_api_key.as_ref().is_some_and(|k| !k.is_empty());
-            providers.push(ProviderStatus::new("OpenRouter", has_openrouter, if has_openrouter { Some(0) } else { None }));
-
-            let has_groq = config.groq_api_key.as_ref().is_some_and(|k| !k.is_empty());
-            providers.push(ProviderStatus::new("Groq", has_groq, if has_groq { Some(0) } else { None }));
-
-            // Local providers: check if the configured URLs are set.
-            let has_ollama = !config.ollama_url.is_empty();
-            providers.push(ProviderStatus::new("Ollama (local)", has_ollama, if has_ollama { Some(0) } else { None }));
-
-            let has_lmstudio = !config.lmstudio_url.is_empty();
-            providers.push(ProviderStatus::new("LM Studio", has_lmstudio, if has_lmstudio { Some(0) } else { None }));
-
-            if let Some(ref url) = config.local_provider_url {
-                if !url.is_empty() {
-                    providers.push(ProviderStatus::new("Custom Local", true, Some(0)));
-                }
-            }
-
-            self.monitor_data.providers = providers;
-        }
-
-        // -- Uptime (seconds since process start) -----------------------------
-        // macOS: ps -o etime= -p <pid> gives elapsed time.
-        if let Ok(output) = std::process::Command::new("ps")
-            .args(["-o", "etime=", "-p", &std::process::id().to_string()])
-            .output()
-        {
-            if output.status.success() {
-                let raw = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                self.monitor_data.uptime_secs = parse_etime(&raw);
-            }
-        }
-    }
+    // NOTE: refresh_monitor_data is defined earlier in this impl block (near
+    // line 705) with the full real-metrics implementation.  The handler above
+    // at `handle_monitor_refresh` calls it via `self.refresh_monitor_data(cx)`.
 
     /// Read system resource metrics (CPU, memory, disk) using macOS-friendly
     /// commands and stdlib APIs.
@@ -4989,7 +5056,7 @@ impl HiveWorkspace {
                     &workflow_for_thread,
                     working_dir,
                 );
-            *run_result_for_thread.lock().unwrap() = Some(result);
+            *run_result_for_thread.lock().unwrap_or_else(|e| e.into_inner()) = Some(result);
         });
 
         let run_result_for_ui = std::sync::Arc::clone(&run_result);
@@ -4997,7 +5064,7 @@ impl HiveWorkspace {
 
         cx.spawn(async move |this, app: &mut AsyncApp| {
             loop {
-                if let Some(result) = run_result_for_ui.lock().unwrap().take() {
+                if let Some(result) = run_result_for_ui.lock().unwrap_or_else(|e| e.into_inner()).take() {
                     let _ = this.update(app, |this, cx| {
                         match result {
                             Ok(run) => {
@@ -5228,7 +5295,7 @@ impl HiveWorkspace {
         cx: &mut Context<Self>,
     ) {
         let platform_str = action.platform.clone();
-        let Some(platform) = hive_core::config::AccountPlatform::from_str(&platform_str) else {
+        let Some(platform) = hive_core::config::AccountPlatform::parse_platform(&platform_str) else {
             warn!("OAuth: unknown platform '{platform_str}'");
             return;
         };
@@ -5303,7 +5370,7 @@ impl HiveWorkspace {
             let listener = match std::net::TcpListener::bind("127.0.0.1:8742") {
                 Ok(l) => l,
                 Err(e) => {
-                    *result_for_thread.lock().unwrap() =
+                    *result_for_thread.lock().unwrap_or_else(|e| e.into_inner()) =
                         Some(Err(format!("Failed to start callback server: {e}")));
                     return;
                 }
@@ -5317,7 +5384,7 @@ impl HiveWorkspace {
             let start = std::time::Instant::now();
             loop {
                 if start.elapsed() > timeout {
-                    *result_for_thread.lock().unwrap() =
+                    *result_for_thread.lock().unwrap_or_else(|e| e.into_inner()) =
                         Some(Err("OAuth callback timed out after 5 minutes".to_string()));
                     return;
                 }
@@ -5348,16 +5415,16 @@ impl HiveWorkspace {
                                         rt.block_on(oauth_client.exchange_code(&code));
                                     match exchange_result {
                                         Ok(token) => {
-                                            *result_for_thread.lock().unwrap() = Some(Ok(token));
+                                            *result_for_thread.lock().unwrap_or_else(|e| e.into_inner()) = Some(Ok(token));
                                         }
                                         Err(e) => {
-                                            *result_for_thread.lock().unwrap() =
+                                            *result_for_thread.lock().unwrap_or_else(|e| e.into_inner()) =
                                                 Some(Err(format!("Token exchange failed: {e}")));
                                         }
                                     }
                                 }
                                 Err(e) => {
-                                    *result_for_thread.lock().unwrap() = Some(Err(format!(
+                                    *result_for_thread.lock().unwrap_or_else(|e| e.into_inner()) = Some(Err(format!(
                                         "Failed to create runtime for token exchange: {e}"
                                     )));
                                 }
@@ -5383,7 +5450,7 @@ impl HiveWorkspace {
 
         cx.spawn(async move |_this, app: &mut AsyncApp| {
             loop {
-                if let Some(result) = result_for_ui.lock().unwrap().take() {
+                if let Some(result) = result_for_ui.lock().unwrap_or_else(|e| e.into_inner()).take() {
                     let _ = app.update(|cx| match result {
                         Ok(token) => {
                             info!("OAuth: successfully connected {platform_label_ui}");

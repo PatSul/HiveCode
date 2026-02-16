@@ -101,43 +101,43 @@ static SECRET_PATTERNS: Lazy<Vec<SecretPattern>> = Lazy::new(|| {
     vec![
         SecretPattern {
             secret_type: SecretType::AwsAccessKey,
-            regex: Regex::new(r"AKIA[0-9A-Z]{16}").unwrap(),
+            regex: Regex::new(r"AKIA[0-9A-Z]{16}").expect("valid regex: AWS access key"),
             confidence: 0.95,
             risk: RiskLevel::Critical,
         },
         SecretPattern {
             secret_type: SecretType::GithubToken,
-            regex: Regex::new(r"gh[pousr]_[A-Za-z0-9_]{36,}").unwrap(),
+            regex: Regex::new(r"gh[pousr]_[A-Za-z0-9_]{36,}").expect("valid regex: GitHub token"),
             confidence: 0.95,
             risk: RiskLevel::Critical,
         },
         SecretPattern {
             secret_type: SecretType::GitlabToken,
-            regex: Regex::new(r"glpat-[A-Za-z0-9\-]{20,}").unwrap(),
+            regex: Regex::new(r"glpat-[A-Za-z0-9\-]{20,}").expect("valid regex: GitLab token"),
             confidence: 0.95,
             risk: RiskLevel::Critical,
         },
         SecretPattern {
             secret_type: SecretType::SlackToken,
-            regex: Regex::new(r"xox[baprs]-[A-Za-z0-9\-]+").unwrap(),
+            regex: Regex::new(r"xox[baprs]-[A-Za-z0-9\-]+").expect("valid regex: Slack token"),
             confidence: 0.90,
             risk: RiskLevel::High,
         },
         SecretPattern {
             secret_type: SecretType::JwtToken,
-            regex: Regex::new(r"eyJ[A-Za-z0-9_\-]+\.eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+").unwrap(),
+            regex: Regex::new(r"eyJ[A-Za-z0-9_\-]+\.eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+").expect("valid regex: JWT token"),
             confidence: 0.85,
             risk: RiskLevel::High,
         },
         SecretPattern {
             secret_type: SecretType::PrivateKey,
-            regex: Regex::new(r"-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----").unwrap(),
+            regex: Regex::new(r"-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----").expect("valid regex: private key"),
             confidence: 0.99,
             risk: RiskLevel::Critical,
         },
         SecretPattern {
             secret_type: SecretType::DatabaseUrl,
-            regex: Regex::new(r"(?i)(postgres|mysql|mongodb|redis)://[^\s]+").unwrap(),
+            regex: Regex::new(r"(?i)(postgres|mysql|mongodb|redis)://[^\s]+").expect("valid regex: database URL"),
             confidence: 0.90,
             risk: RiskLevel::High,
         },
@@ -145,7 +145,7 @@ static SECRET_PATTERNS: Lazy<Vec<SecretPattern>> = Lazy::new(|| {
             secret_type: SecretType::GenericSecret,
             regex: Regex::new(
                 r"(?i)(api[_\-]?key|apikey|api_secret|access_token)\s*[=:]\s*['\x22]?([a-zA-Z0-9_\-]{20,})['\x22]?"
-            ).unwrap(),
+            ).expect("valid regex: generic API key"),
             confidence: 0.70,
             risk: RiskLevel::Medium,
         },

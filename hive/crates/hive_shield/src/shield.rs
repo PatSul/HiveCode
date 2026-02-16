@@ -145,8 +145,8 @@ impl HiveShield {
             None
         };
 
-        if let Some(ref a) = assessment {
-            if !a.safe_to_send {
+        if let Some(ref a) = assessment
+            && !a.safe_to_send {
                 self.threats_caught.fetch_add(1, Ordering::Relaxed);
                 return ShieldResult {
                     action: ShieldAction::Block(format!(
@@ -159,7 +159,6 @@ impl HiveShield {
                     processing_time_ms: start.elapsed().as_millis() as u64,
                 };
             }
-        }
 
         // 3. PII detection.
         let pii_found = self.pii_detector.detect(text);
@@ -236,11 +235,10 @@ impl HiveShield {
             self.pii_detections
                 .fetch_add(pii_found.len(), Ordering::Relaxed);
         }
-        if let Some(a) = &assessment {
-            if !a.safe_to_send {
+        if let Some(a) = &assessment
+            && !a.safe_to_send {
                 self.threats_caught.fetch_add(1, Ordering::Relaxed);
             }
-        }
 
         let mut warnings = Vec::new();
         if !secrets_found.is_empty() {
@@ -249,11 +247,10 @@ impl HiveShield {
         if !pii_found.is_empty() {
             warnings.push("Response contains PII");
         }
-        if let Some(ref a) = assessment {
-            if !a.safe_to_send {
+        if let Some(ref a) = assessment
+            && !a.safe_to_send {
                 warnings.push("Response contains potential injection");
             }
-        }
 
         let action = if warnings.is_empty() {
             ShieldAction::Allow

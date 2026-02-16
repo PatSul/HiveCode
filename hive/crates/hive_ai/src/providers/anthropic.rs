@@ -511,11 +511,9 @@ impl AiProvider for AnthropicProvider {
 
                         if let Err(send_err) =
                             process_sse_event(&current_event_type, data, &mut state, &tx).await
-                        {
-                            if send_err {
+                            && send_err {
                                 return;
                             }
-                        }
 
                         current_event_type.clear();
                     }
@@ -586,18 +584,16 @@ async fn process_sse_event(
 ) -> Result<(), bool> {
     match event_type {
         "message_start" => {
-            if let Ok(msg) = serde_json::from_str::<SseMessageStart>(data) {
-                if let Some(info) = msg.message {
-                    if let Some(usage) = info.usage {
+            if let Ok(msg) = serde_json::from_str::<SseMessageStart>(data)
+                && let Some(info) = msg.message
+                    && let Some(usage) = info.usage {
                         state.input_tokens = usage.input_tokens;
                     }
-                }
-            }
         }
 
         "content_block_start" => {
-            if let Ok(block) = serde_json::from_str::<SseContentBlockStart>(data) {
-                if let Some(cb) = block.content_block {
+            if let Ok(block) = serde_json::from_str::<SseContentBlockStart>(data)
+                && let Some(cb) = block.content_block {
                     state.current_block_type = cb.block_type.clone();
                     // For tool_use blocks, capture the id and name.
                     if cb.block_type == "tool_use" {
@@ -606,12 +602,11 @@ async fn process_sse_event(
                         state.current_tool_input_json.clear();
                     }
                 }
-            }
         }
 
         "content_block_delta" => {
-            if let Ok(delta_msg) = serde_json::from_str::<SseContentBlockDelta>(data) {
-                if let Some(delta) = delta_msg.delta {
+            if let Ok(delta_msg) = serde_json::from_str::<SseContentBlockDelta>(data)
+                && let Some(delta) = delta_msg.delta {
                     let delta_type = delta.delta_type.as_deref().unwrap_or("");
 
                     match delta_type {
@@ -655,7 +650,6 @@ async fn process_sse_event(
                         }
                     }
                 }
-            }
         }
 
         "content_block_stop" => {
@@ -675,16 +669,14 @@ async fn process_sse_event(
 
         "message_delta" => {
             if let Ok(msg_delta) = serde_json::from_str::<SseMessageDelta>(data) {
-                if let Some(usage) = msg_delta.usage {
-                    if let Some(out) = usage.output_tokens {
+                if let Some(usage) = msg_delta.usage
+                    && let Some(out) = usage.output_tokens {
                         state.output_tokens = out;
                     }
-                }
-                if let Some(ref delta) = msg_delta.delta {
-                    if let Some(ref reason) = delta.stop_reason {
+                if let Some(ref delta) = msg_delta.delta
+                    && let Some(ref reason) = delta.stop_reason {
                         state.stop_reason = Some(reason.clone());
                     }
-                }
             }
         }
 
@@ -736,13 +728,11 @@ async fn process_sse_event(
 /// Truncate error bodies to avoid bloating logs.
 fn truncate_error(body: &str) -> String {
     // Try to extract a useful message from the JSON error body.
-    if let Ok(err) = serde_json::from_str::<AnthropicErrorResponse>(body) {
-        if let Some(detail) = err.error {
-            if let Some(msg) = detail.message {
+    if let Ok(err) = serde_json::from_str::<AnthropicErrorResponse>(body)
+        && let Some(detail) = err.error
+            && let Some(msg) = detail.message {
                 return msg;
             }
-        }
-    }
 
     // Fall back to truncated raw body.
     if body.len() > 200 {

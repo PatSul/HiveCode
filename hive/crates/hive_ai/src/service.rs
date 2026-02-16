@@ -70,70 +70,70 @@ impl AiService {
 
         // Register cloud providers (skipped in privacy mode)
         if !config.privacy_mode {
-            if let Some(ref key) = config.anthropic_api_key {
-                if !key.is_empty() {
-                    providers.insert(
-                        ProviderType::Anthropic,
-                        Arc::new(AnthropicProvider::new(key.clone())),
-                    );
-                    info!("Anthropic provider registered");
-                }
+            if let Some(ref key) = config.anthropic_api_key
+                && !key.is_empty()
+            {
+                providers.insert(
+                    ProviderType::Anthropic,
+                    Arc::new(AnthropicProvider::new(key.clone())),
+                );
+                info!("Anthropic provider registered");
             }
-            if let Some(ref key) = config.openai_api_key {
-                if !key.is_empty() {
-                    providers.insert(
-                        ProviderType::OpenAI,
-                        Arc::new(OpenAIProvider::new(key.clone())),
-                    );
-                    info!("OpenAI provider registered");
-                }
+            if let Some(ref key) = config.openai_api_key
+                && !key.is_empty()
+            {
+                providers.insert(
+                    ProviderType::OpenAI,
+                    Arc::new(OpenAIProvider::new(key.clone())),
+                );
+                info!("OpenAI provider registered");
             }
-            if let Some(ref key) = config.openrouter_api_key {
-                if !key.is_empty() {
-                    providers.insert(
-                        ProviderType::OpenRouter,
-                        Arc::new(OpenRouterProvider::new(key.clone())),
-                    );
-                    info!("OpenRouter provider registered");
-                }
+            if let Some(ref key) = config.openrouter_api_key
+                && !key.is_empty()
+            {
+                providers.insert(
+                    ProviderType::OpenRouter,
+                    Arc::new(OpenRouterProvider::new(key.clone())),
+                );
+                info!("OpenRouter provider registered");
             }
-            if let Some(ref key) = config.google_api_key {
-                if !key.is_empty() {
-                    providers.insert(
-                        ProviderType::Google,
-                        Arc::new(GeminiProvider::new(key.clone())),
-                    );
-                    info!("Google Gemini provider registered");
-                }
+            if let Some(ref key) = config.google_api_key
+                && !key.is_empty()
+            {
+                providers.insert(
+                    ProviderType::Google,
+                    Arc::new(GeminiProvider::new(key.clone())),
+                );
+                info!("Google Gemini provider registered");
             }
-            if let Some(ref key) = config.groq_api_key {
-                if !key.is_empty() {
-                    providers.insert(ProviderType::Groq, Arc::new(GroqProvider::new(key.clone())));
-                    info!("Groq provider registered");
-                }
+            if let Some(ref key) = config.groq_api_key
+                && !key.is_empty()
+            {
+                providers.insert(ProviderType::Groq, Arc::new(GroqProvider::new(key.clone())));
+                info!("Groq provider registered");
             }
-            if let Some(ref key) = config.huggingface_api_key {
-                if !key.is_empty() {
-                    providers.insert(
-                        ProviderType::HuggingFace,
-                        Arc::new(HuggingFaceProvider::new(key.clone())),
-                    );
-                    info!("HuggingFace provider registered");
-                }
+            if let Some(ref key) = config.huggingface_api_key
+                && !key.is_empty()
+            {
+                providers.insert(
+                    ProviderType::HuggingFace,
+                    Arc::new(HuggingFaceProvider::new(key.clone())),
+                );
+                info!("HuggingFace provider registered");
             }
         }
 
         // LiteLLM proxy (always available if configured — it's user-hosted)
-        if let Some(ref url) = config.litellm_url {
-            if !url.is_empty() {
-                let provider = if let Some(ref key) = config.litellm_api_key {
-                    LiteLLMProvider::with_api_key(key.clone(), Some(url.clone()))
-                } else {
-                    LiteLLMProvider::new(Some(url.clone()))
-                };
-                providers.insert(ProviderType::LiteLLM, Arc::new(provider));
-                debug!("LiteLLM provider registered at {}", url);
-            }
+        if let Some(ref url) = config.litellm_url
+            && !url.is_empty()
+        {
+            let provider = if let Some(ref key) = config.litellm_api_key {
+                LiteLLMProvider::with_api_key(key.clone(), Some(url.clone()))
+            } else {
+                LiteLLMProvider::new(Some(url.clone()))
+            };
+            providers.insert(ProviderType::LiteLLM, Arc::new(provider));
+            debug!("LiteLLM provider registered at {}", url);
         }
 
         // Local providers (always available)
@@ -151,14 +151,14 @@ impl AiService {
             );
             debug!("LMStudio provider registered at {}", config.lmstudio_url);
         }
-        if let Some(ref url) = config.local_provider_url {
-            if !url.is_empty() {
-                providers.insert(
-                    ProviderType::GenericLocal,
-                    Arc::new(GenericLocalProvider::new(url.clone())),
-                );
-                debug!("GenericLocal provider registered at {}", url);
-            }
+        if let Some(ref url) = config.local_provider_url
+            && !url.is_empty()
+        {
+            providers.insert(
+                ProviderType::GenericLocal,
+                Arc::new(GenericLocalProvider::new(url.clone())),
+            );
+            debug!("GenericLocal provider registered at {}", url);
         }
 
         info!("{} AI provider(s) registered", providers.len());
@@ -241,16 +241,16 @@ impl AiService {
             let mut tier_entries: Vec<FallbackChainEntry> = Vec::new();
 
             for model_id in project_models {
-                if let Some(info) = registry.iter().find(|m| m.id == *model_id) {
-                    if info.tier == *tier {
-                        tier_entries.push(FallbackChainEntry {
-                            provider: map_to_router_provider(info.provider_type),
-                            model: model_id.clone(),
-                            priority,
-                            cost_tier: *tier,
-                        });
-                        priority += 1;
-                    }
+                if let Some(info) = registry.iter().find(|m| m.id == *model_id)
+                    && info.tier == *tier
+                {
+                    tier_entries.push(FallbackChainEntry {
+                        provider: map_to_router_provider(info.provider_type),
+                        model: model_id.clone(),
+                        priority,
+                        cost_tier: *tier,
+                    });
+                    priority += 1;
                 }
             }
 
@@ -291,8 +291,8 @@ impl AiService {
         if let Some(provider) = self.providers.get(&provider_type) {
             return Some((provider_type, provider.clone()));
         }
-        // Fallback: try all providers
-        for (pt, p) in &self.providers {
+        // Fallback: pick the first available provider
+        if let Some((pt, p)) = self.providers.iter().next() {
             return Some((*pt, p.clone()));
         }
         None
@@ -428,10 +428,10 @@ impl AiService {
         if !self.config.lmstudio_url.is_empty() {
             config_urls.push((ProviderType::LMStudio, self.config.lmstudio_url.clone()));
         }
-        if let Some(ref url) = self.config.local_provider_url {
-            if !url.is_empty() {
-                config_urls.push((ProviderType::GenericLocal, url.clone()));
-            }
+        if let Some(ref url) = self.config.local_provider_url
+            && !url.is_empty()
+        {
+            config_urls.push((ProviderType::GenericLocal, url.clone()));
         }
 
         let discovery = Arc::new(LocalDiscovery::new(config_urls));

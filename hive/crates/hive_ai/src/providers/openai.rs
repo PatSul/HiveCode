@@ -169,8 +169,8 @@ impl OpenAIProvider {
             }
 
             // Assistant messages with tool_calls.
-            if m.role == crate::types::MessageRole::Assistant {
-                if let Some(ref calls) = m.tool_calls {
+            if m.role == crate::types::MessageRole::Assistant
+                && let Some(ref calls) = m.tool_calls {
                     let tc_msgs: Vec<OpenAIToolCallMsg> = calls
                         .iter()
                         .map(|c| OpenAIToolCallMsg {
@@ -194,7 +194,6 @@ impl OpenAIProvider {
                     });
                     continue;
                 }
-            }
 
             out.push(OpenAIMessage {
                 role: role.into(),

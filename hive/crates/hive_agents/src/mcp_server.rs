@@ -448,7 +448,9 @@ fn execute_command_blocking(
         let cmd = command.to_string();
         let root = executor.working_dir().to_path_buf();
 
-        let output = std::thread::spawn(move || {
+        
+
+        std::thread::spawn(move || {
             let threaded_executor =
                 CommandExecutor::new(root).map_err(|e| format!("Invalid working directory: {e}"))?;
             let rt = tokio::runtime::Runtime::new()
@@ -457,9 +459,7 @@ fn execute_command_blocking(
                 .map_err(|e| format!("Command execution failed: {e}"))
         })
         .join()
-        .map_err(|_| "Command execution thread panicked".to_string())?;
-
-        output
+        .map_err(|_| "Command execution thread panicked".to_string())?
     } else {
         let rt = tokio::runtime::Runtime::new()
             .map_err(|e| format!("Failed to create runtime: {e}"))?;

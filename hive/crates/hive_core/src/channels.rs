@@ -70,6 +70,12 @@ pub struct ChannelStore {
     channels: Vec<AgentChannel>,
 }
 
+impl Default for ChannelStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ChannelStore {
     /// Create a new store, loading all channels from disk.
     pub fn new() -> Self {

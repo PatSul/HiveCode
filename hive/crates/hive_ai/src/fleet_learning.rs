@@ -230,10 +230,8 @@ impl FleetLearningService {
                     })
                 })
                 .map_err(|e| format!("Query: {e}"))?;
-            for row in rows {
-                if let Ok(p) = row {
-                    self.patterns.push(p);
-                }
+            for p in rows.flatten() {
+                self.patterns.push(p);
             }
         }
 
@@ -258,10 +256,8 @@ impl FleetLearningService {
                     })
                 })
                 .map_err(|e| format!("Query: {e}"))?;
-            for row in rows {
-                if let Ok(p) = row {
-                    self.model_performance.insert(p.model_id.clone(), p);
-                }
+            for p in rows.flatten() {
+                self.model_performance.insert(p.model_id.clone(), p);
             }
         }
 
@@ -286,10 +282,8 @@ impl FleetLearningService {
                     })
                 })
                 .map_err(|e| format!("Query: {e}"))?;
-            for row in rows {
-                if let Ok(i) = row {
-                    self.insights.push(i);
-                }
+            for i in rows.flatten() {
+                self.insights.push(i);
             }
         }
 
@@ -317,10 +311,8 @@ impl FleetLearningService {
                     })
                 })
                 .map_err(|e| format!("Query: {e}"))?;
-            for row in rows {
-                if let Ok(m) = row {
-                    self.instances.insert(m.instance_id.clone(), m);
-                }
+            for m in rows.flatten() {
+                self.instances.insert(m.instance_id.clone(), m);
             }
         }
 

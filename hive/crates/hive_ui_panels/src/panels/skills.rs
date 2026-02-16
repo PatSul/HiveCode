@@ -170,11 +170,10 @@ impl SkillsData {
             .iter()
             .filter(|s| {
                 // Category filter
-                if let Some(cat) = self.selected_category {
-                    if s.category != cat {
+                if let Some(cat) = self.selected_category
+                    && s.category != cat {
                         return false;
                     }
-                }
                 // Text search filter
                 if self.search_query.is_empty() {
                     return true;
@@ -188,6 +187,7 @@ impl SkillsData {
     }
 
     /// Return a sample dataset for previewing the panel.
+    #[allow(dead_code)]
     pub fn sample() -> Self {
         Self {
             installed: vec![
@@ -764,7 +764,7 @@ fn render_category_bar(selected: &Option<SkillCategory>, theme: &HiveTheme) -> A
     bar = bar.child(category_pill("All", all_active, theme));
 
     for cat in &SkillCategory::ALL {
-        let active = selected.map_or(false, |s| s == *cat);
+        let active = selected.is_some_and(|s| s == *cat);
         bar = bar.child(category_pill(cat.label(), active, theme));
     }
 

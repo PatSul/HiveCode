@@ -82,10 +82,14 @@ impl LogsData {
     }
 
     /// Sample data so the layout is visible before real log streaming is wired in.
+    #[allow(dead_code)]
     pub fn sample() -> Self {
         use chrono::TimeZone;
 
-        let base = Utc.with_ymd_and_hms(2026, 2, 8, 14, 32, 0).unwrap();
+        let base = Utc
+            .with_ymd_and_hms(2026, 2, 8, 14, 32, 0)
+            .single()
+            .expect("valid sample timestamp");
 
         let entries = vec![
             LogEntry {

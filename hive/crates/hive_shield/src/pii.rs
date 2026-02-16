@@ -120,27 +120,27 @@ static PII_PATTERNS: Lazy<Vec<PiiPattern>> = Lazy::new(|| {
     vec![
         PiiPattern {
             pii_type: PiiType::Email,
-            regex: Regex::new(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}").unwrap(),
+            regex: Regex::new(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}").expect("valid regex: email"),
             confidence: 0.95,
         },
         PiiPattern {
             pii_type: PiiType::SSN,
-            regex: Regex::new(r"\b\d{3}-\d{2}-\d{4}\b").unwrap(),
+            regex: Regex::new(r"\b\d{3}-\d{2}-\d{4}\b").expect("valid regex: SSN"),
             confidence: 0.90,
         },
         PiiPattern {
             pii_type: PiiType::CreditCard,
-            regex: Regex::new(r"\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b").unwrap(),
+            regex: Regex::new(r"\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b").expect("valid regex: credit card"),
             confidence: 0.85,
         },
         PiiPattern {
             pii_type: PiiType::Phone,
-            regex: Regex::new(r"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b").unwrap(),
+            regex: Regex::new(r"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b").expect("valid regex: phone"),
             confidence: 0.80,
         },
         PiiPattern {
             pii_type: PiiType::IpAddress,
-            regex: Regex::new(r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b").unwrap(),
+            regex: Regex::new(r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b").expect("valid regex: IP address"),
             confidence: 0.75,
         },
     ]

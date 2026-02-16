@@ -352,11 +352,10 @@ impl OllamaManager {
 
         // Process any remaining data in the buffer.
         let remaining = buffer.trim();
-        if !remaining.is_empty() {
-            if let Ok(progress) = serde_json::from_str::<PullProgress>(remaining) {
+        if !remaining.is_empty()
+            && let Ok(progress) = serde_json::from_str::<PullProgress>(remaining) {
                 let _ = tx.send(progress).await;
             }
-        }
 
         // Signal completion.
         let _ = tx

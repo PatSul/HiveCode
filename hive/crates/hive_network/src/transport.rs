@@ -239,7 +239,7 @@ pub async fn connect_to_peer(
         .trim_start_matches("ws://")
         .trim_start_matches("wss://")
         .parse()
-        .unwrap_or_else(|_| "0.0.0.0:0".parse().unwrap());
+        .unwrap_or_else(|_| "0.0.0.0:0".parse().expect("valid fallback address"));
 
     let (sink, mut stream) = ws_stream.split();
     let temp_peer_id = PeerId::from_string(format!("outbound-{addr}"));

@@ -246,6 +246,12 @@ pub struct ExecuteCommandTool {
     security: SecurityGateway,
 }
 
+impl Default for ExecuteCommandTool {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ExecuteCommandTool {
     pub fn new() -> Self {
         Self {
@@ -477,9 +483,9 @@ pub fn parse_tool_calls_from_response(response: &serde_json::Value) -> Vec<ToolC
     }
 
     // Try OpenAI format: { "choices": [{ "message": { "tool_calls": [...] } }] }
-    if let Some(choices) = response.get("choices").and_then(|v| v.as_array()) {
-        if let Some(first) = choices.first() {
-            if let Some(tool_calls) = first
+    if let Some(choices) = response.get("choices").and_then(|v| v.as_array())
+        && let Some(first) = choices.first()
+            && let Some(tool_calls) = first
                 .get("message")
                 .and_then(|m| m.get("tool_calls"))
                 .and_then(|tc| tc.as_array())
@@ -489,8 +495,6 @@ pub fn parse_tool_calls_from_response(response: &serde_json::Value) -> Vec<ToolC
                     return calls;
                 }
             }
-        }
-    }
 
     // Try flat `tool_calls` at top level (generic format)
     if let Some(tool_calls) = response.get("tool_calls").and_then(|v| v.as_array()) {
@@ -542,6 +546,12 @@ enum HandlerKind {
 /// Registry of available tools and their handlers.
 pub struct ToolRegistry {
     tools: HashMap<String, (ToolDefinition, HandlerKind)>,
+}
+
+impl Default for ToolRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ToolRegistry {

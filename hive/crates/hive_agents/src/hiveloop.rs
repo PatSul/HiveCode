@@ -94,11 +94,10 @@ impl HiveLoop {
         if self.total_cost >= self.config.cost_limit_usd {
             return false;
         }
-        if let Some(started) = self.started_at {
-            if started.elapsed() >= Duration::from_secs(self.config.time_limit_secs) {
+        if let Some(started) = self.started_at
+            && started.elapsed() >= Duration::from_secs(self.config.time_limit_secs) {
                 return false;
             }
-        }
         true
     }
 
@@ -122,11 +121,10 @@ impl HiveLoop {
             self.status = LoopStatus::IterationLimitReached;
         } else if self.total_cost >= self.config.cost_limit_usd {
             self.status = LoopStatus::CostLimitReached;
-        } else if let Some(started) = self.started_at {
-            if started.elapsed() >= Duration::from_secs(self.config.time_limit_secs) {
+        } else if let Some(started) = self.started_at
+            && started.elapsed() >= Duration::from_secs(self.config.time_limit_secs) {
                 self.status = LoopStatus::TimeLimitReached;
             }
-        }
 
         self.status
     }

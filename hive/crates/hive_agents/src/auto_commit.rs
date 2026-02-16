@@ -118,11 +118,10 @@ impl AutoCommitService {
 
         parts.push(self.config.commit_prefix.clone());
 
-        if self.config.include_spec_id {
-            if let Some(id) = spec_id {
+        if self.config.include_spec_id
+            && let Some(id) = spec_id {
                 parts.push(format!("(spec:{id})"));
             }
-        }
 
         // Sanitize the task description: remove newlines and limit length.
         let sanitized = task_desc

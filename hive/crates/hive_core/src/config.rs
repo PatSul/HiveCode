@@ -26,6 +26,7 @@ pub enum AccountPlatform {
 }
 
 impl AccountPlatform {
+    /// All supported OAuth platforms.
     pub const ALL: [AccountPlatform; 6] = [
         AccountPlatform::Google,
         AccountPlatform::Microsoft,
@@ -35,6 +36,7 @@ impl AccountPlatform {
         AccountPlatform::Telegram,
     ];
 
+    /// Returns the human-readable display name for this platform.
     pub fn label(&self) -> &'static str {
         match self {
             Self::Google => "Google",
@@ -46,6 +48,7 @@ impl AccountPlatform {
         }
     }
 
+    /// Returns a Unicode emoji icon representing this platform.
     pub fn icon(&self) -> &'static str {
         match self {
             Self::Google => "\u{1F4E7}",
@@ -93,7 +96,8 @@ impl AccountPlatform {
         }
     }
 
-    pub fn from_str(s: &str) -> Option<Self> {
+    /// Parses a platform name (case-insensitive) into an `AccountPlatform`.
+    pub fn parse_platform(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "google" => Some(Self::Google),
             "microsoft" => Some(Self::Microsoft),
@@ -483,7 +487,7 @@ impl LegacyKeys {
             &self.google_api_key,
         ]
         .iter()
-        .any(|k| k.as_ref().map_or(false, |v| !v.is_empty()))
+        .any(|k| k.as_ref().is_some_and(|v| !v.is_empty()))
     }
 }
 
@@ -525,6 +529,9 @@ pub struct ConfigManager {
 }
 
 impl ConfigManager {
+    /// Creates a new ConfigManager, loading config from disk and initializing
+    /// secure storage for API key encryption. Sets up a file watcher for
+    /// hot-reloading config changes.
     pub fn new() -> Result<Self> {
         HiveConfig::migrate_from_hivecode()?;
 
@@ -790,24 +797,26 @@ impl ConfigManager {
         secure_storage: Option<SecureStorage>,
     ) -> Result<RecommendedWatcher> {
         let config_path = HiveConfig::config_path()?;
-        let watch_dir = config_path.parent().unwrap().to_path_buf();
+        let watch_dir = config_path.parent()
+            .context("config path has no parent directory")?
+            .to_path_buf();
 
         let mut watcher = notify::recommended_watcher(move |res: Result<Event, _>| {
-            if let Ok(event) = res {
-                if event.paths.iter().any(|p| p.ends_with("config.json")) {
-                    match HiveConfig::load() {
-                        Ok(mut new_config) => {
-                            // Re-populate keys from SecureStorage on hot reload
-                            Self::populate_keys_from_storage(
-                                &mut new_config,
-                                &keys_path,
-                                &secure_storage,
-                            );
-                            *config.write() = new_config;
-                            info!("Config hot-reloaded");
-                        }
-                        Err(e) => warn!("Failed to hot-reload config: {e}"),
+            if let Ok(event) = res
+                && event.paths.iter().any(|p| p.ends_with("config.json"))
+            {
+                match HiveConfig::load() {
+                    Ok(mut new_config) => {
+                        // Re-populate keys from SecureStorage on hot reload
+                        Self::populate_keys_from_storage(
+                            &mut new_config,
+                            &keys_path,
+                            &secure_storage,
+                        );
+                        *config.write() = new_config;
+                        info!("Config hot-reloaded");
                     }
+                    Err(e) => warn!("Failed to hot-reload config: {e}"),
                 }
             }
         })?;

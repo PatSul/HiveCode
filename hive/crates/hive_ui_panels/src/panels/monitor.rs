@@ -198,8 +198,22 @@ pub struct SystemResources {
     pub disk_total: u64,
 }
 
+impl Default for SystemResources {
+    /// Default empty resources — zeroed out until real data is populated.
+    fn default() -> Self {
+        Self {
+            cpu_percent: 0.0,
+            memory_used: 0,
+            memory_total: 0,
+            disk_used: 0,
+            disk_total: 0,
+        }
+    }
+}
+
 impl SystemResources {
     /// Returns a placeholder snapshot with sample values.
+    #[allow(dead_code)]
     pub fn placeholder() -> Self {
         Self {
             cpu_percent: 34.2,
@@ -271,7 +285,7 @@ impl MonitorData {
             total_runs: 0,
             current_run_id: None,
             run_history: Vec::new(),
-            resources: SystemResources::placeholder(),
+            resources: SystemResources::default(),
             providers: Vec::new(),
             request_queue_length: 0,
             active_streams: 0,
@@ -280,6 +294,7 @@ impl MonitorData {
     }
 
     /// Realistic sample data so the panel is visible before live wiring.
+    #[allow(dead_code)]
     pub fn sample() -> Self {
         use AgentStatus::*;
         let now = Utc::now();

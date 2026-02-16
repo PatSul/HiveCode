@@ -69,11 +69,10 @@ pub async fn fetch_openrouter_models(api_key: &str) -> Result<Vec<ModelInfo>, St
     // Check cache first
     {
         let cache = CACHE.lock();
-        if let Some(fetched_at) = cache.fetched_at {
-            if fetched_at.elapsed() < CACHE_TTL && !cache.models.is_empty() {
+        if let Some(fetched_at) = cache.fetched_at
+            && fetched_at.elapsed() < CACHE_TTL && !cache.models.is_empty() {
                 return Ok(cache.models.clone());
             }
-        }
     }
 
     // Fetch from API

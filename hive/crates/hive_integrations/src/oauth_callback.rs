@@ -186,14 +186,13 @@ impl OAuthCallbackServer {
         let query_string = path.split_once('?').map(|(_, q)| q)?;
 
         for pair in query_string.split('&') {
-            if let Some((key, value)) = pair.split_once('=') {
-                if key == "code" {
+            if let Some((key, value)) = pair.split_once('=')
+                && key == "code" {
                     let decoded = Self::percent_decode(value);
                     if !decoded.is_empty() {
                         return Some(decoded);
                     }
                 }
-            }
         }
 
         None
@@ -207,12 +206,11 @@ impl OAuthCallbackServer {
         while let Some(c) = chars.next() {
             if c == '%' {
                 let hex: String = chars.by_ref().take(2).collect();
-                if hex.len() == 2 {
-                    if let Ok(byte) = u8::from_str_radix(&hex, 16) {
+                if hex.len() == 2
+                    && let Ok(byte) = u8::from_str_radix(&hex, 16) {
                         output.push(byte as char);
                         continue;
                     }
-                }
                 // If decoding failed, keep the original characters.
                 output.push('%');
                 output.push_str(&hex);

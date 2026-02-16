@@ -180,21 +180,13 @@ impl GitOpsTab {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct AiCommitState {
     pub generating: bool,
     pub generated_message: Option<String>,
     pub user_edited_message: String,
 }
 
-impl Default for AiCommitState {
-    fn default() -> Self {
-        Self {
-            generating: false,
-            generated_message: None,
-            user_edited_message: String::new(),
-        }
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct PushData {
@@ -253,6 +245,7 @@ impl Default for PrForm {
 }
 
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct PullRequestsData {
     pub open_prs: Vec<PrSummary>,
     pub pr_form: PrForm,
@@ -260,16 +253,6 @@ pub struct PullRequestsData {
     pub github_connected: bool,
 }
 
-impl Default for PullRequestsData {
-    fn default() -> Self {
-        Self {
-            open_prs: Vec::new(),
-            pr_form: PrForm::default(),
-            loading: false,
-            github_connected: false,
-        }
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct BranchEntry {
@@ -281,21 +264,13 @@ pub struct BranchEntry {
 }
 
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct BranchesData {
     pub branches: Vec<BranchEntry>,
     pub current_branch: String,
     pub new_branch_name: String,
 }
 
-impl Default for BranchesData {
-    fn default() -> Self {
-        Self {
-            branches: Vec::new(),
-            current_branch: String::new(),
-            new_branch_name: String::new(),
-        }
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct LfsFileEntry {
@@ -306,6 +281,7 @@ pub struct LfsFileEntry {
 }
 
 #[derive(Debug, Clone)]
+#[derive(Default)]
 pub struct LfsData {
     pub is_lfs_installed: bool,
     pub tracked_patterns: Vec<String>,
@@ -315,18 +291,6 @@ pub struct LfsData {
     pub lfs_push_in_progress: bool,
 }
 
-impl Default for LfsData {
-    fn default() -> Self {
-        Self {
-            is_lfs_installed: false,
-            tracked_patterns: Vec::new(),
-            lfs_files: Vec::new(),
-            new_pattern: String::new(),
-            lfs_pull_in_progress: false,
-            lfs_push_in_progress: false,
-        }
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct GitflowData {
@@ -997,8 +961,7 @@ impl ReviewPanel {
             for entry in &data.files {
                 let is_selected = data
                     .selected_file
-                    .as_ref()
-                    .map_or(false, |s| s == &entry.path);
+                    .as_ref() == Some(&entry.path);
                 let comment_count = data.comments_for_file(&entry.path).len();
                 container =
                     container.child(Self::file_row(entry, is_selected, comment_count, theme));
@@ -1947,7 +1910,7 @@ impl ReviewPanel {
             )
             // Last push result
             .when(push.last_push_result.is_some(), |el| {
-                let result = push.last_push_result.as_ref().unwrap();
+                let result = push.last_push_result.as_ref().expect("guarded by is_some check");
                 let (color, msg) = match result {
                     Ok(m) => (
                         theme.accent_green,

@@ -1338,11 +1338,10 @@ impl ModelsBrowserView {
 
         for (ptype, label) in &provider_order {
             // Provider chip filter
-            if let Some(filter) = self.active_provider_filter {
-                if filter != *ptype {
+            if let Some(filter) = self.active_provider_filter
+                && filter != *ptype {
                     continue;
                 }
-            }
 
             let models: Vec<&ModelInfo> = all_models
                 .iter()
@@ -1442,9 +1441,7 @@ impl ModelsBrowserView {
                 self.google_fetch_status,
                 self.groq_fetch_status,
                 self.hf_fetch_status,
-            ]
-            .iter()
-            .any(|s| *s == FetchStatus::Loading);
+            ].contains(&FetchStatus::Loading);
 
             let message = if self.view_mode == ViewMode::Project {
                 "No project models yet. Switch to All Models to add models.".to_string()

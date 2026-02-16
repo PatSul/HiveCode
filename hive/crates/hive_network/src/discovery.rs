@@ -64,7 +64,9 @@ impl DiscoveryService {
         discovered_tx: mpsc::Sender<DiscoveredPeer>,
         mut shutdown: tokio::sync::broadcast::Receiver<()>,
     ) -> Result<(), crate::error::NetworkError> {
-        let bind_addr: SocketAddr = format!("0.0.0.0:{}", config.port).parse().unwrap();
+        let bind_addr: SocketAddr = format!("0.0.0.0:{}", config.port)
+            .parse()
+            .expect("valid bind address from port number");
 
         // Bind the listener socket.
         let listener_socket = UdpSocket::bind(bind_addr)
@@ -79,7 +81,9 @@ impl DiscoveryService {
 
         let our_peer_id = config.announcement.peer_id.clone();
         let announcement_json = serde_json::to_string(&config.announcement).unwrap_or_default();
-        let broadcast_addr: SocketAddr = format!("255.255.255.255:{}", config.port).parse().unwrap();
+        let broadcast_addr: SocketAddr = format!("255.255.255.255:{}", config.port)
+            .parse()
+            .expect("valid broadcast address from port number");
         let interval = config.interval;
 
         // Bind a separate socket for sending broadcasts.

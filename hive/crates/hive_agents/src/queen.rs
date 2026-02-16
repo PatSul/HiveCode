@@ -1068,7 +1068,7 @@ fn extract_insights_from_text(text: &str) -> Vec<String> {
     let mut insights = Vec::new();
 
     // Split into sentences (rough heuristic: split on ". " or ".\n").
-    for sentence in text.split(|c| c == '.' || c == '\n') {
+    for sentence in text.split(['.', '\n']) {
         let trimmed = sentence.trim();
         if trimmed.len() < 10 || trimmed.len() > 500 {
             continue;

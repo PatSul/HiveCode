@@ -151,6 +151,7 @@ impl RoutingData {
     }
 
     /// Return a sample dataset for previewing the panel.
+    #[allow(dead_code)]
     pub fn sample() -> Self {
         Self {
             task_mappings: vec![

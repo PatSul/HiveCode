@@ -6,9 +6,9 @@ use std::sync::LazyLock;
 
 static SQL_INJECTION_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
     vec![
-        Regex::new(r"(?i)('\s*(OR|AND)\s+')").unwrap(),
-        Regex::new(r"(?i)(;\s*(DROP|DELETE|UPDATE|INSERT)\s+)").unwrap(),
-        Regex::new(r"(?i)(UNION\s+SELECT)").unwrap(),
+        Regex::new(r"(?i)('\s*(OR|AND)\s+')").expect("valid regex"),
+        Regex::new(r"(?i)(;\s*(DROP|DELETE|UPDATE|INSERT)\s+)").expect("valid regex"),
+        Regex::new(r"(?i)(UNION\s+SELECT)").expect("valid regex"),
     ]
 });
 
@@ -25,27 +25,27 @@ impl SecurityGateway {
     pub fn new() -> Self {
         Self {
             dangerous_commands: vec![
-                Regex::new(r"(?i)\brm\s+-rf\s+/").unwrap(),
-                Regex::new(r"(?i)\bmkfs\b").unwrap(),
-                Regex::new(r"(?i)\bdd\s+if=").unwrap(),
-                Regex::new(r"(?i)>\s*/dev/sd[a-z]").unwrap(),
-                Regex::new(r"(?i)\bformat\s+[a-z]:").unwrap(),
-                Regex::new(r"(?i)\b(shutdown|reboot|halt|poweroff)\b").unwrap(),
-                Regex::new(r"(?i):\(\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:").unwrap(), // fork bomb
-                Regex::new(r"(?i)\bchmod\s+-R\s+777\s+/").unwrap(),
-                Regex::new(r"(?i)\bchown\s+-R\s+.*\s+/\s*$").unwrap(),
-                Regex::new(r"(?i)\bcurl\b.*\|\s*(ba)?sh").unwrap(),
-                Regex::new(r"(?i)\bwget\b.*\|\s*(ba)?sh").unwrap(),
-                Regex::new(r"(?i)\bdel\s+/s\s+/q\s+[a-z]:\\").unwrap(),
-                Regex::new(r"(?i)\brd\s+/s\s+/q\s+[a-z]:\\").unwrap(),
-                Regex::new(r"(?i)\bRemove-Item\s+.*-Recurse\s+-Force\s+[a-z]:\\").unwrap(),
-                Regex::new(r"(?i)\bdiskpart\b").unwrap(),
+                Regex::new(r"(?i)\brm\s+-rf\s+/").expect("valid regex"),
+                Regex::new(r"(?i)\bmkfs\b").expect("valid regex"),
+                Regex::new(r"(?i)\bdd\s+if=").expect("valid regex"),
+                Regex::new(r"(?i)>\s*/dev/sd[a-z]").expect("valid regex"),
+                Regex::new(r"(?i)\bformat\s+[a-z]:").expect("valid regex"),
+                Regex::new(r"(?i)\b(shutdown|reboot|halt|poweroff)\b").expect("valid regex"),
+                Regex::new(r"(?i):\(\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:").expect("valid regex"), // fork bomb
+                Regex::new(r"(?i)\bchmod\s+-R\s+777\s+/").expect("valid regex"),
+                Regex::new(r"(?i)\bchown\s+-R\s+.*\s+/\s*$").expect("valid regex"),
+                Regex::new(r"(?i)\bcurl\b.*\|\s*(ba)?sh").expect("valid regex"),
+                Regex::new(r"(?i)\bwget\b.*\|\s*(ba)?sh").expect("valid regex"),
+                Regex::new(r"(?i)\bdel\s+/s\s+/q\s+[a-z]:\\").expect("valid regex"),
+                Regex::new(r"(?i)\brd\s+/s\s+/q\s+[a-z]:\\").expect("valid regex"),
+                Regex::new(r"(?i)\bRemove-Item\s+.*-Recurse\s+-Force\s+[a-z]:\\").expect("valid regex"),
+                Regex::new(r"(?i)\bdiskpart\b").expect("valid regex"),
             ],
             risky_patterns: vec![
-                Regex::new(r"(?i);\s*(rm|del|format|mkfs)").unwrap(),
-                Regex::new(r"(?i)\$\(.*\)").unwrap(),
-                Regex::new(r"(?i)`[^`]+`").unwrap(),
-                Regex::new(r"(?i)\beval\b").unwrap(),
+                Regex::new(r"(?i);\s*(rm|del|format|mkfs)").expect("valid regex"),
+                Regex::new(r"(?i)\$\(.*\)").expect("valid regex"),
+                Regex::new(r"(?i)`[^`]+`").expect("valid regex"),
+                Regex::new(r"(?i)\beval\b").expect("valid regex"),
             ],
             allowed_domains: vec![
                 "github.com".into(),
@@ -119,7 +119,7 @@ impl SecurityGateway {
                 && path_str
                     .as_bytes()
                     .first()
-                    .map_or(false, |b| b.is_ascii_alphabetic())
+                    .is_some_and(|b| b.is_ascii_alphabetic())
                 && path_str.as_bytes().get(1) == Some(&b':'));
         if is_root {
             return Err("Access to system root is blocked".into());

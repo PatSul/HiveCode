@@ -62,6 +62,7 @@ impl ShieldPanelData {
     }
 
     /// Return a sample dataset for preview / testing.
+    #[allow(dead_code)]
     pub fn sample() -> Self {
         Self {
             enabled: true,

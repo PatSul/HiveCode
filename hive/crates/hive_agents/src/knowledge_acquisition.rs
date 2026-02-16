@@ -178,7 +178,7 @@ pub fn parse_html(html: &str) -> (String, String, Vec<CodeBlock>) {
     }
 
     // 4. Strip all HTML tags
-    let tag_re = Regex::new(r"<[^>]*>").unwrap();
+    let tag_re = Regex::new(r"<[^>]*>").expect("valid regex");
     let text = tag_re.replace_all(&text, " ").to_string();
 
     // 5. Decode entities
@@ -204,7 +204,7 @@ fn extract_code_blocks(html: &str) -> Vec<CodeBlock> {
     let re = Regex::new(
         r#"(?is)<(?:pre\s*>\s*<code|code)\s*(?:class\s*=\s*["']([^"']*)["'])?\s*>(.*?)</code>"#,
     )
-    .unwrap();
+    .expect("valid regex");
 
     for cap in re.captures_iter(html) {
         let class_attr = cap.get(1).map(|m| m.as_str().to_string());
@@ -225,7 +225,7 @@ fn extract_code_blocks(html: &str) -> Vec<CodeBlock> {
         });
 
         // Strip inner tags from code content
-        let tag_re = Regex::new(r"<[^>]*>").unwrap();
+        let tag_re = Regex::new(r"<[^>]*>").expect("valid regex");
         let content = tag_re.replace_all(raw_content, "").to_string();
         let content = decode_entities(&content);
 
@@ -240,7 +240,7 @@ fn extract_code_blocks(html: &str) -> Vec<CodeBlock> {
 /// Remove entire `<tag>...</tag>` blocks (case-insensitive, greedy for nesting safety).
 fn strip_tag_block(html: &str, tag: &str) -> String {
     let pattern = format!(r"(?is)<{tag}[\s>].*?</{tag}\s*>");
-    let re = Regex::new(&pattern).unwrap();
+    let re = Regex::new(&pattern).expect("valid regex");
     re.replace_all(html, " ").to_string()
 }
 
@@ -256,9 +256,9 @@ fn decode_entities(text: &str) -> String {
 
 /// Collapse runs of whitespace into single spaces and normalize paragraph breaks.
 fn collapse_whitespace(text: &str) -> String {
-    let re = Regex::new(r"\n{3,}").unwrap();
+    let re = Regex::new(r"\n{3,}").expect("valid regex");
     let text = re.replace_all(text, "\n\n").to_string();
-    let re = Regex::new(r"[^\S\n]+").unwrap();
+    let re = Regex::new(r"[^\S\n]+").expect("valid regex");
     let text = re.replace_all(&text, " ").to_string();
     text.trim().to_string()
 }
@@ -305,17 +305,14 @@ pub fn validate_url(url: &str, allowed_domains: &[String]) -> Result<(), String>
         }
     }
     // 172.16.0.0 – 172.31.255.255
-    if lower_domain.starts_with("172.") {
-        if let Some(second_octet) = lower_domain
+    if lower_domain.starts_with("172.")
+        && let Some(second_octet) = lower_domain
             .strip_prefix("172.")
             .and_then(|rest| rest.split('.').next())
             .and_then(|s| s.parse::<u8>().ok())
-        {
-            if (16..=31).contains(&second_octet) {
+            && (16..=31).contains(&second_octet) {
                 return Err(format!("Private address blocked: {domain}"));
             }
-        }
-    }
 
     // Check allowed domains
     if !allowed_domains.iter().any(|d| lower_domain == d.to_lowercase()) {

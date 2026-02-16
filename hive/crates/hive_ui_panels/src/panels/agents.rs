@@ -93,6 +93,7 @@ impl AgentsPanelData {
     }
 
     /// Return a sample dataset with the six default personas.
+    #[allow(dead_code)]
     pub fn sample() -> Self {
         Self {
             personas: vec![

@@ -277,7 +277,7 @@ fn classify_go_line(line: &str) -> Option<(String, String)> {
 fn classify_java_line(line: &str) -> Option<(String, String)> {
     // Simplified: check for common Java/Kotlin patterns
     if line.contains("class ") && (line.starts_with("public ") || line.starts_with("class ")) {
-        let keyword_pos = line.find("class ").unwrap();
+        let keyword_pos = line.find("class ")?;
         let after = &line[keyword_pos + 6..];
         let name = after
             .split(|c: char| !c.is_alphanumeric() && c != '_')
@@ -342,7 +342,7 @@ fn extract_fn_name(line: &str, after_keyword: &str) -> String {
         None => return "unknown".to_string(),
     };
     let rest = &line[start..];
-    rest.split(|c: char| c == '(' || c == '<' || c == ' ' || c == ':')
+    rest.split(['(', '<', ' ', ':'])
         .next()
         .unwrap_or("unknown")
         .to_string()

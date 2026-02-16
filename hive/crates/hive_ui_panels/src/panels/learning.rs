@@ -96,6 +96,7 @@ impl LearningPanelData {
         }
     }
 
+    #[allow(dead_code)]
     pub fn sample() -> Self {
         Self {
             metrics: QualityMetrics {

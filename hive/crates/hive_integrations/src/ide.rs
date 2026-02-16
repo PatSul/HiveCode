@@ -317,7 +317,7 @@ impl IdeIntegrationService {
                     line,
                     column,
                 };
-                CommandResult::ok(Some(serde_json::to_value(location).unwrap()))
+                CommandResult::ok(serde_json::to_value(location).ok())
             }
 
             EditorCommand::FindReferences { symbol_name } => {
@@ -330,7 +330,7 @@ impl IdeIntegrationService {
                         column: s.column,
                     })
                     .collect();
-                CommandResult::ok(Some(serde_json::to_value(locations).unwrap()))
+                CommandResult::ok(serde_json::to_value(locations).ok())
             }
 
             EditorCommand::GetDiagnostics { file_path } => {
@@ -340,7 +340,7 @@ impl IdeIntegrationService {
                 } else {
                     let values: Vec<Value> = diags
                         .iter()
-                        .map(|d| serde_json::to_value(d).unwrap())
+                        .filter_map(|d| serde_json::to_value(d).ok())
                         .collect();
                     CommandResult::ok(Some(Value::Array(values)))
                 }
@@ -350,7 +350,7 @@ impl IdeIntegrationService {
                 let syms = self.symbols_in_file(&file_path);
                 let values: Vec<Value> = syms
                     .iter()
-                    .map(|s| serde_json::to_value(s).unwrap())
+                    .filter_map(|s| serde_json::to_value(s).ok())
                     .collect();
                 CommandResult::ok(Some(Value::Array(values)))
             }

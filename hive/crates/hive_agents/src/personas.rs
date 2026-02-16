@@ -276,13 +276,12 @@ impl PersonaRegistry {
     /// an owned `Persona` with the evolved prompt.
     pub fn get_evolved(&self, kind: &PersonaKind) -> Option<Persona> {
         let persona = self.get(kind)?;
-        if let Some(ref provider) = self.prompt_override {
-            if let Some(evolved_prompt) = provider.get_prompt(kind) {
+        if let Some(ref provider) = self.prompt_override
+            && let Some(evolved_prompt) = provider.get_prompt(kind) {
                 let mut evolved = persona.clone();
                 evolved.system_prompt = evolved_prompt;
                 return Some(evolved);
             }
-        }
         Some(persona.clone())
     }
 

@@ -166,11 +166,11 @@ static COMPILED_API_KEY_PATTERNS: LazyLock<Vec<(Regex, &'static str)>> = LazyLoc
 
 /// Zero-width character pattern — Medium severity.
 static COMPILED_ZWC_PATTERN: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"[\u{200B}\u{200C}\u{200D}\u{FEFF}\u{00AD}]").unwrap());
+    LazyLock::new(|| Regex::new(r"[\u{200B}\u{200C}\u{200D}\u{FEFF}\u{00AD}]").expect("valid regex"));
 
 /// Base64 payload pattern — Medium severity.
 static COMPILED_B64_PATTERN: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"[A-Za-z0-9+/]{64,}={0,2}").unwrap());
+    LazyLock::new(|| Regex::new(r"[A-Za-z0-9+/]{64,}={0,2}").expect("valid regex"));
 
 /// Suspicious URL patterns — High severity.
 static COMPILED_URL_PATTERNS: LazyLock<Vec<(Regex, &'static str)>> = LazyLock::new(|| {
@@ -324,7 +324,7 @@ impl SkillMarketplace {
     /// Check whether a domain is trusted.
     pub fn is_trusted_domain(&self, domain: &str) -> bool {
         let domain = domain.to_lowercase();
-        self.trusted_domains.iter().any(|d| *d == domain)
+        self.trusted_domains.contains(&domain)
     }
 
     // -- security -----------------------------------------------------------
