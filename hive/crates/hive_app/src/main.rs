@@ -58,6 +58,24 @@ impl gpui::AssetSource for Assets {
 pub struct AppTray(pub Option<tray::TrayService>);
 impl gpui::Global for AppTray {}
 
+/// Walk up from `path` looking for a `.git` directory, returning the first
+/// ancestor that contains one. Falls back to `path` itself if no git root is
+/// found.
+fn discover_git_root(path: std::path::PathBuf) -> std::path::PathBuf {
+    let canonical = path.canonicalize().unwrap_or_else(|_| path.clone());
+    let mut current = canonical.as_path();
+    while let Some(parent) = current.parent() {
+        if current.join(".git").exists() {
+            return current.to_path_buf();
+        }
+        current = parent;
+    }
+    if canonical.join(".git").exists() {
+        return canonical;
+    }
+    canonical
+}
+
 // ---------------------------------------------------------------------------
 // Actions
 // ---------------------------------------------------------------------------
@@ -203,7 +221,7 @@ fn init_services(cx: &mut App) -> anyhow::Result<()> {
     info!("PersonaRegistry initialized (6 built-in personas)");
 
     // Automation service — workflow engine.
-    let workspace_root = std::env::current_dir().unwrap_or_default();
+    let workspace_root = discover_git_root(std::env::current_dir().unwrap_or_default());
     let mut automation = hive_agents::AutomationService::new();
     let workflow_report = automation.initialize_workflows(&workspace_root);
     if workflow_report.failed > 0 {

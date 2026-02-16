@@ -51,6 +51,22 @@ actions!(
         ReviewUnstageAll,
         ReviewCommit,
         ReviewDiscardAll,
+        // Git Ops — expanded review panel
+        ReviewAiCommitMessage,
+        ReviewCommitWithMessage,
+        ReviewPush,
+        ReviewPushSetUpstream,
+        ReviewPrRefresh,
+        ReviewPrAiGenerate,
+        ReviewPrCreate,
+        ReviewBranchRefresh,
+        ReviewBranchCreate,
+        ReviewLfsRefresh,
+        ReviewLfsTrack,
+        ReviewLfsUntrack,
+        ReviewLfsPull,
+        ReviewLfsPush,
+        ReviewGitflowInit,
         // Skills panel
         SkillsRefresh,
         // Routing panel
@@ -178,4 +194,90 @@ pub struct AgentsRunWorkflow {
     pub instruction: String,
     pub source: String,
     pub source_id: String,
+}
+
+/// Switch to a specific tab within the Git Ops panel.
+#[derive(Clone, PartialEq, gpui::Action)]
+#[action(namespace = hive_workspace, no_json)]
+pub struct ReviewSwitchTab {
+    pub tab: String,
+}
+
+/// Set the commit message text.
+#[derive(Clone, PartialEq, gpui::Action)]
+#[action(namespace = hive_workspace, no_json)]
+pub struct ReviewSetCommitMessage {
+    pub message: String,
+}
+
+/// Switch to a specific branch.
+#[derive(Clone, PartialEq, gpui::Action)]
+#[action(namespace = hive_workspace, no_json)]
+pub struct ReviewBranchSwitch {
+    pub branch_name: String,
+}
+
+/// Delete a specific branch by name.
+#[derive(Clone, PartialEq, gpui::Action)]
+#[action(namespace = hive_workspace, no_json)]
+pub struct ReviewBranchDeleteNamed {
+    pub branch_name: String,
+}
+
+/// Set the new branch name input.
+#[derive(Clone, PartialEq, gpui::Action)]
+#[action(namespace = hive_workspace, no_json)]
+pub struct ReviewBranchSetName {
+    pub name: String,
+}
+
+/// Set PR title.
+#[derive(Clone, PartialEq, gpui::Action)]
+#[action(namespace = hive_workspace, no_json)]
+pub struct ReviewPrSetTitle {
+    pub title: String,
+}
+
+/// Set PR body.
+#[derive(Clone, PartialEq, gpui::Action)]
+#[action(namespace = hive_workspace, no_json)]
+pub struct ReviewPrSetBody {
+    pub body: String,
+}
+
+/// Set PR base branch.
+#[derive(Clone, PartialEq, gpui::Action)]
+#[action(namespace = hive_workspace, no_json)]
+pub struct ReviewPrSetBase {
+    pub base: String,
+}
+
+/// Start a gitflow feature/release/hotfix.
+#[derive(Clone, PartialEq, gpui::Action)]
+#[action(namespace = hive_workspace, no_json)]
+pub struct ReviewGitflowStart {
+    pub kind: String,
+    pub name: String,
+}
+
+/// Finish a gitflow feature/release/hotfix.
+#[derive(Clone, PartialEq, gpui::Action)]
+#[action(namespace = hive_workspace, no_json)]
+pub struct ReviewGitflowFinishNamed {
+    pub kind: String,
+    pub name: String,
+}
+
+/// Set gitflow new name input.
+#[derive(Clone, PartialEq, gpui::Action)]
+#[action(namespace = hive_workspace, no_json)]
+pub struct ReviewGitflowSetName {
+    pub name: String,
+}
+
+/// Set LFS track pattern input.
+#[derive(Clone, PartialEq, gpui::Action)]
+#[action(namespace = hive_workspace, no_json)]
+pub struct ReviewLfsSetPattern {
+    pub pattern: String,
 }
