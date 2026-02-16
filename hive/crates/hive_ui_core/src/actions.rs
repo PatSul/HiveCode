@@ -63,6 +63,17 @@ actions!(
         MonitorRefresh,
         // Agents panel
         AgentsReloadWorkflows,
+        // Panel switch — new panels
+        SwitchToWorkflows,
+        SwitchToChannels,
+        // Workflow builder
+        WorkflowBuilderSave,
+        WorkflowBuilderRun,
+        WorkflowBuilderDeleteNode,
+        // Connected accounts
+        AccountConnect,
+        AccountDisconnect,
+        AccountRefresh,
     ]
 );
 
@@ -125,6 +136,34 @@ pub struct TokenLaunchSetStep {
 #[action(namespace = hive_workspace, no_json)]
 pub struct TokenLaunchSelectChain {
     pub chain: String,
+}
+
+/// Load a specific workflow into the visual builder canvas.
+#[derive(Clone, PartialEq, gpui::Action)]
+#[action(namespace = hive_workspace, no_json)]
+pub struct WorkflowBuilderLoadWorkflow {
+    pub workflow_id: String,
+}
+
+/// Select a channel in the Channels panel.
+#[derive(Clone, PartialEq, gpui::Action)]
+#[action(namespace = hive_workspace, no_json)]
+pub struct ChannelSelect {
+    pub channel_id: String,
+}
+
+/// Initiate an OAuth connection for a specific platform.
+#[derive(Clone, PartialEq, gpui::Action)]
+#[action(namespace = hive_workspace, no_json)]
+pub struct AccountConnectPlatform {
+    pub platform: String,
+}
+
+/// Disconnect a connected account.
+#[derive(Clone, PartialEq, gpui::Action)]
+#[action(namespace = hive_workspace, no_json)]
+pub struct AccountDisconnectPlatform {
+    pub platform: String,
 }
 
 /// Run a specific automation workflow by ID from the Agents panel.

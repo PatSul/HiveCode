@@ -18,9 +18,9 @@ use hive_core::notifications::{AppNotification, NotificationType};
 use hive_core::persistence::Database;
 use hive_core::security::SecurityGateway;
 use hive_ui::globals::{
-    AppAiService, AppAssistant, AppAutomation, AppCli, AppConfig, AppDatabase, AppIde, AppLearning,
-    AppMarketplace, AppMcpServer, AppNotifications, AppPersonas, AppRpcConfig, AppSecurity,
-    AppShield, AppSkills, AppSpecs, AppTts, AppWallets,
+    AppAiService, AppAssistant, AppAutomation, AppChannels, AppCli, AppConfig, AppDatabase,
+    AppIde, AppLearning, AppMarketplace, AppMcpServer, AppNotifications, AppPersonas, AppRpcConfig,
+    AppSecurity, AppShield, AppSkills, AppSpecs, AppTts, AppWallets,
 };
 use hive_ui::workspace::{
     ClearChat, HiveWorkspace, NewConversation, SwitchPanel, SwitchToAgents, SwitchToChat,
@@ -268,6 +268,12 @@ fn init_services(cx: &mut App) -> anyhow::Result<()> {
     // IDE integration — workspace and file tracking.
     cx.set_global(AppIde(hive_integrations::ide::IdeIntegrationService::new()));
     info!("IdeIntegrationService initialized");
+
+    // Channel store — AI agent messaging channels.
+    let mut channel_store = hive_core::channels::ChannelStore::new();
+    channel_store.ensure_default_channels();
+    cx.set_global(AppChannels(channel_store));
+    info!("ChannelStore initialized with default channels");
 
     Ok(())
 }

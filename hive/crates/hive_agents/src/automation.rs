@@ -289,6 +289,100 @@ impl AutomationService {
         };
 
         self.workflows.push(workflow);
+
+        // -- Additional built-in workflow templates --
+
+        self.ensure_template("builtin:build-test-v1", "Build & Test",
+            "Full build + test pipeline: cargo check, build release, run all tests, notify.",
+            vec![
+                ("Check", "cargo check --quiet"),
+                ("Build", "cargo build --release --quiet"),
+                ("Test", "cargo test --quiet"),
+            ],
+        );
+
+        self.ensure_template("builtin:code-review-v1", "Code Review",
+            "AI-powered code review: investigate changes, critique code, notify results.",
+            vec![
+                ("Investigate changes", "git diff --stat"),
+                ("Run clippy", "cargo clippy --quiet -- -W clippy::all"),
+                ("Run tests", "cargo test --quiet"),
+            ],
+        );
+
+        self.ensure_template("builtin:debug-issue-v1", "Debug Issue",
+            "Debug workflow: reproduce issue, investigate root cause, implement fix, verify.",
+            vec![
+                ("Reproduce", "cargo test --quiet 2>&1 || true"),
+                ("Investigate", "git log --oneline -10"),
+                ("Verify", "cargo test --quiet"),
+            ],
+        );
+
+        self.ensure_template("builtin:deploy-v1", "Deploy",
+            "Deploy pipeline: test, build release, deploy, notify team.",
+            vec![
+                ("Test", "cargo test --quiet"),
+                ("Build release", "cargo build --release --quiet"),
+                ("Check binary", "ls -la target/release/"),
+            ],
+        );
+
+        self.ensure_template("builtin:research-impl-v1", "Research & Implement",
+            "Research-first workflow: investigate approaches, implement solution, verify, review.",
+            vec![
+                ("Investigate", "git log --oneline -20"),
+                ("Implement", "cargo check --quiet"),
+                ("Verify", "cargo test --quiet"),
+                ("Review", "cargo clippy --quiet -- -W clippy::all"),
+            ],
+        );
+
+        self.ensure_template("builtin:full-pipeline-v1", "Full Pipeline",
+            "End-to-end pipeline: investigate, implement, verify, critique, debug, notify.",
+            vec![
+                ("Investigate", "git status --short"),
+                ("Build", "cargo check --quiet"),
+                ("Test", "cargo test --quiet"),
+                ("Lint", "cargo clippy --quiet -- -W clippy::all"),
+                ("Verify", "cargo test --quiet"),
+            ],
+        );
+    }
+
+    /// Internal helper: ensure a template workflow exists by ID.
+    fn ensure_template(&mut self, id: &str, name: &str, desc: &str, steps: Vec<(&str, &str)>) {
+        if self.workflows.iter().any(|wf| wf.id == id) {
+            return;
+        }
+        let now = Utc::now();
+        let wf_steps: Vec<WorkflowStep> = steps
+            .iter()
+            .enumerate()
+            .map(|(i, (step_name, cmd))| WorkflowStep {
+                id: format!("{}:step-{}", id, i + 1),
+                name: step_name.to_string(),
+                action: ActionType::RunCommand {
+                    command: cmd.to_string(),
+                },
+                conditions: Vec::new(),
+                timeout_secs: Some(900),
+                retry_count: 0,
+            })
+            .collect();
+
+        self.workflows.push(Workflow {
+            id: id.to_string(),
+            name: name.to_string(),
+            description: desc.to_string(),
+            trigger: TriggerType::ManualTrigger,
+            steps: wf_steps,
+            status: WorkflowStatus::Active,
+            created_at: now,
+            updated_at: now,
+            last_run: None,
+            run_count: 0,
+        });
     }
 
     /// Replace file-based workflows by reading JSON templates from

@@ -19,8 +19,8 @@ use crate::chat_service::{ChatService, StreamCompleted};
 use chrono::Utc;
 use hive_ui_core::{
     // Globals
-    AppAiService, AppAssistant, AppAutomation, AppConfig, AppLearning, AppMarketplace, AppNotifications,
-    AppPersonas, AppSecurity, AppShield, AppSpecs,
+    AppAiService, AppAssistant, AppAutomation, AppChannels, AppConfig, AppLearning, AppMarketplace,
+    AppNotifications, AppPersonas, AppSecurity, AppShield, AppSpecs,
     // Types
     HiveTheme, Panel, Sidebar,
 };
@@ -40,6 +40,11 @@ pub use hive_ui_core::{
     ReviewStageAll, ReviewUnstageAll, ReviewCommit, ReviewDiscardAll,
     SkillsRefresh, RoutingAddRule, TokenLaunchDeploy, TokenLaunchSetStep, TokenLaunchSelectChain,
     SettingsSave, MonitorRefresh, AgentsReloadWorkflows, AgentsRunWorkflow,
+    SwitchToWorkflows, SwitchToChannels,
+    WorkflowBuilderSave, WorkflowBuilderRun, WorkflowBuilderDeleteNode,
+    WorkflowBuilderLoadWorkflow, ChannelSelect,
+    AccountConnect, AccountDisconnect, AccountRefresh,
+    AccountConnectPlatform, AccountDisconnectPlatform,
 };
 use hive_ui_panels::panels::chat::{DisplayMessage, ToolCallDisplay};
 use hive_ui_panels::panels::{
@@ -62,6 +67,8 @@ use hive_ui_panels::panels::{
     skills::{SkillsData, SkillsPanel},
     specs::{SpecPanelData, SpecsPanel},
     token_launch::{TokenLaunchData, TokenLaunchPanel},
+    workflow_builder::{WorkflowBuilderView, WorkflowSaved, WorkflowRunRequested},
+    channels::{ChannelsView, ChannelMessageSent},
 };
 use crate::statusbar::{ConnectivityDisplay, StatusBar};
 use crate::titlebar::Titlebar;
@@ -84,6 +91,8 @@ pub struct HiveWorkspace {
     chat_service: Entity<ChatService>,
     settings_view: Entity<SettingsView>,
     models_browser_view: Entity<ModelsBrowserView>,
+    workflow_builder_view: Entity<WorkflowBuilderView>,
+    channels_view: Entity<ChannelsView>,
     /// Focus handle for the workspace root div. Ensures that `dispatch_action`
     /// from child panels (Files, History, etc.) can bubble up to the root
     /// div's `.on_action()` handlers even when no input element is focused.
@@ -312,6 +321,37 @@ impl HiveWorkspace {
         )
         .detach();
 
+        // Create the workflow builder view entity.
+        let workflow_builder_view = cx.new(|cx| WorkflowBuilderView::new(window, cx));
+        cx.subscribe_in(
+            &workflow_builder_view,
+            window,
+            |this, _view, event: &WorkflowSaved, _window, cx| {
+                info!("Workflow saved: {}", event.0);
+                this.refresh_agents_data(cx);
+            },
+        )
+        .detach();
+        cx.subscribe_in(
+            &workflow_builder_view,
+            window,
+            |this, _view, event: &WorkflowRunRequested, _window, cx| {
+                info!("Workflow run requested: {}", event.0);
+            },
+        )
+        .detach();
+
+        // Create the channels view entity.
+        let channels_view = cx.new(|cx| ChannelsView::new(window, cx));
+        cx.subscribe_in(
+            &channels_view,
+            window,
+            |this, _view, event: &ChannelMessageSent, _window, cx| {
+                info!("Channel message sent in {}: {}", event.channel_id, event.content);
+            },
+        )
+        .detach();
+
         // Focus handle for the workspace root — ensures dispatch_action works
         // from child panel click handlers even when no input is focused.
         let focus_handle = cx.focus_handle();
@@ -342,6 +382,8 @@ impl HiveWorkspace {
             chat_service,
             settings_view,
             models_browser_view,
+            workflow_builder_view,
+            channels_view,
             focus_handle,
             history_data,
             files_data,
@@ -829,6 +871,52 @@ impl HiveWorkspace {
         }
     }
 
+    fn refresh_workflow_builder(&mut self, cx: &mut Context<Self>) {
+        use hive_ui_panels::panels::workflow_builder::WorkflowListEntry;
+
+        if cx.has_global::<AppAutomation>() {
+            let automation = &cx.global::<AppAutomation>().0;
+            let workflows = automation.list_workflows();
+            let entries: Vec<WorkflowListEntry> = workflows
+                .iter()
+                .map(|wf| WorkflowListEntry {
+                    id: wf.id.clone(),
+                    name: wf.name.clone(),
+                    is_builtin: wf.id.starts_with("builtin:"),
+                    status: format!("{:?}", wf.status),
+                })
+                .collect();
+
+            self.workflow_builder_view.update(cx, |view, cx| {
+                view.refresh_workflow_list(entries, cx);
+            });
+        }
+    }
+
+    fn refresh_channels_view(&mut self, cx: &mut Context<Self>) {
+        if cx.has_global::<AppChannels>() {
+            // Extract channel list data first to avoid borrow conflict.
+            let channel_data: Vec<_> = cx
+                .global::<AppChannels>()
+                .0
+                .list_channels()
+                .iter()
+                .map(|c| (
+                    c.id.clone(),
+                    c.name.clone(),
+                    c.icon.clone(),
+                    c.description.clone(),
+                    c.messages.len(),
+                    c.assigned_agents.clone(),
+                ))
+                .collect();
+
+            self.channels_view.update(cx, |view, cx| {
+                view.refresh_from_data(channel_data, cx);
+            });
+        }
+    }
+
     fn refresh_cost_data(&mut self, cx: &App) {
         self.cost_data = if cx.has_global::<AppAiService>() {
             CostData::from_tracker(cx.global::<AppAiService>().0.cost_tracker())
@@ -1145,6 +1233,8 @@ impl HiveWorkspace {
             Panel::Review => ReviewPanel::render(&self.review_data, theme).into_any_element(),
             Panel::Skills => SkillsPanel::render(&self.skills_data, theme).into_any_element(),
             Panel::Routing => RoutingPanel::render(&self.routing_data, theme).into_any_element(),
+            Panel::Workflows => self.workflow_builder_view.clone().into_any_element(),
+            Panel::Channels => self.channels_view.clone().into_any_element(),
             Panel::Models => self.models_browser_view.clone().into_any_element(),
             Panel::TokenLaunch => {
                 TokenLaunchPanel::render(&self.token_launch_data, theme).into_any_element()
@@ -1244,6 +1334,12 @@ impl HiveWorkspace {
             }
             Panel::Routing => {
                 self.refresh_routing_data(cx);
+            }
+            Panel::Workflows => {
+                self.refresh_workflow_builder(cx);
+            }
+            Panel::Channels => {
+                self.refresh_channels_view(cx);
             }
             Panel::Models => {
                 self.push_keys_to_models_browser(cx);
@@ -1424,6 +1520,24 @@ impl HiveWorkspace {
         cx: &mut Context<Self>,
     ) {
         self.switch_to_panel(Panel::Agents, cx);
+    }
+
+    fn handle_switch_to_workflows(
+        &mut self,
+        _action: &SwitchToWorkflows,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.switch_to_panel(Panel::Workflows, cx);
+    }
+
+    fn handle_switch_to_channels(
+        &mut self,
+        _action: &SwitchToChannels,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.switch_to_panel(Panel::Channels, cx);
     }
 
     fn handle_switch_to_learning(
@@ -2882,6 +2996,8 @@ impl Render for HiveWorkspace {
             .on_action(cx.listener(Self::handle_switch_to_token_launch))
             .on_action(cx.listener(Self::handle_switch_to_specs))
             .on_action(cx.listener(Self::handle_switch_to_agents))
+            .on_action(cx.listener(Self::handle_switch_to_workflows))
+            .on_action(cx.listener(Self::handle_switch_to_channels))
             .on_action(cx.listener(Self::handle_switch_to_learning))
             .on_action(cx.listener(Self::handle_switch_to_shield))
             .on_action(cx.listener(Self::handle_switch_to_assistant))
@@ -3038,6 +3154,8 @@ impl HiveWorkspace {
                         "Flow",
                         &[
                             Panel::Agents,
+                            Panel::Workflows,
+                            Panel::Channels,
                             Panel::Kanban,
                             Panel::Review,
                             Panel::Skills,

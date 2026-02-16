@@ -1,5 +1,6 @@
 pub mod agents;
 pub mod assistant;
+pub mod channels;
 pub mod chat;
 pub mod costs;
 pub mod files;
@@ -17,6 +18,7 @@ pub mod shield;
 pub mod skills;
 pub mod specs;
 pub mod token_launch;
+pub mod workflow_builder;
 
 use hive_ui_core::HiveTheme;
 use gpui::*;

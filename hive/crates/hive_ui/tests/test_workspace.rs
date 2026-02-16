@@ -33,11 +33,11 @@ fn test_keyboard_panel_mapping() {
         (3, Panel::Files),
         (4, Panel::Specs),
         (5, Panel::Agents),
-        (6, Panel::Kanban),
-        (7, Panel::Monitor),
-        (8, Panel::Logs),
-        (9, Panel::Costs),
-        (0, Panel::Review),
+        (6, Panel::Workflows),
+        (7, Panel::Channels),
+        (8, Panel::Kanban),
+        (9, Panel::Monitor),
+        (0, Panel::Logs),
     ];
     for (key, expected_panel) in expected {
         let idx = if key == 0 { 9 } else { key - 1 };
@@ -55,6 +55,8 @@ fn test_action_types_implement_action_trait() {
     assert_action::<SwitchToChat>();
     assert_action::<SwitchToHistory>();
     assert_action::<SwitchToFiles>();
+    assert_action::<SwitchToWorkflows>();
+    assert_action::<SwitchToChannels>();
     assert_action::<SwitchToKanban>();
     assert_action::<SwitchToMonitor>();
     assert_action::<SwitchToLogs>();

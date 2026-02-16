@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use gpui::prelude::FluentBuilder;
 use gpui::*;
 use gpui_component::input::{Input, InputEvent, InputState};
 use gpui_component::switch::Switch;
@@ -853,6 +854,7 @@ impl Render for SettingsView {
                                     .child(self.render_model_routing_section(cx))
                                     .child(self.render_budget_section(cx))
                                     .child(self.render_voice_tts_section(cx))
+                                    .child(self.render_connected_accounts_section(cx))
                                     .child(self.render_general_section(cx)),
                             ),
                     ),
@@ -1067,6 +1069,124 @@ impl SettingsView {
                         "TTS disabled -- enable to hear assistant responses."
                     }),
             )
+            .into_any_element()
+    }
+
+    fn render_connected_accounts_section(&self, cx: &Context<Self>) -> AnyElement {
+        use hive_core::config::AccountPlatform;
+        let theme = &self.theme;
+
+        // Read connected accounts from config
+        let connected = if cx.has_global::<AppConfig>() {
+            cx.global::<AppConfig>()
+                .0
+                .get()
+                .connected_accounts
+                .clone()
+        } else {
+            Vec::new()
+        };
+
+        let platforms = AccountPlatform::ALL;
+        let mut rows: Vec<AnyElement> = Vec::new();
+
+        for platform in &platforms {
+            let is_connected = connected.iter().any(|a| a.platform == *platform);
+            let account_name = connected
+                .iter()
+                .find(|a| a.platform == *platform)
+                .map(|a| a.account_name.clone())
+                .unwrap_or_default();
+            let last_synced = connected
+                .iter()
+                .find(|a| a.platform == *platform)
+                .and_then(|a| a.last_synced.clone());
+
+            rows.push(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap(theme.space_3)
+                    .py(theme.space_2)
+                    .child(
+                        div()
+                            .text_size(px(20.0))
+                            .child(platform.icon().to_string()),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .flex_1()
+                            .min_w(px(0.0))
+                            .child(
+                                div()
+                                    .text_size(theme.font_size_sm)
+                                    .text_color(theme.text_primary)
+                                    .font_weight(FontWeight::SEMIBOLD)
+                                    .child(platform.label().to_string()),
+                            )
+                            .when(is_connected, |el: Div| {
+                                el.child(
+                                    div()
+                                        .text_size(theme.font_size_xs)
+                                        .text_color(theme.text_muted)
+                                        .child(account_name.clone()),
+                                )
+                            })
+                            .when(last_synced.is_some(), |el: Div| {
+                                el.child(
+                                    div()
+                                        .text_size(px(9.0))
+                                        .text_color(theme.text_muted)
+                                        .child(format!(
+                                            "Last synced: {}",
+                                            last_synced.as_deref().unwrap_or("never")
+                                        )),
+                                )
+                            }),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap(theme.space_2)
+                            .child(status_dot(is_connected, theme))
+                            .child(if is_connected {
+                                div()
+                                    .text_size(theme.font_size_xs)
+                                    .text_color(theme.accent_green)
+                                    .child("Connected")
+                                    .into_any_element()
+                            } else {
+                                div()
+                                    .id(ElementId::Name(
+                                        format!("connect-{}", platform.label()).into(),
+                                    ))
+                                    .px(theme.space_3)
+                                    .py(theme.space_1)
+                                    .rounded(theme.radius_md)
+                                    .bg(theme.accent_cyan)
+                                    .text_size(theme.font_size_xs)
+                                    .text_color(theme.bg_primary)
+                                    .font_weight(FontWeight::BOLD)
+                                    .cursor_pointer()
+                                    .child("Connect")
+                                    .into_any_element()
+                            }),
+                    )
+                    .into_any_element(),
+            );
+        }
+
+        card(theme)
+            .child(section_title("\u{1F517}", "Connected Accounts", theme))
+            .child(section_desc(
+                "Link external services for calendar, email, repos, and messaging integration.",
+                theme,
+            ))
+            .child(separator(theme))
+            .children(rows)
             .into_any_element()
     }
 

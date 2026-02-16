@@ -1,6 +1,6 @@
 use gpui_component::IconName;
 
-/// The 19 navigable panels in the application.
+/// The 21 navigable panels in the application.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Panel {
     Chat,
@@ -8,6 +8,8 @@ pub enum Panel {
     Files,
     Specs,
     Agents,
+    Workflows,
+    Channels,
     Kanban,
     Monitor,
     Logs,
@@ -25,12 +27,14 @@ pub enum Panel {
 }
 
 impl Panel {
-    pub const ALL: [Panel; 19] = [
+    pub const ALL: [Panel; 21] = [
         Panel::Chat,
         Panel::History,
         Panel::Files,
         Panel::Specs,
         Panel::Agents,
+        Panel::Workflows,
+        Panel::Channels,
         Panel::Kanban,
         Panel::Monitor,
         Panel::Logs,
@@ -54,6 +58,8 @@ impl Panel {
             Self::Files => "Files",
             Self::Specs => "Specs",
             Self::Agents => "Agents",
+            Self::Workflows => "Workflows",
+            Self::Channels => "Channels",
             Self::Kanban => "Kanban",
             Self::Monitor => "Monitor",
             Self::Logs => "Logs",
@@ -88,6 +94,8 @@ impl Panel {
             Self::Files => IconName::Folder,
             Self::Specs => IconName::File,
             Self::Agents => IconName::Bot,
+            Self::Workflows => IconName::Map,
+            Self::Channels => IconName::Inbox,
             Self::Kanban => IconName::LayoutDashboard,
             Self::Monitor => IconName::Loader,
             Self::Logs => IconName::File,
@@ -116,6 +124,8 @@ impl Panel {
             "Files" => Self::Files,
             "Specs" => Self::Specs,
             "Agents" => Self::Agents,
+            "Workflows" => Self::Workflows,
+            "Channels" => Self::Channels,
             "Kanban" => Self::Kanban,
             "Monitor" => Self::Monitor,
             "Logs" => Self::Logs,
@@ -142,6 +152,8 @@ impl Panel {
             Self::Files => "Files",
             Self::Specs => "Specs",
             Self::Agents => "Agents",
+            Self::Workflows => "Workflows",
+            Self::Channels => "Channels",
             Self::Kanban => "Kanban",
             Self::Monitor => "Monitor",
             Self::Logs => "Logs",
@@ -160,7 +172,7 @@ impl Panel {
     }
 }
 
-/// Sidebar component with 19 navigation icon buttons.
+/// Sidebar component with 21 navigation icon buttons.
 pub struct Sidebar {
     pub active_panel: Panel,
 }

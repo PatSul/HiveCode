@@ -19,6 +19,7 @@ use hive_ai::tts::service::TtsService;
 use hive_assistant::AssistantService;
 use hive_blockchain::rpc_config::RpcConfigStore;
 use hive_blockchain::wallet_store::WalletStore;
+use hive_core::channels::ChannelStore;
 use hive_core::config::ConfigManager;
 use hive_core::notifications::NotificationStore;
 use hive_core::persistence::Database;
@@ -103,3 +104,7 @@ impl Global for AppRpcConfig {}
 /// Global wrapper for IDE integration (diagnostics, symbols, workspace info).
 pub struct AppIde(pub IdeIntegrationService);
 impl Global for AppIde {}
+
+/// Global wrapper for the AI agent channel store (persistent messaging channels).
+pub struct AppChannels(pub ChannelStore);
+impl Global for AppChannels {}

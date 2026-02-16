@@ -10,6 +10,110 @@ use tracing::{info, warn};
 use crate::secure_storage::SecureStorage;
 
 // ---------------------------------------------------------------------------
+// Connected accounts
+// ---------------------------------------------------------------------------
+
+/// External platforms that can be connected via OAuth.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AccountPlatform {
+    Google,
+    Microsoft,
+    GitHub,
+    Slack,
+    Discord,
+    Telegram,
+}
+
+impl AccountPlatform {
+    pub const ALL: [AccountPlatform; 6] = [
+        AccountPlatform::Google,
+        AccountPlatform::Microsoft,
+        AccountPlatform::GitHub,
+        AccountPlatform::Slack,
+        AccountPlatform::Discord,
+        AccountPlatform::Telegram,
+    ];
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Google => "Google",
+            Self::Microsoft => "Microsoft",
+            Self::GitHub => "GitHub",
+            Self::Slack => "Slack",
+            Self::Discord => "Discord",
+            Self::Telegram => "Telegram",
+        }
+    }
+
+    pub fn icon(&self) -> &'static str {
+        match self {
+            Self::Google => "\u{1F4E7}",
+            Self::Microsoft => "\u{1F4BC}",
+            Self::GitHub => "\u{1F419}",
+            Self::Slack => "\u{1F4AC}",
+            Self::Discord => "\u{1F3AE}",
+            Self::Telegram => "\u{2708}",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "google" => Some(Self::Google),
+            "microsoft" => Some(Self::Microsoft),
+            "github" => Some(Self::GitHub),
+            "slack" => Some(Self::Slack),
+            "discord" => Some(Self::Discord),
+            "telegram" => Some(Self::Telegram),
+            _ => None,
+        }
+    }
+}
+
+/// Platform-specific sync settings.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct AccountSettings {
+    pub sync_enabled: bool,
+    pub sync_interval_minutes: u32,
+    pub github_repos: Vec<String>,
+    pub slack_channels: Vec<String>,
+    pub google_calendars: Vec<String>,
+}
+
+impl Default for AccountSettings {
+    fn default() -> Self {
+        Self {
+            sync_enabled: true,
+            sync_interval_minutes: 30,
+            github_repos: Vec::new(),
+            slack_channels: Vec::new(),
+            google_calendars: Vec::new(),
+        }
+    }
+}
+
+/// A connected external account (persisted in config).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConnectedAccount {
+    pub platform: AccountPlatform,
+    pub account_name: String,
+    pub account_id: String,
+    pub scopes: Vec<String>,
+    pub connected_at: String,
+    pub last_synced: Option<String>,
+    pub settings: AccountSettings,
+}
+
+/// OAuth token data (stored in SecureStorage, never in config.json).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OAuthTokenData {
+    pub access_token: String,
+    pub refresh_token: Option<String>,
+    pub expires_at: Option<String>,
+}
+
+// ---------------------------------------------------------------------------
 // Secure key storage file helpers
 // ---------------------------------------------------------------------------
 
@@ -23,6 +127,14 @@ const KEY_HUGGINGFACE: &str = "api_key_huggingface";
 const KEY_LITELLM: &str = "api_key_litellm";
 const KEY_ELEVENLABS: &str = "api_key_elevenlabs";
 const KEY_TELNYX: &str = "api_key_telnyx";
+
+// OAuth token storage keys
+const KEY_OAUTH_GOOGLE: &str = "oauth_google";
+const KEY_OAUTH_MICROSOFT: &str = "oauth_microsoft";
+const KEY_OAUTH_GITHUB: &str = "oauth_github";
+const KEY_OAUTH_SLACK: &str = "oauth_slack";
+const KEY_OAUTH_DISCORD: &str = "oauth_discord";
+const KEY_OAUTH_TELEGRAM: &str = "oauth_telegram";
 
 /// Path to the encrypted key store: `~/.hive/keys.enc`
 fn keys_file_path() -> Result<PathBuf> {
@@ -147,6 +259,9 @@ pub struct HiveConfig {
     pub notifications_enabled: bool,
     pub log_level: String,
     pub close_to_tray_notice_seen: bool,
+
+    // Connected accounts
+    pub connected_accounts: Vec<ConnectedAccount>,
 }
 
 impl Default for HiveConfig {
@@ -184,6 +299,7 @@ impl Default for HiveConfig {
             notifications_enabled: true,
             log_level: "info".into(),
             close_to_tray_notice_seen: false,
+            connected_accounts: Vec::new(),
         }
     }
 }
@@ -549,6 +665,73 @@ impl ConfigManager {
         set_secure_key(ss, &mut key_map, KEY_ELEVENLABS, &config.elevenlabs_api_key)?;
         set_secure_key(ss, &mut key_map, KEY_TELNYX, &config.telnyx_api_key)?;
         save_key_map(&self.keys_path, &key_map)
+    }
+
+    // -- Connected accounts helpers ----------------------------------------
+
+    /// Get the OAuth token for a connected platform.
+    pub fn get_oauth_token(&self, platform: AccountPlatform) -> Option<OAuthTokenData> {
+        let key = Self::oauth_key(platform);
+        let Some(ss) = &self.secure_storage else {
+            return None;
+        };
+        let key_map = load_key_map(&self.keys_path);
+        let encrypted = key_map.get(key)?;
+        match ss.decrypt(encrypted) {
+            Ok(json) if !json.is_empty() => serde_json::from_str(&json).ok(),
+            _ => None,
+        }
+    }
+
+    /// Store an OAuth token for a platform.
+    pub fn set_oauth_token(&self, platform: AccountPlatform, token: &OAuthTokenData) -> Result<()> {
+        let key = Self::oauth_key(platform);
+        let Some(ss) = &self.secure_storage else {
+            anyhow::bail!("SecureStorage unavailable");
+        };
+        let json = serde_json::to_string(token)?;
+        let mut key_map = load_key_map(&self.keys_path);
+        let encrypted = ss.encrypt(&json)?;
+        key_map.insert(key.to_string(), encrypted);
+        save_key_map(&self.keys_path, &key_map)
+    }
+
+    /// Remove an OAuth token for a platform.
+    pub fn remove_oauth_token(&self, platform: AccountPlatform) -> Result<()> {
+        let key = Self::oauth_key(platform);
+        let mut key_map = load_key_map(&self.keys_path);
+        key_map.remove(key);
+        save_key_map(&self.keys_path, &key_map)
+    }
+
+    /// Add a connected account to the config.
+    pub fn add_connected_account(&self, account: ConnectedAccount) -> Result<()> {
+        self.update(|config| {
+            config
+                .connected_accounts
+                .retain(|a| a.platform != account.platform);
+            config.connected_accounts.push(account);
+        })
+    }
+
+    /// Remove a connected account from the config.
+    pub fn remove_connected_account(&self, platform: AccountPlatform) -> Result<()> {
+        self.update(|config| {
+            config
+                .connected_accounts
+                .retain(|a| a.platform != platform);
+        })
+    }
+
+    fn oauth_key(platform: AccountPlatform) -> &'static str {
+        match platform {
+            AccountPlatform::Google => KEY_OAUTH_GOOGLE,
+            AccountPlatform::Microsoft => KEY_OAUTH_MICROSOFT,
+            AccountPlatform::GitHub => KEY_OAUTH_GITHUB,
+            AccountPlatform::Slack => KEY_OAUTH_SLACK,
+            AccountPlatform::Discord => KEY_OAUTH_DISCORD,
+            AccountPlatform::Telegram => KEY_OAUTH_TELEGRAM,
+        }
     }
 
     fn setup_watcher(

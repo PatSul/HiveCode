@@ -1,5 +1,6 @@
 pub mod background;
 pub mod canvas;
+pub mod channels;
 pub mod code_review;
 pub mod config;
 pub mod context;
@@ -41,3 +42,4 @@ pub use scheduler::{CronSchedule, ScheduledJob, Scheduler};
 pub use secure_storage::SecureStorage;
 pub use security::SecurityGateway;
 pub use session::SessionState;
+pub use channels::{AgentChannel, ChannelMessage, ChannelStore, ChannelThread, MessageAuthor};

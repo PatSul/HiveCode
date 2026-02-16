@@ -29,6 +29,9 @@ impl HelpPanel {
                     .gap(theme.space_4)
                     .child(render_header(theme))
                     .child(render_quick_start(theme))
+                    .child(render_workflows_section(theme))
+                    .child(render_channels_section(theme))
+                    .child(render_connected_accounts_section(theme))
                     .child(render_project_workflow(theme))
                     .child(render_keyboard_shortcuts(theme))
                     .child(render_features_overview(theme))
@@ -322,8 +325,8 @@ fn render_quick_start(theme: &HiveTheme) -> AnyElement {
             4,
             "Explore features",
             "Use the grouped navigation: Core, Flow, Observe, Project, and System. \
-             Open Agents to run built-in workflows and reload custom ones from \
-             .hive/workflows/*.json.",
+             Open Workflows for the visual drag-and-drop builder, Channels for AI agent \
+             messaging, and Settings to connect Google, GitHub, Slack, and more.",
             theme,
         ))
         .child(step_row(
@@ -332,6 +335,248 @@ fn render_quick_start(theme: &HiveTheme) -> AnyElement {
             "Closing the window hides it from the taskbar and keeps Hive alive \
              in the system tray / menu bar indicator so scheduled tasks and reminders \
              can keep running.",
+            theme,
+        ))
+        .into_any_element()
+}
+
+// ---------------------------------------------------------------------------
+// Section: Visual Workflow Builder
+// ---------------------------------------------------------------------------
+
+fn render_workflows_section(theme: &HiveTheme) -> AnyElement {
+    card(theme)
+        .child(section_title("\u{1F5FA}", "Visual Workflow Builder", theme))
+        .child(section_desc(
+            "Design and execute automation workflows with a drag-and-drop canvas.",
+            theme,
+        ))
+        .child(separator(theme))
+        .child(step_row(
+            1,
+            "Open the Workflows panel",
+            "Click Workflows in the sidebar under Flow. The canvas shows your current workflow \
+             with a node palette on the left and properties inspector on the right.",
+            theme,
+        ))
+        .child(step_row(
+            2,
+            "Add nodes from the palette",
+            "Click Trigger, Run Command, Call API, Send Notification, Condition, or End to add \
+             nodes to the canvas. Each node type has a distinct color: green for triggers, \
+             cyan for actions, yellow for conditions, pink for outputs.",
+            theme,
+        ))
+        .child(step_row(
+            3,
+            "Connect nodes",
+            "Nodes are connected via edges that form the execution path. Click a node to select \
+             it and view its properties in the right panel.",
+            theme,
+        ))
+        .child(step_row(
+            4,
+            "Save and run",
+            "Click Save to persist your workflow, then Run to execute it. The workflow is \
+             converted to an automation workflow and executed by the agent system.",
+            theme,
+        ))
+        .child(separator(theme))
+        .child(
+            div()
+                .text_size(theme.font_size_sm)
+                .text_color(theme.text_secondary)
+                .font_weight(FontWeight::BOLD)
+                .child("Built-in Templates"),
+        )
+        .child(feature_card(
+            "\u{1F528}",
+            "Build & Test",
+            "cargo check, build release, run all tests",
+            theme,
+        ))
+        .child(feature_card(
+            "\u{1F50D}",
+            "Code Review",
+            "Investigate changes, run clippy, run tests",
+            theme,
+        ))
+        .child(feature_card(
+            "\u{1F41B}",
+            "Debug Issue",
+            "Reproduce, investigate root cause, verify fix",
+            theme,
+        ))
+        .child(feature_card(
+            "\u{1F680}",
+            "Deploy",
+            "Test, build release, check binary",
+            theme,
+        ))
+        .child(feature_card(
+            "\u{1F4D6}",
+            "Research & Implement",
+            "Investigate approaches, implement, verify, review",
+            theme,
+        ))
+        .child(feature_card(
+            "\u{2699}",
+            "Full Pipeline",
+            "End-to-end: investigate, build, test, lint, verify",
+            theme,
+        ))
+        .into_any_element()
+}
+
+// ---------------------------------------------------------------------------
+// Section: AI Agent Channels
+// ---------------------------------------------------------------------------
+
+fn render_channels_section(theme: &HiveTheme) -> AnyElement {
+    card(theme)
+        .child(section_title("\u{1F4AC}", "AI Agent Channels", theme))
+        .child(section_desc(
+            "Chat with multiple AI agents in persistent, Telegram-style channels.",
+            theme,
+        ))
+        .child(separator(theme))
+        .child(step_row(
+            1,
+            "Open the Channels panel",
+            "Click Channels in the sidebar. You will see a list of channels on the left, \
+             the message area in the center, and the agent presence panel on the right.",
+            theme,
+        ))
+        .child(step_row(
+            2,
+            "Select a channel",
+            "Click any channel to view its messages. Each channel has assigned AI agents \
+             that will respond to your messages based on their persona expertise.",
+            theme,
+        ))
+        .child(step_row(
+            3,
+            "Send a message",
+            "Type in the message input at the bottom and click Send. The assigned agents \
+             will respond with their specialized knowledge.",
+            theme,
+        ))
+        .child(separator(theme))
+        .child(
+            div()
+                .text_size(theme.font_size_sm)
+                .text_color(theme.text_secondary)
+                .font_weight(FontWeight::BOLD)
+                .child("Default Channels"),
+        )
+        .child(feature_card(
+            "\u{1F4AC}",
+            "#general",
+            "All 6 agents available \u{2014} Investigate, Implement, Verify, Critique, Debug, CodeReview",
+            theme,
+        ))
+        .child(feature_card(
+            "\u{1F50D}",
+            "#code-review",
+            "CodeReview + Critique agents for reviewing code changes",
+            theme,
+        ))
+        .child(feature_card(
+            "\u{1F41B}",
+            "#debug",
+            "Debug + Investigate agents for debugging sessions",
+            theme,
+        ))
+        .child(feature_card(
+            "\u{1F4D6}",
+            "#research",
+            "Investigate + Implement agents for research tasks",
+            theme,
+        ))
+        .into_any_element()
+}
+
+// ---------------------------------------------------------------------------
+// Section: Connected Accounts
+// ---------------------------------------------------------------------------
+
+fn render_connected_accounts_section(theme: &HiveTheme) -> AnyElement {
+    card(theme)
+        .child(section_title("\u{1F517}", "Connected Accounts", theme))
+        .child(section_desc(
+            "Link external services to power the Assistant panel with real data.",
+            theme,
+        ))
+        .child(separator(theme))
+        .child(step_row(
+            1,
+            "Open Settings",
+            "Navigate to Settings and scroll to the Connected Accounts section in the right column.",
+            theme,
+        ))
+        .child(step_row(
+            2,
+            "Click Connect",
+            "Click the Connect button next to any platform (Google, Microsoft, GitHub, \
+             Slack, Discord, Telegram). This opens your browser for OAuth authentication.",
+            theme,
+        ))
+        .child(step_row(
+            3,
+            "Authorize in browser",
+            "Sign in and authorize Hive. The authorization code is captured automatically \
+             via a local callback server. Your tokens are stored encrypted in SecureStorage.",
+            theme,
+        ))
+        .child(step_row(
+            4,
+            "View data in Assistant",
+            "Once connected, the Assistant panel shows real data from your accounts: \
+             emails from Gmail/Outlook, calendar events, GitHub activity, and messaging mentions.",
+            theme,
+        ))
+        .child(separator(theme))
+        .child(
+            div()
+                .text_size(theme.font_size_sm)
+                .text_color(theme.text_secondary)
+                .font_weight(FontWeight::BOLD)
+                .child("Supported Platforms"),
+        )
+        .child(feature_card(
+            "\u{1F4E7}",
+            "Google",
+            "Gmail, Calendar, Drive, Contacts, Tasks",
+            theme,
+        ))
+        .child(feature_card(
+            "\u{1F4BC}",
+            "Microsoft",
+            "Outlook Email, Outlook Calendar, Teams",
+            theme,
+        ))
+        .child(feature_card(
+            "\u{1F419}",
+            "GitHub",
+            "Repos, Issues, PRs, Activity feed",
+            theme,
+        ))
+        .child(feature_card(
+            "\u{1F4AC}",
+            "Slack",
+            "Channels, DMs, Mentions",
+            theme,
+        ))
+        .child(feature_card(
+            "\u{1F3AE}",
+            "Discord",
+            "Servers, Channels, DMs",
+            theme,
+        ))
+        .child(feature_card(
+            "\u{2708}",
+            "Telegram",
+            "Chats, Groups, Bots",
             theme,
         ))
         .into_any_element()
@@ -463,6 +708,21 @@ fn render_features_overview(theme: &HiveTheme) -> AnyElement {
             "\u{2699}",
             "Custom Workflows",
             "Define JSON workflows in .hive/workflows and run them from Agents",
+        ),
+        (
+            "\u{1F5FA}",
+            "Visual Workflow Builder",
+            "Drag-and-drop canvas for wiring agents, steps, and conditions",
+        ),
+        (
+            "\u{1F4AC}",
+            "AI Agent Channels",
+            "Telegram-style channels for chatting with specialized AI agents",
+        ),
+        (
+            "\u{1F517}",
+            "Connected Accounts",
+            "OAuth integration with Google, Microsoft, GitHub, Slack, Discord, Telegram",
         ),
         (
             "\u{1F50D}",
