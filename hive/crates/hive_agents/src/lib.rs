@@ -1,16 +1,19 @@
 pub mod auto_commit;
 pub mod automation;
 pub mod collective_memory;
+pub mod competence_detection;
 pub mod coordinator;
 pub mod guardian;
 pub mod heartbeat;
 pub mod hiveloop;
 pub mod hivemind;
+pub mod knowledge_acquisition;
 pub mod mcp_client;
 pub mod mcp_server;
 pub mod persistence;
 pub mod personas;
 pub mod queen;
+pub mod skill_authoring;
 pub mod skill_marketplace;
 pub mod skills;
 pub mod specs;
@@ -27,6 +30,10 @@ pub use automation::{
     USER_WORKFLOW_DIR,
 };
 pub use collective_memory::{CollectiveMemory, MemoryCategory, MemoryEntry, MemoryStats};
+pub use competence_detection::{
+    CompetenceAssessment, CompetenceConfig, CompetenceDetector, CompetenceGap, GapSeverity,
+    GapType, SuggestedAction,
+};
 pub use coordinator::{
     Coordinator, CoordinatorConfig, CoordinatorResult, PlannedTask, TaskPlan, TaskResult,
 };
@@ -34,6 +41,14 @@ pub use heartbeat::{AgentHeartbeat, HeartbeatService};
 pub use persistence::{AgentPersistenceService, AgentSnapshot, CompletedTask};
 pub use personas::{Persona, PersonaKind, PersonaRegistry, PromptOverride, execute_with_persona};
 pub use queen::Queen;
+pub use knowledge_acquisition::{
+    AcquisitionResult, CodeBlock, KnowledgeAcquisitionAgent, KnowledgeConfig, KnowledgePage,
+    KnowledgeSummary,
+};
+pub use skill_authoring::{
+    DraftSkill, SkillAuthoringConfig, SkillAuthoringPipeline, SkillAuthoringRequest,
+    SkillAuthoringResult, SkillResultSource, SkillSearchResult,
+};
 pub use skill_marketplace::{
     AvailableSkill, InstalledSkill, SecurityIssue, SecurityIssueType, Severity, SkillCategory,
     SkillDirectory, SkillMarketplace, SkillOrg, SkillSource,

@@ -10,10 +10,12 @@
 
 <p align="center">
   <a href="https://github.com/PatSul/Hive/releases"><img src="https://img.shields.io/github/v/release/PatSul/Hive?label=download&color=brightgreen&cache=1" alt="Download" /></a>
+  <img src="https://img.shields.io/badge/version-0.2.0-blue" alt="Version" />
   <img src="https://img.shields.io/badge/language-Rust-orange?logo=rust" alt="Rust" />
-  <img src="https://img.shields.io/badge/tests-2.5k%2B-brightgreen" alt="Tests" />
+  <img src="https://img.shields.io/badge/tests-2%2C531-brightgreen" alt="Tests" />
   <img src="https://img.shields.io/badge/crates-16-blue" alt="Crates" />
   <img src="https://img.shields.io/badge/warnings-0-brightgreen" alt="Warnings" />
+  <img src="https://img.shields.io/badge/lines-127k%2B-informational" alt="Lines of Rust" />
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20(Apple%20Silicon)%20%7C%20Linux-informational" alt="Windows | macOS (Apple Silicon) | Linux" />
   <img src="https://img.shields.io/badge/UI-GPUI-blueviolet" alt="GPUI" />
 </p>
@@ -23,6 +25,8 @@
 ## What Is Hive?
 
 Hive is a **native Rust desktop AI platform** built on [GPUI](https://gpui.rs) — no Electron, no web wrappers. It unifies a development environment, a personal assistant framework, and a security-first architecture into a single application. Instead of one chatbot, Hive runs a **multi-agent swarm** that can plan, build, test, and orchestrate workflows while learning your preferences over time — all while ensuring no secret or PII ever leaves your machine without approval.
+
+What makes Hive different: it **learns from every interaction** (locally, privately), it **detects its own knowledge gaps** and autonomously researches and acquires new skills, and it **federates** across instances for distributed swarm execution.
 
 ---
 
@@ -41,6 +45,7 @@ Hive is a **native Rust desktop AI platform** built on [GPUI](https://gpui.rs) �
 - Cost tracking & budget enforcement
 - Code review & testing automation
 - ClawdHub skill marketplace
+- Autonomous skill acquisition (self-teaching)
 - Automation workflows (cron, event, webhook triggers)
 - Docker sandbox with real CLI integration
 - MCP client + server
@@ -102,7 +107,7 @@ Hive does not use a single AI agent. It uses a **hierarchical swarm** modeled on
 
 **HiveMind teams** use specialized agents — Architect, Coder, Reviewer, Tester, Security — that reach consensus through structured debate.
 
-**Coordinator teams** decompose work into dependency-ordered tasks (investigate → implement → verify) with persona-specific prompts.
+**Coordinator teams** decompose work into dependency-ordered tasks (investigate, implement, verify) with persona-specific prompts.
 
 Every team gets its own **git worktree** (`swarm/{run_id}/{team_id}`) for conflict-free parallel execution, merging back on completion.
 
@@ -120,6 +125,76 @@ Every team gets its own **git worktree** (`swarm/{run_id}/{team_id}`) for confli
 | HuggingFace | |
 
 Features: complexity classification, 14-entry fallback chain, per-model cost tracking, streaming support, budget enforcement.
+
+---
+
+## Autonomous Skill Acquisition
+
+Hive doesn't just execute what it already knows — it **recognizes what it doesn't know** and teaches itself. This is the closed-loop system that lets Hive grow its own capabilities in real time:
+
+```
+User request
+    |
+    v
+Competence Detection ─── "I know this" ───> Normal execution
+    |
+    "I don't know this"
+    |
+    v
+Search ClawdHub / Sources ─── Found sufficient skill? ───> Install & use
+    |
+    Not found (or insufficient)
+    |
+    v
+Knowledge Acquisition ───> Fetch docs, parse, synthesize
+    |
+    v
+Skill Authoring Pipeline ───> Generate, security-scan, test, install
+    |
+    v
+New skill available for future requests
+```
+
+### Competence Detection
+
+The **CompetenceDetector** scores Hive's confidence on every incoming request using a weighted formula across four signals:
+
+| Signal | Weight | Source |
+|---|---|---|
+| Skill match | 30% | Exact trigger/name match in skills registry |
+| Pattern match | 20% | Keyword overlap with marketplace skill descriptions |
+| Memory match | 15% | Relevant entries in collective memory |
+| AI assessment | 35% | Lightweight model call rating confidence 0-10 |
+
+When confidence drops below the learning threshold (default 0.4), the system identifies **competence gaps** — missing skills, missing knowledge, low-quality skills, or absent patterns — and triggers the acquisition pipeline automatically.
+
+A **quick assessment** mode (no AI call) is available for low-latency checks using purely pattern-based matching.
+
+### Knowledge Acquisition
+
+The **KnowledgeAcquisitionAgent** is a research agent that autonomously:
+
+1. **Identifies** the best documentation URLs for a topic (AI-orchestrated)
+2. **Fetches** pages via HTTPS with domain allowlisting and private-IP blocking
+3. **Parses** HTML to clean text — strips scripts, styles, nav, footers; extracts `<code>` blocks with language detection
+4. **Caches** locally (`~/.hive/knowledge/`) with SHA-256 content hashing and configurable TTL (default 7 days)
+5. **Synthesizes** knowledge via AI into structured summaries (key concepts, relevant commands, code examples)
+6. **Injects** results into the ContextEngine as `Documentation` sources for future queries
+
+Security: HTTPS-only, 23+ allowlisted documentation domains (docs.rs, kubernetes.io, react.dev, MDN, etc.), private IP rejection, content scanned for injection before storage, configurable page-size limits.
+
+### Skill Authoring Pipeline
+
+When no existing skill is found, the **SkillAuthoringPipeline** creates one:
+
+1. **Search existing skills first** — Queries ClawdHub directory and remote sources. Each candidate is AI-scored for sufficiency (0-10). Skills scoring >= 7 are installed directly.
+2. **Research** — Delegates to KnowledgeAcquisitionAgent if no sufficient existing skill is found
+3. **Generate** — AI creates a skill definition (name, trigger, category, prompt template, test input)
+4. **Security scan** — Runs the same 6-category injection scan used for community skills. Retries up to 2x on failure.
+5. **Test** — Validates the skill produces relevant output for the sample input
+6. **Install** — Adds to marketplace with `/hive-` trigger prefix, disabled by default until user enables
+
+All auto-generated skills are logged to CollectiveMemory for auditability. The pipeline fails gracefully at every step — a failed scan or test never installs a broken skill.
 
 ---
 
@@ -203,6 +278,7 @@ All learning data stored locally in SQLite (`~/.hive/learning.db`). Every prefer
 |---|---|
 | **Automation Workflows** | Multi-step workflows with triggers (manual, cron schedule, event, webhook) and 6 action types (run command, send message, call API, create task, send notification, execute skill). YAML-based definitions in `~/.hive/workflows/`. |
 | **ClawdHub Marketplace** | Browse, install, remove, and toggle skills. Create custom skills. Add remote skill sources. Built-in directory of curated skills. Security scanning on install. |
+| **Autonomous Skill Creation** | When Hive encounters an unfamiliar domain, it searches existing skill sources first, then researches documentation and authors a new skill if nothing sufficient exists. See [Autonomous Skill Acquisition](#autonomous-skill-acquisition). |
 | **Personas** | Named agent personalities with custom system prompts, prompt overrides per task type, and configurable model preferences. |
 | **Auto-Commit** | Watches for staged changes and generates AI-powered commit messages. |
 | **Daily Standups** | Automated agent activity summaries across all teams and workflows. |
@@ -266,21 +342,38 @@ Hive instances can discover and communicate with each other over the network, en
 ```
 hive/crates/
 ├── hive_app           Binary entry point — window, tray, build.rs (winres)
+│                      3 files · 965 lines
 ├── hive_ui            Workspace shell, chat service, learning bridge, title/status bars
+│                      21 files · 10,751 lines
 ├── hive_ui_core       Theme, actions, globals, sidebar, welcome screen
-├── hive_ui_panels     All panel implementations (18+ panels)
+│                      6 files · 889 lines
+├── hive_ui_panels     All panel implementations (20+ panels)
+│                      42 files · 26,258 lines
 ├── hive_core          Config, SecurityGateway, persistence (SQLite), Kanban, channels, scheduling
+│                      18 files · 9,691 lines
 ├── hive_ai            11 AI providers, model router, complexity classifier, context engine, RAG
-├── hive_agents        Queen, HiveMind, Coordinator, collective memory, MCP, skills, personas
+│                      39 files · 17,741 lines
+├── hive_agents        Queen, HiveMind, Coordinator, collective memory, MCP, skills, personas,
+│                      knowledge acquisition, competence detection, skill authoring
+│                      25 files · 21,399 lines
 ├── hive_shield        PII detection, secrets scanning, vulnerability assessment, access control
+│                      6 files · 2,008 lines
 ├── hive_learn         Outcome tracking, routing learner, preference model, prompt evolution
+│                      10 files · 5,438 lines
 ├── hive_assistant     Email, calendar, reminders, approval workflows, daily briefings
+│                      13 files · 4,424 lines
 ├── hive_fs            File operations, git integration, file watchers, search
+│                      5 files · 1,150 lines
 ├── hive_terminal      Command execution, Docker sandbox, browser automation, local AI detection
+│                      8 files · 5,877 lines
 ├── hive_docs          Document generation — CSV, DOCX, XLSX, HTML, Markdown, PDF, PPTX
+│                      8 files · 1,478 lines
 ├── hive_blockchain    EVM + Solana wallets, RPC config, token deployment with real JSON-RPC
+│                      6 files · 1,669 lines
 ├── hive_integrations  Google, Microsoft, GitHub, messaging, OAuth2, smart home, cloud, webhooks
+│                      35 files · 14,501 lines
 └── hive_network       P2P federation, WebSocket transport, UDP discovery, peer registry, sync
+                       11 files · 2,762 lines
 ```
 
 ---
@@ -400,7 +493,7 @@ cargo run --release
 
 ```bash
 cd hive
-cargo test
+cargo test --workspace
 ```
 
 ---
@@ -409,14 +502,37 @@ cargo test
 
 | Metric | Value |
 |---|---|
+| Version | 0.2.0 |
 | Crates | 16 |
-| Rust source files | 250+ |
-| Lines of Rust | 120,000+ |
-| Tests | 2,486 |
+| Rust source files | 256 |
+| Lines of Rust | 127,001 |
+| Tests | 2,531 |
 | Compiler warnings | 0 |
 | Memory footprint | < 50 MB |
 | Startup time | < 1 second |
 | UI rendering | 120fps (GPU-accelerated via GPUI) |
+
+---
+
+## Changelog
+
+### v0.2.0
+
+**Autonomous Skill Acquisition** — Hive can now detect its own knowledge gaps, research documentation, and author new skills entirely on its own.
+
+- **Knowledge Acquisition Agent** — Fetches documentation from 23+ allowlisted domains, parses HTML to clean text with code block extraction, caches locally with SHA-256 dedup and 7-day TTL, synthesizes via AI into structured summaries, and injects into the context engine for future queries.
+- **Competence Detection** — Self-awareness layer that scores confidence (0.0-1.0) across skill match, pattern overlap, memory recall, and AI assessment. Identifies gap types (missing skill, missing knowledge, low quality, no patterns) and triggers the learning pipeline when confidence is low.
+- **Skill Authoring Pipeline** — Search-first approach: queries ClawdHub directory and remote sources, AI-scores each candidate for sufficiency (>= 7/10 threshold). Only if no sufficient existing skill is found does it research, generate, security-scan, test, and install a new `/hive-` prefixed skill. All auto-generated skills are disabled by default until user enables them.
+- **P2P Federation** (`hive_network`) — UDP broadcast peer discovery, WebSocket transport, 12 typed message kinds, channel sync, fleet learning, persistent peer registry.
+- **Blockchain / Web3** (`hive_blockchain`) — EVM multi-chain (7 networks) and Solana wallet management with real JSON-RPC calls, token deployment with cost estimation, encrypted key storage.
+- **Docker Sandbox** — Real Docker CLI integration with container lifecycle management (create, start, stop, exec, pause, unpause, remove) and simulation fallback.
+- Over 45 new tests across knowledge acquisition, competence detection, and skill authoring modules.
+- Increased total test count from 2,486 to 2,531.
+- Updated to 256 source files and 127,001 lines of Rust.
+
+### v0.1.0
+
+- Initial release with 16-crate architecture, multi-agent swarm (Queen + HiveMind + Coordinator), 11 AI providers, HiveShield security (PII detection, secrets scanning, vulnerability assessment), self-improvement engine (5 feedback loops), ClawdHub skill marketplace, personal assistant (email, calendar, reminders), 20+ UI panels, automation workflows, and full Git Ops.
 
 ---
 
