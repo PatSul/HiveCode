@@ -16,6 +16,7 @@ members = [
     "crates/hive_shield",
     "crates/hive_learn",
     "crates/hive_assistant",
+    "crates/hive_network",
 ]
 
 [workspace.package]

@@ -28,6 +28,7 @@ actions!(
         SwitchToShield,
         SwitchToAssistant,
         SwitchToSettings,
+        SwitchToNetwork,
         SwitchToHelp,
         OpenWorkspaceDirectory,
         // Files panel

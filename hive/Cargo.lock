@@ -3287,6 +3287,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "hive_network"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "futures",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-tungstenite",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "hive_shield"
 version = "0.1.0"
 dependencies = [
@@ -3364,6 +3379,7 @@ dependencies = [
  "hive_core",
  "hive_integrations",
  "hive_learn",
+ "hive_network",
  "hive_shield",
  "hive_terminal",
 ]

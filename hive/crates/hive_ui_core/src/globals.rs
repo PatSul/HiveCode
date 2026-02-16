@@ -20,6 +20,7 @@ use hive_assistant::AssistantService;
 use hive_blockchain::rpc_config::RpcConfigStore;
 use hive_blockchain::wallet_store::WalletStore;
 use hive_core::channels::ChannelStore;
+use hive_network::HiveNode;
 use hive_core::config::ConfigManager;
 use hive_core::notifications::NotificationStore;
 use hive_core::persistence::Database;
@@ -108,3 +109,7 @@ impl Global for AppIde {}
 /// Global wrapper for the AI agent channel store (persistent messaging channels).
 pub struct AppChannels(pub ChannelStore);
 impl Global for AppChannels {}
+
+/// Global wrapper for the P2P network node (federation, peer discovery).
+pub struct AppNetwork(pub Arc<HiveNode>);
+impl Global for AppNetwork {}
