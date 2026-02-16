@@ -57,6 +57,42 @@ impl AccountPlatform {
         }
     }
 
+    /// URL where users can create their own OAuth client/app for this platform.
+    pub fn setup_url(&self) -> &'static str {
+        match self {
+            Self::Google => "https://console.cloud.google.com/apis/credentials",
+            Self::Microsoft => "https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps",
+            Self::GitHub => "https://github.com/settings/developers",
+            Self::Slack => "https://api.slack.com/apps",
+            Self::Discord => "https://discord.com/developers/applications",
+            Self::Telegram => "https://core.telegram.org/bots#botfather",
+        }
+    }
+
+    /// Get the OAuth client ID from config for this platform.
+    pub fn client_id_from_config(&self, cfg: &HiveConfig) -> Option<String> {
+        match self {
+            Self::Google => cfg.google_oauth_client_id.clone(),
+            Self::Microsoft => cfg.microsoft_oauth_client_id.clone(),
+            Self::GitHub => cfg.github_oauth_client_id.clone(),
+            Self::Slack => cfg.slack_oauth_client_id.clone(),
+            Self::Discord => cfg.discord_oauth_client_id.clone(),
+            Self::Telegram => cfg.telegram_oauth_client_id.clone(),
+        }
+    }
+
+    /// Set the OAuth client ID in config for this platform.
+    pub fn set_client_id_in_config(&self, cfg: &mut HiveConfig, value: Option<String>) {
+        match self {
+            Self::Google => cfg.google_oauth_client_id = value,
+            Self::Microsoft => cfg.microsoft_oauth_client_id = value,
+            Self::GitHub => cfg.github_oauth_client_id = value,
+            Self::Slack => cfg.slack_oauth_client_id = value,
+            Self::Discord => cfg.discord_oauth_client_id = value,
+            Self::Telegram => cfg.telegram_oauth_client_id = value,
+        }
+    }
+
     pub fn from_str(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "google" => Some(Self::Google),
@@ -262,6 +298,14 @@ pub struct HiveConfig {
 
     // Connected accounts
     pub connected_accounts: Vec<ConnectedAccount>,
+
+    // OAuth client IDs — user-provided per-platform
+    pub google_oauth_client_id: Option<String>,
+    pub microsoft_oauth_client_id: Option<String>,
+    pub github_oauth_client_id: Option<String>,
+    pub slack_oauth_client_id: Option<String>,
+    pub discord_oauth_client_id: Option<String>,
+    pub telegram_oauth_client_id: Option<String>,
 }
 
 impl Default for HiveConfig {
@@ -300,6 +344,12 @@ impl Default for HiveConfig {
             log_level: "info".into(),
             close_to_tray_notice_seen: false,
             connected_accounts: Vec::new(),
+            google_oauth_client_id: None,
+            microsoft_oauth_client_id: None,
+            github_oauth_client_id: None,
+            slack_oauth_client_id: None,
+            discord_oauth_client_id: None,
+            telegram_oauth_client_id: None,
         }
     }
 }

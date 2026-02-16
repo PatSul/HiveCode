@@ -243,6 +243,14 @@ pub struct SettingsView {
 
     // Discovery status
     discovered_model_count: usize,
+
+    // OAuth client ID inputs per platform
+    google_client_id_input: Entity<InputState>,
+    microsoft_client_id_input: Entity<InputState>,
+    github_client_id_input: Entity<InputState>,
+    slack_client_id_input: Entity<InputState>,
+    discord_client_id_input: Entity<InputState>,
+    telegram_client_id_input: Entity<InputState>,
 }
 
 impl EventEmitter<SettingsSaved> for SettingsView {}
@@ -382,6 +390,56 @@ impl SettingsView {
             state
         });
 
+        // OAuth client ID inputs per platform
+        let google_client_id_input = cx.new(|cx| {
+            let mut state = InputState::new(window, cx);
+            state.set_placeholder("Google OAuth Client ID", window, cx);
+            if let Some(ref val) = cfg.google_oauth_client_id {
+                state.set_value(val.clone(), window, cx);
+            }
+            state
+        });
+        let microsoft_client_id_input = cx.new(|cx| {
+            let mut state = InputState::new(window, cx);
+            state.set_placeholder("Microsoft OAuth Client ID", window, cx);
+            if let Some(ref val) = cfg.microsoft_oauth_client_id {
+                state.set_value(val.clone(), window, cx);
+            }
+            state
+        });
+        let github_client_id_input = cx.new(|cx| {
+            let mut state = InputState::new(window, cx);
+            state.set_placeholder("GitHub OAuth Client ID", window, cx);
+            if let Some(ref val) = cfg.github_oauth_client_id {
+                state.set_value(val.clone(), window, cx);
+            }
+            state
+        });
+        let slack_client_id_input = cx.new(|cx| {
+            let mut state = InputState::new(window, cx);
+            state.set_placeholder("Slack OAuth Client ID", window, cx);
+            if let Some(ref val) = cfg.slack_oauth_client_id {
+                state.set_value(val.clone(), window, cx);
+            }
+            state
+        });
+        let discord_client_id_input = cx.new(|cx| {
+            let mut state = InputState::new(window, cx);
+            state.set_placeholder("Discord OAuth Client ID", window, cx);
+            if let Some(ref val) = cfg.discord_oauth_client_id {
+                state.set_value(val.clone(), window, cx);
+            }
+            state
+        });
+        let telegram_client_id_input = cx.new(|cx| {
+            let mut state = InputState::new(window, cx);
+            state.set_placeholder("Telegram Bot Token", window, cx);
+            if let Some(ref val) = cfg.telegram_oauth_client_id {
+                state.set_value(val.clone(), window, cx);
+            }
+            state
+        });
+
         // Subscribe to blur events on all text inputs → auto-save
         let all_inputs = [
             &anthropic_key_input,
@@ -399,6 +457,12 @@ impl SettingsView {
             &custom_url_input,
             &daily_budget_input,
             &monthly_budget_input,
+            &google_client_id_input,
+            &microsoft_client_id_input,
+            &github_client_id_input,
+            &slack_client_id_input,
+            &discord_client_id_input,
+            &telegram_client_id_input,
         ];
         for input in all_inputs {
             cx.subscribe_in(input, window, Self::on_input_event)
@@ -444,6 +508,12 @@ impl SettingsView {
             had_elevenlabs_key: had_elevenlabs,
             had_telnyx_key: had_telnyx,
             discovered_model_count: 0,
+            google_client_id_input,
+            microsoft_client_id_input,
+            github_client_id_input,
+            slack_client_id_input,
+            discord_client_id_input,
+            telegram_client_id_input,
         };
 
         // Initialize model selector with current provider availability
@@ -543,6 +613,24 @@ impl SettingsView {
             tts_enabled: self.tts_enabled,
             tts_auto_speak: self.tts_auto_speak,
             clawdtalk_enabled: self.clawdtalk_enabled,
+            google_oauth_client_id: non_empty_trimmed(
+                &self.google_client_id_input.read(cx).value().to_string(),
+            ),
+            microsoft_oauth_client_id: non_empty_trimmed(
+                &self.microsoft_client_id_input.read(cx).value().to_string(),
+            ),
+            github_oauth_client_id: non_empty_trimmed(
+                &self.github_client_id_input.read(cx).value().to_string(),
+            ),
+            slack_oauth_client_id: non_empty_trimmed(
+                &self.slack_client_id_input.read(cx).value().to_string(),
+            ),
+            discord_oauth_client_id: non_empty_trimmed(
+                &self.discord_client_id_input.read(cx).value().to_string(),
+            ),
+            telegram_oauth_client_id: non_empty_trimmed(
+                &self.telegram_client_id_input.read(cx).value().to_string(),
+            ),
         }
     }
 
@@ -685,6 +773,13 @@ pub struct SettingsSnapshot {
     pub tts_enabled: bool,
     pub tts_auto_speak: bool,
     pub clawdtalk_enabled: bool,
+    // OAuth client IDs
+    pub google_oauth_client_id: Option<String>,
+    pub microsoft_oauth_client_id: Option<String>,
+    pub github_oauth_client_id: Option<String>,
+    pub slack_oauth_client_id: Option<String>,
+    pub discord_oauth_client_id: Option<String>,
+    pub telegram_oauth_client_id: Option<String>,
 }
 
 fn key_placeholder(has_key: bool) -> &'static str {
@@ -1102,78 +1197,143 @@ impl SettingsView {
                 .find(|a| a.platform == *platform)
                 .and_then(|a| a.last_synced.clone());
 
+            // Get the client ID input entity for this platform
+            let client_id_input = match platform {
+                AccountPlatform::Google => self.google_client_id_input.clone(),
+                AccountPlatform::Microsoft => self.microsoft_client_id_input.clone(),
+                AccountPlatform::GitHub => self.github_client_id_input.clone(),
+                AccountPlatform::Slack => self.slack_client_id_input.clone(),
+                AccountPlatform::Discord => self.discord_client_id_input.clone(),
+                AccountPlatform::Telegram => self.telegram_client_id_input.clone(),
+            };
+
+            let setup_url = platform.setup_url();
+
             rows.push(
                 div()
                     .flex()
-                    .items_center()
-                    .gap(theme.space_3)
-                    .py(theme.space_2)
+                    .flex_col()
+                    .gap(theme.space_2)
+                    .py(theme.space_3)
+                    .border_b_1()
+                    .border_color(theme.border)
                     .child(
-                        div()
-                            .text_size(px(20.0))
-                            .child(platform.icon().to_string()),
-                    )
-                    .child(
+                        // Platform header row
                         div()
                             .flex()
-                            .flex_col()
-                            .flex_1()
-                            .min_w(px(0.0))
+                            .items_center()
+                            .gap(theme.space_3)
                             .child(
                                 div()
-                                    .text_size(theme.font_size_sm)
-                                    .text_color(theme.text_primary)
-                                    .font_weight(FontWeight::SEMIBOLD)
-                                    .child(platform.label().to_string()),
+                                    .text_size(px(20.0))
+                                    .child(platform.icon().to_string()),
                             )
-                            .when(is_connected, |el: Div| {
-                                el.child(
-                                    div()
-                                        .text_size(theme.font_size_xs)
-                                        .text_color(theme.text_muted)
-                                        .child(account_name.clone()),
-                                )
-                            })
-                            .when(last_synced.is_some(), |el: Div| {
-                                el.child(
-                                    div()
-                                        .text_size(px(9.0))
-                                        .text_color(theme.text_muted)
-                                        .child(format!(
-                                            "Last synced: {}",
-                                            last_synced.as_deref().unwrap_or("never")
-                                        )),
-                                )
-                            }),
+                            .child(
+                                div()
+                                    .flex()
+                                    .flex_col()
+                                    .flex_1()
+                                    .min_w(px(0.0))
+                                    .child(
+                                        div()
+                                            .text_size(theme.font_size_sm)
+                                            .text_color(theme.text_primary)
+                                            .font_weight(FontWeight::SEMIBOLD)
+                                            .child(platform.label().to_string()),
+                                    )
+                                    .when(is_connected, |el: Div| {
+                                        el.child(
+                                            div()
+                                                .text_size(theme.font_size_xs)
+                                                .text_color(theme.text_muted)
+                                                .child(account_name.clone()),
+                                        )
+                                    })
+                                    .when(last_synced.is_some(), |el: Div| {
+                                        el.child(
+                                            div()
+                                                .text_size(px(9.0))
+                                                .text_color(theme.text_muted)
+                                                .child(format!(
+                                                    "Last synced: {}",
+                                                    last_synced.as_deref().unwrap_or("never")
+                                                )),
+                                        )
+                                    }),
+                            )
+                            .child(
+                                div()
+                                    .flex()
+                                    .items_center()
+                                    .gap(theme.space_2)
+                                    .child(status_dot(is_connected, theme))
+                                    .child(if is_connected {
+                                        div()
+                                            .text_size(theme.font_size_xs)
+                                            .text_color(theme.accent_green)
+                                            .child("Connected")
+                                            .into_any_element()
+                                    } else {
+                                        div()
+                                            .id(ElementId::Name(
+                                                format!("connect-{}", platform.label()).into(),
+                                            ))
+                                            .px(theme.space_3)
+                                            .py(theme.space_1)
+                                            .rounded(theme.radius_md)
+                                            .bg(theme.accent_cyan)
+                                            .text_size(theme.font_size_xs)
+                                            .text_color(theme.bg_primary)
+                                            .font_weight(FontWeight::BOLD)
+                                            .cursor_pointer()
+                                            .child("Connect")
+                                            .into_any_element()
+                                    }),
+                            ),
                     )
                     .child(
+                        // OAuth Client ID input row
                         div()
                             .flex()
                             .items_center()
                             .gap(theme.space_2)
-                            .child(status_dot(is_connected, theme))
-                            .child(if is_connected {
+                            .pl(px(32.0)) // Indent under icon
+                            .child(
                                 div()
-                                    .text_size(theme.font_size_xs)
-                                    .text_color(theme.accent_green)
-                                    .child("Connected")
-                                    .into_any_element()
-                            } else {
+                                    .flex_1()
+                                    .min_w(px(0.0))
+                                    .child(
+                                        Input::new(&client_id_input)
+                                            .text_size(theme.font_size_xs)
+                                            .cleanable(true),
+                                    ),
+                            )
+                            .child(
                                 div()
-                                    .id(ElementId::Name(
-                                        format!("connect-{}", platform.label()).into(),
-                                    ))
-                                    .px(theme.space_3)
-                                    .py(theme.space_1)
-                                    .rounded(theme.radius_md)
-                                    .bg(theme.accent_cyan)
-                                    .text_size(theme.font_size_xs)
-                                    .text_color(theme.bg_primary)
-                                    .font_weight(FontWeight::BOLD)
-                                    .cursor_pointer()
-                                    .child("Connect")
-                                    .into_any_element()
-                            }),
+                                    .flex()
+                                    .flex_col()
+                                    .items_end()
+                                    .gap(px(2.0))
+                                    .child(
+                                        div()
+                                            .id(ElementId::Name(
+                                                format!("setup-link-{}", platform.label()).into(),
+                                            ))
+                                            .text_size(theme.font_size_xs)
+                                            .text_color(theme.accent_cyan)
+                                            .cursor_pointer()
+                                            .hover(|s| s.text_color(theme.accent_aqua))
+                                            .child("Setup \u{2197}"),
+                                    )
+                                    .child(
+                                        div()
+                                            .text_size(px(8.0))
+                                            .text_color(theme.text_muted)
+                                            .max_w(px(150.0))
+                                            .overflow_hidden()
+                                            .child(setup_url.to_string()),
+                                    ),
+                            ),
                     )
                     .into_any_element(),
             );
@@ -1182,7 +1342,7 @@ impl SettingsView {
         card(theme)
             .child(section_title("\u{1F517}", "Connected Accounts", theme))
             .child(section_desc(
-                "Link external services for calendar, email, repos, and messaging integration.",
+                "Link external services for calendar, email, repos, and messaging integration. Provide your own OAuth Client ID for each platform.",
                 theme,
             ))
             .child(separator(theme))

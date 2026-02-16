@@ -77,6 +77,33 @@ use crate::titlebar::Titlebar;
 // Workspace
 // ---------------------------------------------------------------------------
 
+/// Helper types for background assistant data fetching.
+#[derive(Debug)]
+struct EmailPreviewData {
+    from: String,
+    subject: String,
+    snippet: String,
+    time: String,
+    important: bool,
+}
+
+#[derive(Debug)]
+struct EventData {
+    title: String,
+    time: String,
+    location: Option<String>,
+}
+
+#[derive(Debug)]
+enum AssistantFetchResult {
+    Emails {
+        provider: String,
+        previews: Vec<EmailPreviewData>,
+    },
+    Events(Vec<EventData>),
+    RecentActions(Vec<String>),
+}
+
 /// Root workspace layout: titlebar + sidebar + content + statusbar + chat input.
 ///
 /// Owns the `Entity<ChatService>` and orchestrates the flow between the chat
@@ -337,6 +364,7 @@ impl HiveWorkspace {
             window,
             |this, _view, event: &WorkflowRunRequested, _window, cx| {
                 info!("Workflow run requested: {}", event.0);
+                this.handle_workflow_builder_run(event.0.clone(), cx);
             },
         )
         .detach();
@@ -348,6 +376,27 @@ impl HiveWorkspace {
             window,
             |this, _view, event: &ChannelMessageSent, _window, cx| {
                 info!("Channel message sent in {}: {}", event.channel_id, event.content);
+
+                // Persist user message to the channel store.
+                if cx.has_global::<AppChannels>() {
+                    let user_msg = hive_core::channels::ChannelMessage {
+                        id: uuid::Uuid::new_v4().to_string(),
+                        author: hive_core::channels::MessageAuthor::User,
+                        content: event.content.clone(),
+                        timestamp: chrono::Utc::now(),
+                        thread_id: None,
+                        model: None,
+                        cost: None,
+                    };
+                    cx.global_mut::<AppChannels>().0.add_message(&event.channel_id, user_msg);
+                }
+
+                this.handle_channel_agent_responses(
+                    event.channel_id.clone(),
+                    event.content.clone(),
+                    event.assigned_agents.clone(),
+                    cx,
+                );
             },
         )
         .detach();
@@ -543,6 +592,12 @@ impl HiveWorkspace {
     pub fn set_active_panel(&mut self, panel: Panel) {
         self.sidebar.active_panel = panel;
         self.session_dirty = true;
+    }
+
+    /// Override the version shown in the status bar (called from hive_app
+    /// which has access to the git-based HIVE_VERSION).
+    pub fn set_version(&mut self, version: String) {
+        self.status_bar.version = version;
     }
 
     // -- History data --------------------------------------------------------
@@ -869,6 +924,223 @@ impl HiveWorkspace {
                 })
                 .collect();
         }
+    }
+
+    /// Kick off background async fetches to populate the assistant panel with
+    /// real data from connected accounts (Gmail, Calendar, GitHub, etc.).
+    fn refresh_assistant_connected_data(&mut self, cx: &mut Context<Self>) {
+        use hive_core::config::AccountPlatform;
+        use hive_ui_panels::panels::assistant::{
+            EmailGroup, EmailPreview, UpcomingEvent,
+        };
+
+        if !cx.has_global::<AppConfig>() {
+            return;
+        }
+
+        let config = cx.global::<AppConfig>().0.get();
+        let connected = config.connected_accounts.clone();
+        if connected.is_empty() {
+            return;
+        }
+
+        // Gather OAuth tokens for connected platforms
+        let mut tokens: Vec<(AccountPlatform, String)> = Vec::new();
+        let config_mgr = &cx.global::<AppConfig>().0;
+        for account in &connected {
+            if let Some(token_data) = config_mgr.get_oauth_token(account.platform) {
+                tokens.push((account.platform, token_data.access_token.clone()));
+            }
+        }
+
+        if tokens.is_empty() {
+            return;
+        }
+
+        // Spawn background thread with tokio runtime for async fetches
+        let (tx, rx) = std::sync::mpsc::channel::<AssistantFetchResult>();
+
+        std::thread::spawn(move || {
+            let rt = match tokio::runtime::Runtime::new() {
+                Ok(rt) => rt,
+                Err(e) => {
+                    warn!("Assistant: failed to create tokio runtime: {e}");
+                    return;
+                }
+            };
+
+            for (platform, token) in &tokens {
+                match platform {
+                    AccountPlatform::Google => {
+                        // Fetch Gmail
+                        let gmail = hive_integrations::GmailClient::new(token);
+                        if let Ok(messages) = rt.block_on(gmail.search_emails("is:unread", 5)) {
+                            let previews: Vec<EmailPreviewData> = messages
+                                .iter()
+                                .map(|m| EmailPreviewData {
+                                    from: m.from.clone(),
+                                    subject: m.subject.clone(),
+                                    snippet: m.snippet.clone(),
+                                    time: m.date.clone(),
+                                    important: m.labels.iter().any(|x| x == "IMPORTANT"),
+                                })
+                                .collect();
+                            let _ = tx.send(AssistantFetchResult::Emails {
+                                provider: "Gmail".into(),
+                                previews,
+                            });
+                        }
+
+                        // Fetch Google Calendar
+                        let cal = hive_integrations::GoogleCalendarClient::new(token);
+                        let now = chrono::Utc::now();
+                        let time_min = now.to_rfc3339();
+                        let time_max = (now + chrono::Duration::days(1)).to_rfc3339();
+                        if let Ok(events) =
+                            rt.block_on(cal.list_events("primary", Some(&time_min), Some(&time_max), Some(10)))
+                        {
+                            let upcoming: Vec<EventData> = events
+                                .items
+                                .iter()
+                                .map(|e| EventData {
+                                    title: e.summary.clone().unwrap_or_default(),
+                                    time: e
+                                        .start
+                                        .as_ref()
+                                        .and_then(|s| s.date_time.clone())
+                                        .unwrap_or_else(|| "All day".into()),
+                                    location: e.location.clone(),
+                                })
+                                .collect();
+                            let _ = tx.send(AssistantFetchResult::Events(upcoming));
+                        }
+                    }
+                    AccountPlatform::Microsoft => {
+                        let outlook = hive_integrations::OutlookEmailClient::new(token);
+                        if let Ok(messages) = rt.block_on(outlook.list_messages("inbox", 5)) {
+                            let previews: Vec<EmailPreviewData> = messages
+                                .iter()
+                                .map(|m| EmailPreviewData {
+                                    from: m
+                                        .from
+                                        .as_ref()
+                                        .map(|a| {
+                                            a.name
+                                                .clone()
+                                                .unwrap_or_else(|| a.address.clone())
+                                        })
+                                        .unwrap_or_default(),
+                                    subject: m.subject.clone(),
+                                    snippet: m.body_preview.clone(),
+                                    time: m.received_at.clone().unwrap_or_default(),
+                                    important: false,
+                                })
+                                .collect();
+                            let _ = tx.send(AssistantFetchResult::Emails {
+                                provider: "Outlook".into(),
+                                previews,
+                            });
+                        }
+                    }
+                    AccountPlatform::GitHub => {
+                        let client = match hive_integrations::GitHubClient::new(token.clone()) {
+                            Ok(c) => c,
+                            Err(_) => continue,
+                        };
+                        if let Ok(repos) = rt.block_on(client.list_repos()) {
+                            if let Some(arr) = repos.as_array() {
+                                let descriptions: Vec<String> = arr
+                                    .iter()
+                                    .take(5)
+                                    .filter_map(|r| {
+                                        let name = r.get("full_name")?.as_str()?;
+                                        Some(format!("Activity on {name}"))
+                                    })
+                                    .collect();
+                                let _ = tx.send(AssistantFetchResult::RecentActions(descriptions));
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        });
+
+        // Poll for results from background thread via timer
+        cx.spawn(async move |entity: WeakEntity<HiveWorkspace>, async_cx: &mut AsyncApp| {
+            // Give background tasks time to complete
+            Timer::after(std::time::Duration::from_secs(3)).await;
+            let mut email_groups: Vec<(String, Vec<EmailPreviewData>)> = Vec::new();
+            let mut events: Vec<EventData> = Vec::new();
+            let mut actions: Vec<String> = Vec::new();
+
+            while let Ok(result) = rx.try_recv() {
+                match result {
+                    AssistantFetchResult::Emails { provider, previews } => {
+                        email_groups.push((provider, previews));
+                    }
+                    AssistantFetchResult::Events(evts) => {
+                        events.extend(evts);
+                    }
+                    AssistantFetchResult::RecentActions(acts) => {
+                        actions.extend(acts);
+                    }
+                }
+            }
+
+            {
+                let _ = entity.update(async_cx, |ws: &mut HiveWorkspace, cx: &mut Context<HiveWorkspace>| {
+                    // Apply email groups
+                    for (provider, previews) in &email_groups {
+                        ws.assistant_data.email_groups.push(EmailGroup {
+                            provider: provider.clone(),
+                            previews: previews
+                                .iter()
+                                .map(|p| EmailPreview {
+                                    from: p.from.clone(),
+                                    subject: p.subject.clone(),
+                                    snippet: p.snippet.clone(),
+                                    time: p.time.clone(),
+                                    important: p.important,
+                                })
+                                .collect(),
+                        });
+                    }
+
+                    // Apply events
+                    for evt in &events {
+                        ws.assistant_data.events.push(UpcomingEvent {
+                            title: evt.title.clone(),
+                            time: evt.time.clone(),
+                            location: evt.location.clone(),
+                            is_conflict: false,
+                        });
+                    }
+
+                    // Apply recent actions
+                    for act in &actions {
+                        ws.assistant_data.recent_actions.push(
+                            hive_ui_panels::panels::assistant::RecentAction {
+                                description: act.clone(),
+                                timestamp: "Now".into(),
+                                action_type: "github".into(),
+                            },
+                        );
+                    }
+
+                    // Update briefing counts
+                    if let Some(ref mut briefing) = ws.assistant_data.briefing {
+                        let total_emails: usize =
+                            email_groups.iter().map(|(_, p)| p.len()).sum();
+                        briefing.unread_emails = total_emails;
+                        briefing.event_count = ws.assistant_data.events.len();
+                    }
+
+                    cx.notify();
+                });
+            }
+        })
+        .detach();
     }
 
     fn refresh_workflow_builder(&mut self, cx: &mut Context<Self>) {
@@ -1358,6 +1630,7 @@ impl HiveWorkspace {
             }
             Panel::Assistant => {
                 self.refresh_assistant_data(cx);
+                self.refresh_assistant_connected_data(cx);
             }
             _ => {}
         }
@@ -2868,6 +3141,34 @@ impl HiveWorkspace {
                 .rebuild_fallback_chain_from_project_models(models);
         }
 
+        // Validate current chat model against the project set.
+        // If the active model is not in the project list, switch to the first
+        // project model (or the config default).
+        if !models.is_empty() {
+            let current_model = self.chat_service.read(cx).current_model().to_string();
+            let model_set: HashSet<String> = models.iter().cloned().collect();
+            // Check if current model is a local model (always allowed) or in project set
+            let is_local = current_model.starts_with("ollama/")
+                || current_model.starts_with("lmstudio/")
+                || current_model.starts_with("local/");
+            if !is_local && !model_set.contains(&current_model) {
+                let new_model = models[0].clone();
+                info!(
+                    "Models: active model '{}' not in project set, switching to '{}'",
+                    current_model, new_model
+                );
+                self.chat_service.update(cx, |svc, _cx| {
+                    svc.set_model(new_model.clone());
+                });
+                // Also update config default
+                if cx.has_global::<AppConfig>() {
+                    let _ = cx.global::<AppConfig>().0.update(|cfg| {
+                        cfg.default_model = new_model;
+                    });
+                }
+            }
+        }
+
         cx.notify();
     }
 
@@ -2895,6 +3196,13 @@ impl HiveWorkspace {
                 cfg.tts_enabled = snapshot.tts_enabled;
                 cfg.tts_auto_speak = snapshot.tts_auto_speak;
                 cfg.clawdtalk_enabled = snapshot.clawdtalk_enabled;
+                // OAuth client IDs
+                cfg.google_oauth_client_id = snapshot.google_oauth_client_id.clone();
+                cfg.microsoft_oauth_client_id = snapshot.microsoft_oauth_client_id.clone();
+                cfg.github_oauth_client_id = snapshot.github_oauth_client_id.clone();
+                cfg.slack_oauth_client_id = snapshot.slack_oauth_client_id.clone();
+                cfg.discord_oauth_client_id = snapshot.discord_oauth_client_id.clone();
+                cfg.telegram_oauth_client_id = snapshot.telegram_oauth_client_id.clone();
             }) {
                 warn!("Settings: failed to save config: {e}");
             }
@@ -2945,6 +3253,649 @@ impl HiveWorkspace {
     ) {
         info!("Monitor: refresh");
         cx.notify();
+    }
+
+    // -- Workflow Builder run handler -----------------------------------------
+
+    /// Execute a workflow from the visual workflow builder canvas.
+    fn handle_workflow_builder_run(
+        &mut self,
+        workflow_id: String,
+        cx: &mut Context<Self>,
+    ) {
+        // Convert the canvas to an executable workflow.
+        let workflow = self.workflow_builder_view.read(cx).to_executable_workflow();
+
+        if workflow.steps.is_empty() {
+            warn!("WorkflowBuilder: no executable steps in workflow '{}'", workflow_id);
+            if cx.has_global::<AppNotifications>() {
+                cx.global_mut::<AppNotifications>().0.push(
+                    AppNotification::new(
+                        NotificationType::Warning,
+                        format!("Workflow '{}' has no executable steps. Add Action nodes to the canvas.", workflow.name),
+                    )
+                    .with_title("Workflow Empty"),
+                );
+            }
+            return;
+        }
+
+        info!(
+            "WorkflowBuilder: running '{}' with {} step(s)",
+            workflow.name,
+            workflow.steps.len()
+        );
+
+        if cx.has_global::<AppNotifications>() {
+            cx.global_mut::<AppNotifications>().0.push(
+                AppNotification::new(
+                    NotificationType::Info,
+                    format!(
+                        "Running workflow '{}' ({} step(s))",
+                        workflow.name,
+                        workflow.steps.len()
+                    ),
+                )
+                .with_title("Workflow Started"),
+            );
+        }
+
+        let working_dir = self
+            .current_project_root
+            .clone()
+            .canonicalize()
+            .unwrap_or_else(|_| self.current_project_root.clone());
+        let workflow_for_thread = workflow.clone();
+        let run_result = std::sync::Arc::new(std::sync::Mutex::new(None));
+        let run_result_for_thread = std::sync::Arc::clone(&run_result);
+
+        // Execute on a background OS thread (tokio runtime inside).
+        std::thread::spawn(move || {
+            let result =
+                hive_agents::automation::AutomationService::execute_run_commands_blocking(
+                    &workflow_for_thread,
+                    working_dir,
+                );
+            *run_result_for_thread.lock().unwrap() = Some(result);
+        });
+
+        let run_result_for_ui = std::sync::Arc::clone(&run_result);
+        let workflow_name = workflow.name.clone();
+
+        cx.spawn(async move |this, app: &mut AsyncApp| {
+            loop {
+                if let Some(result) = run_result_for_ui.lock().unwrap().take() {
+                    let _ = this.update(app, |this, cx| {
+                        match result {
+                            Ok(run) => {
+                                if cx.has_global::<AppAutomation>() {
+                                    let _ = cx.global_mut::<AppAutomation>().0.record_run(
+                                        &run.workflow_id,
+                                        run.success,
+                                        run.steps_completed,
+                                        run.error.clone(),
+                                    );
+                                }
+
+                                if cx.has_global::<AppNotifications>() {
+                                    let (notif_type, title) = if run.success {
+                                        (NotificationType::Success, "Workflow Complete")
+                                    } else {
+                                        (NotificationType::Error, "Workflow Failed")
+                                    };
+                                    let msg = if run.success {
+                                        format!(
+                                            "Workflow '{}' completed ({} steps)",
+                                            workflow_name, run.steps_completed
+                                        )
+                                    } else {
+                                        format!(
+                                            "Workflow '{}' failed after {} step(s): {}",
+                                            workflow_name,
+                                            run.steps_completed,
+                                            run.error.as_deref().unwrap_or("unknown error")
+                                        )
+                                    };
+                                    cx.global_mut::<AppNotifications>().0.push(
+                                        AppNotification::new(notif_type, msg).with_title(title),
+                                    );
+                                }
+                            }
+                            Err(e) => {
+                                warn!("WorkflowBuilder: run error: {e}");
+                                if cx.has_global::<AppNotifications>() {
+                                    cx.global_mut::<AppNotifications>().0.push(
+                                        AppNotification::new(
+                                            NotificationType::Error,
+                                            format!("Workflow run failed: {e}"),
+                                        )
+                                        .with_title("Workflow Run Failed"),
+                                    );
+                                }
+                            }
+                        }
+
+                        this.refresh_agents_data(cx);
+                        cx.notify();
+                    });
+                    break;
+                }
+
+                app.background_executor()
+                    .timer(std::time::Duration::from_millis(120))
+                    .await;
+            }
+        })
+        .detach();
+    }
+
+    // -- Channel AI agent response handler ------------------------------------
+
+    /// Trigger AI agent responses for a channel message. For each assigned
+    /// agent, we build a ChatRequest with the persona system prompt, stream
+    /// the response, and append it to the channel.
+    fn handle_channel_agent_responses(
+        &mut self,
+        channel_id: String,
+        _user_message: String,
+        assigned_agents: Vec<String>,
+        cx: &mut Context<Self>,
+    ) {
+        if assigned_agents.is_empty() {
+            return;
+        }
+
+        // Determine which model to use (current chat model).
+        let model = self.chat_service.read(cx).current_model().to_string();
+        if model.is_empty() || model == "Select Model" {
+            warn!("Channels: no model selected, cannot trigger agent responses");
+            return;
+        }
+
+        // Build context messages: include recent channel history + user message.
+        let mut context_messages = Vec::new();
+
+        // Load recent messages from the channel store for context
+        if cx.has_global::<AppChannels>() {
+            let store = &cx.global::<AppChannels>().0;
+            if let Some(channel) = store.get_channel(&channel_id) {
+                // Take last 10 messages as context
+                let recent = channel.messages.iter().rev().take(10).rev();
+                for msg in recent {
+                    let role = match &msg.author {
+                        hive_core::channels::MessageAuthor::User => hive_ai::types::MessageRole::User,
+                        hive_core::channels::MessageAuthor::Agent { .. } => hive_ai::types::MessageRole::Assistant,
+                        hive_core::channels::MessageAuthor::System => hive_ai::types::MessageRole::System,
+                    };
+                    context_messages.push(hive_ai::types::ChatMessage {
+                        role,
+                        content: msg.content.clone(),
+                        timestamp: msg.timestamp,
+                        tool_calls: None,
+                        tool_call_id: None,
+                    });
+                }
+            }
+        }
+
+        // Mark streaming state in the view for the first agent
+        if let Some(first_agent) = assigned_agents.first() {
+            self.channels_view.update(cx, |view, cx| {
+                view.set_streaming(first_agent, "", cx);
+            });
+        }
+
+        // For each assigned agent, spawn a streaming task
+        for agent_name in assigned_agents {
+            let persona = if cx.has_global::<AppPersonas>() {
+                cx.global::<AppPersonas>().0.find_by_name(&agent_name).cloned()
+            } else {
+                None
+            };
+
+            let system_prompt = persona
+                .as_ref()
+                .map(|p| format!(
+                    "You are {} in an AI agent channel. Respond concisely and stay in character.\n\n{}",
+                    p.name, p.system_prompt
+                ));
+
+            // Prepare the stream setup
+            let stream_setup: Option<(Arc<dyn AiProvider>, ChatRequest)> =
+                if cx.has_global::<AppAiService>() {
+                    cx.global::<AppAiService>().0.prepare_stream(
+                        context_messages.clone(),
+                        &model,
+                        system_prompt,
+                        None,
+                    )
+                } else {
+                    None
+                };
+
+            let Some((provider, request)) = stream_setup else {
+                warn!("Channels: no provider available for agent '{agent_name}'");
+                continue;
+            };
+
+            let channels_view = self.channels_view.downgrade();
+            let channel_id_clone = channel_id.clone();
+            let agent_name_clone = agent_name.clone();
+            let model_clone = model.clone();
+
+            cx.spawn(async move |_this, app: &mut AsyncApp| {
+                match provider.stream_chat(&request).await {
+                    Ok(mut rx) => {
+                        let mut accumulated = String::new();
+                        while let Some(chunk) = rx.recv().await {
+                            accumulated.push_str(&chunk.content);
+
+                            // Update streaming display
+                            let content = accumulated.clone();
+                            let agent = agent_name_clone.clone();
+                            let _ = channels_view.update(app, |view, cx| {
+                                view.set_streaming(&agent, &content, cx);
+                            });
+
+                            if chunk.done {
+                                break;
+                            }
+                        }
+
+                        // Finalize: add the completed message to the channel store
+                        let final_content = accumulated.clone();
+                        let agent = agent_name_clone.clone();
+                        let ch_id = channel_id_clone.clone();
+                        let model_str = model_clone.clone();
+
+                        let _ = app.update(|cx| {
+                            // Add to channel store
+                            if cx.has_global::<AppChannels>() {
+                                let msg = hive_core::channels::ChannelMessage {
+                                    id: uuid::Uuid::new_v4().to_string(),
+                                    author: hive_core::channels::MessageAuthor::Agent {
+                                        persona: agent.clone(),
+                                    },
+                                    content: final_content.clone(),
+                                    timestamp: chrono::Utc::now(),
+                                    thread_id: None,
+                                    model: Some(model_str),
+                                    cost: None,
+                                };
+                                cx.global_mut::<AppChannels>().0.add_message(&ch_id, msg.clone());
+
+                                // Update the view
+                                let _ = channels_view.update(cx, |view, cx| {
+                                    view.finish_streaming(cx);
+                                    view.append_message(&msg, cx);
+                                });
+                            }
+                        });
+                    }
+                    Err(e) => {
+                        error!("Channels: stream error for agent '{}': {e}", agent_name_clone);
+                        let _ = channels_view.update(app, |view, cx| {
+                            view.finish_streaming(cx);
+                        });
+                    }
+                }
+            })
+            .detach();
+        }
+
+    }
+
+    // -- Connected Accounts OAuth flow ----------------------------------------
+
+    /// Handle the AccountConnectPlatform action dispatched from Settings.
+    fn handle_account_connect_platform(
+        &mut self,
+        action: &AccountConnectPlatform,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let platform_str = action.platform.clone();
+        let Some(platform) = hive_core::config::AccountPlatform::from_str(&platform_str) else {
+            warn!("OAuth: unknown platform '{platform_str}'");
+            return;
+        };
+
+        info!("OAuth: initiating connect for {platform_str}");
+
+        // Build OAuthConfig for the platform, reading client_id from config
+        let cfg = if cx.has_global::<AppConfig>() {
+            cx.global::<AppConfig>().0.get()
+        } else {
+            hive_core::config::HiveConfig::default()
+        };
+
+        let oauth_config = Self::oauth_config_for_platform(platform, &cfg);
+
+        if oauth_config.client_id.is_empty() {
+            warn!("OAuth: no client_id configured for {platform_str}. Please set it in Settings → Connected Accounts.");
+            if cx.has_global::<AppNotifications>() {
+                cx.global_mut::<AppNotifications>().0.push(
+                    AppNotification::new(
+                        NotificationType::Warning,
+                        format!("No OAuth Client ID configured for {platform_str}. Go to Settings → Connected Accounts to set it up."),
+                    )
+                    .with_title("OAuth Setup Required"),
+                );
+            }
+            return;
+        }
+
+        let oauth_client = hive_integrations::OAuthClient::new(oauth_config);
+        let (auth_url, _state) = oauth_client.authorization_url();
+
+        // Open the authorization URL in the default browser
+        if let Err(e) = Self::open_url_in_browser(&auth_url) {
+            error!("OAuth: failed to open browser: {e}");
+            if cx.has_global::<AppNotifications>() {
+                cx.global_mut::<AppNotifications>().0.push(
+                    AppNotification::new(
+                        NotificationType::Error,
+                        format!("Failed to open browser for {platform_str} authentication: {e}"),
+                    )
+                    .with_title("OAuth Error"),
+                );
+            }
+            return;
+        }
+
+        if cx.has_global::<AppNotifications>() {
+            cx.global_mut::<AppNotifications>().0.push(
+                AppNotification::new(
+                    NotificationType::Info,
+                    format!(
+                        "Opening browser for {platform_str} authentication. \
+                         Complete the sign-in flow and paste the authorization code."
+                    ),
+                )
+                .with_title("OAuth: Browser Opened"),
+            );
+        }
+
+        // Spawn a background thread to start a minimal localhost callback server
+        // that waits for the OAuth redirect with the authorization code.
+        let platform_for_thread = platform;
+        let platform_label = platform_str.clone();
+        let result_flag = std::sync::Arc::new(std::sync::Mutex::new(
+            None::<Result<hive_integrations::OAuthToken, String>>,
+        ));
+        let result_for_thread = std::sync::Arc::clone(&result_flag);
+
+        std::thread::spawn(move || {
+            // Start a minimal HTTP server on localhost:8742 to catch the redirect
+            let listener = match std::net::TcpListener::bind("127.0.0.1:8742") {
+                Ok(l) => l,
+                Err(e) => {
+                    *result_for_thread.lock().unwrap() =
+                        Some(Err(format!("Failed to start callback server: {e}")));
+                    return;
+                }
+            };
+
+            // Set a timeout so we don't block forever
+            let _ = listener.set_nonblocking(false);
+
+            // Wait for the callback (blocks up to 5 minutes)
+            let timeout = std::time::Duration::from_secs(300);
+            let start = std::time::Instant::now();
+            loop {
+                if start.elapsed() > timeout {
+                    *result_for_thread.lock().unwrap() =
+                        Some(Err("OAuth callback timed out after 5 minutes".to_string()));
+                    return;
+                }
+
+                match listener.accept() {
+                    Ok((mut stream, _addr)) => {
+                        use std::io::{Read, Write};
+                        let mut buf = [0u8; 4096];
+                        let n = stream.read(&mut buf).unwrap_or(0);
+                        let request_str = String::from_utf8_lossy(&buf[..n]);
+
+                        // Extract the code parameter from the GET request
+                        if let Some(code) = Self::extract_oauth_code(&request_str) {
+                            // Send success response
+                            let response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n\
+                                <html><body><h1>Authorization successful!</h1>\
+                                <p>You can close this tab and return to Hive.</p></body></html>";
+                            let _ = stream.write_all(response.as_bytes());
+                            let _ = stream.flush();
+
+                            // Exchange code for token
+                            let rt = tokio::runtime::Builder::new_current_thread()
+                                .enable_all()
+                                .build();
+                            match rt {
+                                Ok(rt) => {
+                                    let exchange_result =
+                                        rt.block_on(oauth_client.exchange_code(&code));
+                                    match exchange_result {
+                                        Ok(token) => {
+                                            *result_for_thread.lock().unwrap() = Some(Ok(token));
+                                        }
+                                        Err(e) => {
+                                            *result_for_thread.lock().unwrap() =
+                                                Some(Err(format!("Token exchange failed: {e}")));
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    *result_for_thread.lock().unwrap() = Some(Err(format!(
+                                        "Failed to create runtime for token exchange: {e}"
+                                    )));
+                                }
+                            }
+                            return;
+                        }
+
+                        // Not the callback we're looking for, send 404
+                        let response = "HTTP/1.1 404 Not Found\r\n\r\nNot found";
+                        let _ = stream.write_all(response.as_bytes());
+                    }
+                    Err(_) => {
+                        std::thread::sleep(std::time::Duration::from_millis(100));
+                    }
+                }
+            }
+        });
+
+        // Poll for the result from the UI thread
+        let result_for_ui = std::sync::Arc::clone(&result_flag);
+        let platform_for_ui = platform_for_thread;
+        let platform_label_ui = platform_label;
+
+        cx.spawn(async move |_this, app: &mut AsyncApp| {
+            loop {
+                if let Some(result) = result_for_ui.lock().unwrap().take() {
+                    let _ = app.update(|cx| match result {
+                        Ok(token) => {
+                            info!("OAuth: successfully connected {platform_label_ui}");
+
+                            // Store the token
+                            if cx.has_global::<AppConfig>() {
+                                let token_data = hive_core::config::OAuthTokenData {
+                                    access_token: token.access_token.clone(),
+                                    refresh_token: token.refresh_token.clone(),
+                                    expires_at: token.expires_at.map(|t| t.to_rfc3339()),
+                                };
+                                let _ = cx
+                                    .global::<AppConfig>()
+                                    .0
+                                    .set_oauth_token(platform_for_ui, &token_data);
+
+                                // Add connected account entry
+                                let account = hive_core::config::ConnectedAccount {
+                                    platform: platform_for_ui,
+                                    account_name: platform_label_ui.clone(),
+                                    account_id: "oauth".to_string(),
+                                    scopes: Vec::new(),
+                                    connected_at: chrono::Utc::now().to_rfc3339(),
+                                    last_synced: None,
+                                    settings: hive_core::config::AccountSettings::default(),
+                                };
+                                let _ = cx
+                                    .global::<AppConfig>()
+                                    .0
+                                    .add_connected_account(account);
+                            }
+
+                            if cx.has_global::<AppNotifications>() {
+                                cx.global_mut::<AppNotifications>().0.push(
+                                    AppNotification::new(
+                                        NotificationType::Success,
+                                        format!(
+                                            "{platform_label_ui} account connected successfully!"
+                                        ),
+                                    )
+                                    .with_title("Account Connected"),
+                                );
+                            }
+                        }
+                        Err(e) => {
+                            error!("OAuth: connection failed for {platform_label_ui}: {e}");
+                            if cx.has_global::<AppNotifications>() {
+                                cx.global_mut::<AppNotifications>().0.push(
+                                    AppNotification::new(
+                                        NotificationType::Error,
+                                        format!("{platform_label_ui} connection failed: {e}"),
+                                    )
+                                    .with_title("OAuth Error"),
+                                );
+                            }
+                        }
+                    });
+                    break;
+                }
+
+                app.background_executor()
+                    .timer(std::time::Duration::from_millis(200))
+                    .await;
+            }
+        })
+        .detach();
+    }
+
+    /// Extract the `code` parameter from an HTTP GET request line.
+    fn extract_oauth_code(request: &str) -> Option<String> {
+        let first_line = request.lines().next()?;
+        let path = first_line.split_whitespace().nth(1)?;
+        let query = path.split('?').nth(1)?;
+        for param in query.split('&') {
+            if let Some(value) = param.strip_prefix("code=") {
+                // Simple URL decode: replace %XX with actual chars
+                let decoded = value
+                    .replace("%3D", "=")
+                    .replace("%2F", "/")
+                    .replace("%2B", "+")
+                    .replace("%20", " ")
+                    .replace('+', " ");
+                return Some(decoded);
+            }
+        }
+        None
+    }
+
+    /// Open a URL in the default system browser.
+    fn open_url_in_browser(url: &str) -> Result<(), String> {
+        #[cfg(target_os = "macos")]
+        {
+            std::process::Command::new("open")
+                .arg(url)
+                .spawn()
+                .map_err(|e| format!("Failed to open browser: {e}"))?;
+        }
+        #[cfg(target_os = "windows")]
+        {
+            std::process::Command::new("cmd")
+                .args(["/C", "start", url])
+                .spawn()
+                .map_err(|e| format!("Failed to open browser: {e}"))?;
+        }
+        #[cfg(target_os = "linux")]
+        {
+            std::process::Command::new("xdg-open")
+                .arg(url)
+                .spawn()
+                .map_err(|e| format!("Failed to open browser: {e}"))?;
+        }
+        Ok(())
+    }
+
+    /// Build an OAuthConfig for the given platform with standard OAuth endpoints.
+    /// Reads the client_id from the user's HiveConfig.
+    fn oauth_config_for_platform(
+        platform: hive_core::config::AccountPlatform,
+        cfg: &hive_core::config::HiveConfig,
+    ) -> hive_integrations::OAuthConfig {
+        use hive_core::config::AccountPlatform;
+        let client_id = platform
+            .client_id_from_config(cfg)
+            .unwrap_or_default();
+        match platform {
+            AccountPlatform::Google => hive_integrations::OAuthConfig {
+                client_id: client_id.clone(),
+                client_secret: None,
+                auth_url: "https://accounts.google.com/o/oauth2/v2/auth".to_string(),
+                token_url: "https://oauth2.googleapis.com/token".to_string(),
+                redirect_uri: "http://127.0.0.1:8742/callback".to_string(),
+                scopes: vec![
+                    "https://www.googleapis.com/auth/gmail.readonly".to_string(),
+                    "https://www.googleapis.com/auth/calendar.readonly".to_string(),
+                ],
+            },
+            AccountPlatform::Microsoft => hive_integrations::OAuthConfig {
+                client_id: client_id.clone(),
+                client_secret: None,
+                auth_url: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize"
+                    .to_string(),
+                token_url: "https://login.microsoftonline.com/common/oauth2/v2.0/token"
+                    .to_string(),
+                redirect_uri: "http://127.0.0.1:8742/callback".to_string(),
+                scopes: vec![
+                    "Mail.Read".to_string(),
+                    "Calendars.Read".to_string(),
+                ],
+            },
+            AccountPlatform::GitHub => hive_integrations::OAuthConfig {
+                client_id: client_id.clone(),
+                client_secret: None,
+                auth_url: "https://github.com/login/oauth/authorize".to_string(),
+                token_url: "https://github.com/login/oauth/access_token".to_string(),
+                redirect_uri: "http://127.0.0.1:8742/callback".to_string(),
+                scopes: vec!["repo".to_string(), "read:user".to_string()],
+            },
+            AccountPlatform::Slack => hive_integrations::OAuthConfig {
+                client_id: client_id.clone(),
+                client_secret: None,
+                auth_url: "https://slack.com/oauth/v2/authorize".to_string(),
+                token_url: "https://slack.com/api/oauth.v2.access".to_string(),
+                redirect_uri: "http://127.0.0.1:8742/callback".to_string(),
+                scopes: vec![
+                    "channels:read".to_string(),
+                    "chat:write".to_string(),
+                ],
+            },
+            AccountPlatform::Discord => hive_integrations::OAuthConfig {
+                client_id: client_id.clone(),
+                client_secret: None,
+                auth_url: "https://discord.com/api/oauth2/authorize".to_string(),
+                token_url: "https://discord.com/api/oauth2/token".to_string(),
+                redirect_uri: "http://127.0.0.1:8742/callback".to_string(),
+                scopes: vec!["identify".to_string(), "guilds".to_string()],
+            },
+            AccountPlatform::Telegram => hive_integrations::OAuthConfig {
+                client_id: client_id.clone(),
+                client_secret: None,
+                auth_url: "https://oauth.telegram.org/auth".to_string(),
+                token_url: "https://oauth.telegram.org/auth".to_string(),
+                redirect_uri: "http://127.0.0.1:8742/callback".to_string(),
+                scopes: Vec::new(),
+            },
+        }
     }
 }
 
@@ -3047,6 +3998,8 @@ impl Render for HiveWorkspace {
             // Agents
             .on_action(cx.listener(Self::handle_agents_reload_workflows))
             .on_action(cx.listener(Self::handle_agents_run_workflow))
+            // Connected Accounts
+            .on_action(cx.listener(Self::handle_account_connect_platform))
             // Titlebar
                 .child(Titlebar::render(theme, window, &self.current_project_root))
             // Main content area: sidebar + panel

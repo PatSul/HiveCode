@@ -197,10 +197,20 @@ pub struct WorkflowListEntry {
 
 struct DragState {
     node_id: String,
+    /// Mouse position at start of drag.
     start_x: f64,
     start_y: f64,
+    /// Node position at start of drag.
     node_start_x: f64,
     node_start_y: f64,
+}
+
+/// State for panning the canvas background.
+struct PanState {
+    start_mouse_x: f64,
+    start_mouse_y: f64,
+    start_offset_x: f64,
+    start_offset_y: f64,
 }
 
 pub struct WorkflowBuilderView {
@@ -213,6 +223,7 @@ pub struct WorkflowBuilderView {
     selected_node_id: Option<String>,
     dragging_node: Option<DragState>,
     connecting_from: Option<(String, Port)>,
+    panning: Option<PanState>,
 
     // Viewport
     canvas_offset: (f64, f64),
@@ -241,6 +252,7 @@ impl WorkflowBuilderView {
             selected_node_id: None,
             dragging_node: None,
             connecting_from: None,
+            panning: None,
             canvas_offset: (0.0, 0.0),
             zoom: 1.0,
             show_node_palette: true,
@@ -306,6 +318,102 @@ impl WorkflowBuilderView {
         self.canvas.edges.push(edge);
         self.is_dirty = true;
         cx.notify();
+    }
+
+    // -- Drag/pan/connect interaction handlers --------------------------------
+
+    /// Start dragging a node.
+    fn start_drag(&mut self, node_id: &str, mouse_x: f64, mouse_y: f64) {
+        if let Some(node) = self.canvas.nodes.iter().find(|n| n.id == node_id) {
+            self.dragging_node = Some(DragState {
+                node_id: node_id.to_string(),
+                start_x: mouse_x,
+                start_y: mouse_y,
+                node_start_x: node.x,
+                node_start_y: node.y,
+            });
+        }
+    }
+
+    /// Update dragged node position based on mouse movement.
+    fn update_drag(&mut self, mouse_x: f64, mouse_y: f64, cx: &mut Context<Self>) {
+        if let Some(ref drag) = self.dragging_node {
+            let dx = mouse_x - drag.start_x;
+            let dy = mouse_y - drag.start_y;
+            let new_x = (drag.node_start_x + dx).max(0.0);
+            let new_y = (drag.node_start_y + dy).max(0.0);
+            let nid = drag.node_id.clone();
+            if let Some(node) = self.canvas.nodes.iter_mut().find(|n| n.id == nid) {
+                node.x = new_x;
+                node.y = new_y;
+            }
+            self.is_dirty = true;
+            cx.notify();
+        }
+    }
+
+    /// Finish dragging a node.
+    fn end_drag(&mut self) {
+        self.dragging_node = None;
+    }
+
+    /// Start panning the canvas.
+    fn start_pan(&mut self, mouse_x: f64, mouse_y: f64) {
+        self.panning = Some(PanState {
+            start_mouse_x: mouse_x,
+            start_mouse_y: mouse_y,
+            start_offset_x: self.canvas_offset.0,
+            start_offset_y: self.canvas_offset.1,
+        });
+    }
+
+    /// Update pan offset based on mouse movement.
+    fn update_pan(&mut self, mouse_x: f64, mouse_y: f64, cx: &mut Context<Self>) {
+        if let Some(ref pan) = self.panning {
+            let dx = mouse_x - pan.start_mouse_x;
+            let dy = mouse_y - pan.start_mouse_y;
+            self.canvas_offset.0 = pan.start_offset_x + dx;
+            self.canvas_offset.1 = pan.start_offset_y + dy;
+            cx.notify();
+        }
+    }
+
+    /// Finish panning.
+    fn end_pan(&mut self) {
+        self.panning = None;
+    }
+
+    /// Start connecting from a port.
+    fn start_connect(&mut self, node_id: &str, port: Port, cx: &mut Context<Self>) {
+        self.connecting_from = Some((node_id.to_string(), port));
+        cx.notify();
+    }
+
+    /// Finish connection at a target port.
+    fn finish_connect(&mut self, target_node_id: &str, target_port: Port, cx: &mut Context<Self>) {
+        if let Some((from_id, from_port)) = self.connecting_from.take() {
+            // Don't connect a node to itself
+            if from_id != target_node_id {
+                self.connect_nodes(&from_id, from_port, target_node_id, target_port, cx);
+            }
+        }
+        cx.notify();
+    }
+
+    /// Cancel connection.
+    fn cancel_connect(&mut self, cx: &mut Context<Self>) {
+        self.connecting_from = None;
+        cx.notify();
+    }
+
+    /// Port position for a node (relative to canvas). Returns (x, y) center of port.
+    fn port_position(node: &CanvasNode, port: Port) -> (f64, f64) {
+        match port {
+            Port::Input => (node.x, node.y + node.height / 2.0),
+            Port::Output => (node.x + node.width, node.y + node.height / 2.0),
+            Port::TrueOutput => (node.x + node.width, node.y + node.height * 0.33),
+            Port::FalseOutput => (node.x + node.width, node.y + node.height * 0.67),
+        }
     }
 
     /// Convert the current canvas to an executable automation `Workflow`.
@@ -472,6 +580,8 @@ impl WorkflowBuilderView {
 
     fn render_canvas_nodes(&self, theme: &HiveTheme, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let mut elements: Vec<AnyElement> = Vec::new();
+        let offset_x = self.canvas_offset.0 as f32;
+        let offset_y = self.canvas_offset.1 as f32;
 
         for node in &self.canvas.nodes {
             let color = self.node_color(node.kind);
@@ -479,12 +589,131 @@ impl WorkflowBuilderView {
             bg.a = 0.12;
             let is_selected = self.selected_node_id.as_deref() == Some(&node.id);
             let node_id = node.id.clone();
+            let node_id2 = node.id.clone();
+            let node_id_input = node.id.clone();
+
+            // Compute display position with canvas offset
+            let display_x = node.x as f32 + offset_x;
+            let display_y = node.y as f32 + offset_y;
+
+            // Determine which ports to show based on node kind
+            let has_input = node.kind != NodeKind::Trigger;
+            let has_output = node.kind == NodeKind::Trigger || node.kind == NodeKind::Action;
+            let is_condition = node.kind == NodeKind::Condition;
+
+            // Build port circles
+            let mut port_elements: Vec<AnyElement> = Vec::new();
+
+            // Input port (left side)
+            if has_input {
+                let nid = node_id_input.clone();
+                port_elements.push(
+                    div()
+                        .id(ElementId::Name(format!("port-in-{}", node.id).into()))
+                        .absolute()
+                        .left(px(-5.0))
+                        .top(px(node.height as f32 / 2.0 - 5.0))
+                        .w(px(10.0))
+                        .h(px(10.0))
+                        .rounded(theme.radius_full)
+                        .bg(theme.accent_aqua)
+                        .border_1()
+                        .border_color(theme.bg_primary)
+                        .cursor_pointer()
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(move |this, _event: &MouseDownEvent, _w, cx| {
+                                // If connecting from another node, finish the connection here
+                                if this.connecting_from.is_some() {
+                                    this.finish_connect(&nid, Port::Input, cx);
+                                }
+                                // Event handled by port — parent node handler will also fire
+                                // but we accept the last-handler-wins behavior in GPUI.
+                            }),
+                        )
+                        .into_any_element(),
+                );
+            }
+
+            // Output port (right side)
+            if has_output {
+                let nid = node.id.clone();
+                port_elements.push(
+                    div()
+                        .id(ElementId::Name(format!("port-out-{}", node.id).into()))
+                        .absolute()
+                        .right(px(-5.0))
+                        .top(px(node.height as f32 / 2.0 - 5.0))
+                        .w(px(10.0))
+                        .h(px(10.0))
+                        .rounded(theme.radius_full)
+                        .bg(theme.accent_cyan)
+                        .border_1()
+                        .border_color(theme.bg_primary)
+                        .cursor_pointer()
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(move |this, _event: &MouseDownEvent, _w, cx| {
+                                this.start_connect(&nid, Port::Output, cx);
+                            }),
+                        )
+                        .into_any_element(),
+                );
+            }
+
+            // Condition node: True (top-right) and False (bottom-right) output ports
+            if is_condition {
+                let nid_true = node.id.clone();
+                let nid_false = node.id.clone();
+                port_elements.push(
+                    div()
+                        .id(ElementId::Name(format!("port-true-{}", node.id).into()))
+                        .absolute()
+                        .right(px(-5.0))
+                        .top(px(node.height as f32 * 0.25 - 5.0))
+                        .w(px(10.0))
+                        .h(px(10.0))
+                        .rounded(theme.radius_full)
+                        .bg(theme.accent_green)
+                        .border_1()
+                        .border_color(theme.bg_primary)
+                        .cursor_pointer()
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(move |this, _event: &MouseDownEvent, _w, cx| {
+                                this.start_connect(&nid_true, Port::TrueOutput, cx);
+                            }),
+                        )
+                        .into_any_element(),
+                );
+                port_elements.push(
+                    div()
+                        .id(ElementId::Name(format!("port-false-{}", node.id).into()))
+                        .absolute()
+                        .right(px(-5.0))
+                        .top(px(node.height as f32 * 0.75 - 5.0))
+                        .w(px(10.0))
+                        .h(px(10.0))
+                        .rounded(theme.radius_full)
+                        .bg(theme.accent_red)
+                        .border_1()
+                        .border_color(theme.bg_primary)
+                        .cursor_pointer()
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(move |this, _event: &MouseDownEvent, _w, cx| {
+                                this.start_connect(&nid_false, Port::FalseOutput, cx);
+                            }),
+                        )
+                        .into_any_element(),
+                );
+            }
 
             let node_el = div()
                 .id(ElementId::Name(format!("node-{}", node.id).into()))
                 .absolute()
-                .left(px(node.x as f32))
-                .top(px(node.y as f32))
+                .left(px(display_x))
+                .top(px(display_y))
                 .w(px(node.width as f32))
                 .h(px(node.height as f32))
                 .rounded(theme.radius_md)
@@ -495,11 +724,21 @@ impl WorkflowBuilderView {
                 .cursor_pointer()
                 .on_mouse_down(
                     MouseButton::Left,
-                    cx.listener(move |this, _e, _w, cx| {
+                    cx.listener(move |this, event: &MouseDownEvent, _w, cx| {
+                        // If we're in connect mode and click a node body, finish connect
+                        // to its input port
+                        if this.connecting_from.is_some() {
+                            this.finish_connect(&node_id2, Port::Input, cx);
+                            return;
+                        }
                         this.selected_node_id = Some(node_id.clone());
+                        let pos = event.position;
+                        this.start_drag(&node_id, f64::from(pos.x), f64::from(pos.y));
                         cx.notify();
                     }),
                 )
+                // Port circles
+                .children(port_elements)
                 .child(
                     div()
                         .flex()
@@ -547,10 +786,19 @@ impl WorkflowBuilderView {
             let from_node = self.canvas.nodes.iter().find(|n| n.id == edge.from_node_id);
             let to_node = self.canvas.nodes.iter().find(|n| n.id == edge.to_node_id);
             if let (Some(from), Some(to)) = (from_node, to_node) {
-                let from_x = (from.x + from.width) as f32;
-                let from_y = (from.y + from.height / 2.0) as f32;
-                let to_x = to.x as f32;
-                let to_y = (to.y + to.height / 2.0) as f32;
+                let (fp_x, fp_y) = Self::port_position(from, edge.from_port);
+                let (tp_x, tp_y) = Self::port_position(to, edge.to_port);
+                let from_x = fp_x as f32 + offset_x;
+                let from_y = fp_y as f32 + offset_y;
+                let to_x = tp_x as f32 + offset_x;
+                let to_y = tp_y as f32 + offset_y;
+
+                // Edge color based on port type
+                let edge_color = match edge.from_port {
+                    Port::TrueOutput => self.theme.accent_green,
+                    Port::FalseOutput => self.theme.accent_red,
+                    _ => self.theme.accent_cyan,
+                };
 
                 let mid_x = (from_x + to_x) / 2.0;
 
@@ -564,7 +812,7 @@ impl WorkflowBuilderView {
                         .top(px(from_y - 1.0))
                         .w(px(h1_w))
                         .h(px(2.0))
-                        .bg(self.theme.accent_cyan)
+                        .bg(edge_color)
                         .into_any_element(),
                 );
 
@@ -578,7 +826,7 @@ impl WorkflowBuilderView {
                         .top(px(v_top))
                         .w(px(2.0))
                         .h(px(v_h))
-                        .bg(self.theme.accent_cyan)
+                        .bg(edge_color)
                         .into_any_element(),
                 );
 
@@ -592,7 +840,7 @@ impl WorkflowBuilderView {
                         .top(px(to_y - 1.0))
                         .w(px(h2_w))
                         .h(px(2.0))
-                        .bg(self.theme.accent_cyan)
+                        .bg(edge_color)
                         .into_any_element(),
                 );
             }
@@ -761,8 +1009,10 @@ impl Render for WorkflowBuilderView {
                     ),
             );
 
-        // Canvas area with nodes
+        // Canvas area with nodes + interaction handlers
         let canvas_elements = self.render_canvas_nodes(theme, cx);
+        let is_connecting = self.connecting_from.is_some();
+
         let canvas_area = div()
             .id("wf-canvas")
             .flex_1()
@@ -771,6 +1021,43 @@ impl Render for WorkflowBuilderView {
             .relative()
             .overflow_hidden()
             .bg(theme.bg_primary)
+            .when(is_connecting, |el| el.cursor(CursorStyle::Crosshair))
+            // Mouse down on canvas background → start panning
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|this, event: &MouseDownEvent, _w, cx| {
+                    // If we're in connect mode and click the background, cancel
+                    if this.connecting_from.is_some() {
+                        this.cancel_connect(cx);
+                        return;
+                    }
+                    // Start panning
+                    let pos = event.position;
+                    this.start_pan(f64::from(pos.x), f64::from(pos.y));
+                    // Deselect node
+                    this.selected_node_id = None;
+                    cx.notify();
+                }),
+            )
+            // Mouse move → update drag or pan
+            .on_mouse_move(cx.listener(|this, event: &MouseMoveEvent, _w, cx| {
+                let pos = event.position;
+                let mx = f64::from(pos.x);
+                let my = f64::from(pos.y);
+                if this.dragging_node.is_some() {
+                    this.update_drag(mx, my, cx);
+                } else if this.panning.is_some() {
+                    this.update_pan(mx, my, cx);
+                }
+            }))
+            // Mouse up → end drag or pan
+            .on_mouse_up(
+                MouseButton::Left,
+                cx.listener(|this, _event: &MouseUpEvent, _w, _cx| {
+                    this.end_drag();
+                    this.end_pan();
+                }),
+            )
             .children(canvas_elements);
 
         // Node palette (left)

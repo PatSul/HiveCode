@@ -23,12 +23,12 @@ use hive_ui::globals::{
     AppSecurity, AppShield, AppSkills, AppSpecs, AppTts, AppWallets,
 };
 use hive_ui::workspace::{
-    ClearChat, HiveWorkspace, NewConversation, SwitchPanel, SwitchToAgents, SwitchToChat,
-    SwitchToCosts, SwitchToFiles, SwitchToHistory, SwitchToKanban, SwitchToLogs, SwitchToMonitor,
-    SwitchToReview, SwitchToSpecs,
+    ClearChat, HiveWorkspace, NewConversation, SwitchPanel, SwitchToAgents, SwitchToChannels,
+    SwitchToChat, SwitchToFiles, SwitchToHistory, SwitchToKanban, SwitchToLogs,
+    SwitchToMonitor, SwitchToSpecs, SwitchToWorkflows,
 };
 
-const VERSION: &str = env!("CARGO_PKG_VERSION");
+const VERSION: &str = env!("HIVE_VERSION");
 
 // ---------------------------------------------------------------------------
 // Embedded assets (icons, images)
@@ -296,11 +296,11 @@ fn register_actions(cx: &mut App) {
         KeyBinding::new("cmd-3", SwitchToFiles, None),
         KeyBinding::new("cmd-4", SwitchToSpecs, None),
         KeyBinding::new("cmd-5", SwitchToAgents, None),
-        KeyBinding::new("cmd-6", SwitchToKanban, None),
-        KeyBinding::new("cmd-7", SwitchToMonitor, None),
-        KeyBinding::new("cmd-8", SwitchToLogs, None),
-        KeyBinding::new("cmd-9", SwitchToCosts, None),
-        KeyBinding::new("cmd-0", SwitchToReview, None),
+        KeyBinding::new("cmd-6", SwitchToWorkflows, None),
+        KeyBinding::new("cmd-7", SwitchToChannels, None),
+        KeyBinding::new("cmd-8", SwitchToKanban, None),
+        KeyBinding::new("cmd-9", SwitchToMonitor, None),
+        KeyBinding::new("cmd-0", SwitchToLogs, None),
     ]);
     #[cfg(not(target_os = "macos"))]
     cx.bind_keys([
@@ -317,11 +317,11 @@ fn register_actions(cx: &mut App) {
         KeyBinding::new("ctrl-3", SwitchToFiles, None),
         KeyBinding::new("ctrl-4", SwitchToSpecs, None),
         KeyBinding::new("ctrl-5", SwitchToAgents, None),
-        KeyBinding::new("ctrl-6", SwitchToKanban, None),
-        KeyBinding::new("ctrl-7", SwitchToMonitor, None),
-        KeyBinding::new("ctrl-8", SwitchToLogs, None),
-        KeyBinding::new("ctrl-9", SwitchToCosts, None),
-        KeyBinding::new("ctrl-0", SwitchToReview, None),
+        KeyBinding::new("ctrl-6", SwitchToWorkflows, None),
+        KeyBinding::new("ctrl-7", SwitchToChannels, None),
+        KeyBinding::new("ctrl-8", SwitchToKanban, None),
+        KeyBinding::new("ctrl-9", SwitchToMonitor, None),
+        KeyBinding::new("ctrl-0", SwitchToLogs, None),
     ]);
 
     cx.on_action(|_: &Quit, cx: &mut App| {
@@ -437,6 +437,11 @@ fn open_main_window(cx: &mut App) -> anyhow::Result<()> {
         window.on_window_should_close(cx, handle_main_window_close);
 
         let workspace = cx.new(|cx| HiveWorkspace::new(window, cx));
+
+        // Push the git-based version (from build.rs) into the status bar.
+        workspace.update(cx, |ws, _cx| {
+            ws.set_version(VERSION.to_string());
+        });
 
         cx.subscribe(&workspace, |workspace, event: &SwitchPanel, cx| {
             workspace.update(cx, |ws, cx| {

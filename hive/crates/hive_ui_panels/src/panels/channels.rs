@@ -3,6 +3,7 @@
 
 use gpui::prelude::FluentBuilder;
 use gpui::*;
+use gpui_component::input::{Input, InputEvent, InputState};
 use gpui_component::scroll::ScrollableElement;
 
 use hive_core::channels::{ChannelMessage, ChannelStore, MessageAuthor};
@@ -46,8 +47,8 @@ pub struct ChannelsView {
     // Messages for the active channel
     messages: Vec<ChannelMessageDisplay>,
 
-    // Input state
-    message_input: String,
+    // Input state — real GPUI InputState for keyboard handling
+    message_input: Entity<InputState>,
 
     // Streaming
     is_streaming: bool,
@@ -76,13 +77,30 @@ struct ChannelMessageDisplay {
 impl EventEmitter<ChannelMessageSent> for ChannelsView {}
 
 impl ChannelsView {
-    pub fn new(_window: &mut Window, _cx: &mut Context<Self>) -> Self {
+    pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let message_input = cx.new(|cx| {
+            let mut state = InputState::new(window, cx);
+            state.set_placeholder("Type a message...", window, cx);
+            state
+        });
+
+        // Subscribe to input events (Enter key handling)
+        cx.subscribe_in(&message_input, window, |this, _entity, event: &InputEvent, window, cx| {
+            if let InputEvent::PressEnter { .. } = event {
+                let text = this.message_input.read(cx).value().to_string();
+                this.send_user_message(text, cx);
+                this.message_input.update(cx, |state, cx| {
+                    state.set_value("".to_string(), window, cx);
+                });
+            }
+        }).detach();
+
         Self {
             theme: HiveTheme::dark(),
             channels: Vec::new(),
             active_channel_id: None,
             messages: Vec::new(),
-            message_input: String::new(),
+            message_input,
             is_streaming: false,
             streaming_content: String::new(),
             streaming_agent: None,
@@ -237,6 +255,64 @@ impl ChannelsView {
             "CodeReview" => self.theme.accent_aqua,
             _ => self.theme.text_secondary,
         }
+    }
+
+    /// Send a user message in the active channel. Adds to the store,
+    /// updates the display, and emits `ChannelMessageSent` so the workspace
+    /// can trigger AI agent responses.
+    pub fn send_user_message(&mut self, text: String, cx: &mut Context<Self>) {
+        let text = text.trim().to_string();
+        if text.is_empty() {
+            return;
+        }
+
+        let Some(ref channel_id) = self.active_channel_id else {
+            return;
+        };
+
+        // Find assigned agents for this channel
+        let assigned_agents: Vec<String> = self
+            .channels
+            .iter()
+            .find(|c| c.id == *channel_id)
+            .map(|c| c.assigned_agents.clone())
+            .unwrap_or_default();
+
+        // Create the user message
+        let msg = hive_core::channels::ChannelMessage {
+            id: uuid::Uuid::new_v4().to_string(),
+            author: hive_core::channels::MessageAuthor::User,
+            content: text.clone(),
+            timestamp: chrono::Utc::now(),
+            thread_id: None,
+            model: None,
+            cost: None,
+        };
+
+        // Append to display
+        self.messages.push(self.message_to_display(&msg));
+
+        // Emit event so workspace can trigger AI responses and persist
+        cx.emit(ChannelMessageSent {
+            channel_id: channel_id.clone(),
+            content: text,
+            assigned_agents,
+        });
+
+        cx.notify();
+    }
+
+    /// Set the message input text programmatically.
+    pub fn set_message_input(&mut self, text: String, window: &mut Window, cx: &mut Context<Self>) {
+        self.message_input.update(cx, |state, cx| {
+            state.set_value(text, window, cx);
+        });
+        cx.notify();
+    }
+
+    /// Get the current input text.
+    fn input_text(&self, cx: &Context<Self>) -> String {
+        self.message_input.read(cx).value().to_string()
     }
 
     fn agent_icon(&self, persona: &str) -> String {
@@ -507,7 +583,10 @@ impl ChannelsView {
             );
         }
 
-        // Input area
+        // Input area — real GPUI Input component with keyboard handling
+        let has_text = !self.message_input.read(cx).value().is_empty();
+        let input_entity = self.message_input.clone();
+
         let input_area = div()
             .flex()
             .items_center()
@@ -518,24 +597,13 @@ impl ChannelsView {
             .border_color(theme.border)
             .child(
                 div()
-                    .id("channel-msg-input")
                     .flex_1()
                     .min_w(px(0.0))
-                    .px(theme.space_3)
-                    .py(theme.space_2)
-                    .rounded(theme.radius_md)
-                    .bg(theme.bg_tertiary)
-                    .text_size(theme.font_size_sm)
-                    .text_color(if self.message_input.is_empty() {
-                        theme.text_muted
-                    } else {
-                        theme.text_primary
-                    })
-                    .child(if self.message_input.is_empty() {
-                        "Type a message...".to_string()
-                    } else {
-                        self.message_input.clone()
-                    }),
+                    .child(
+                        Input::new(&input_entity)
+                            .text_size(theme.font_size_sm)
+                            .cleanable(true),
+                    ),
             )
             .child(
                 div()
@@ -543,11 +611,29 @@ impl ChannelsView {
                     .px(theme.space_3)
                     .py(theme.space_2)
                     .rounded(theme.radius_md)
-                    .bg(theme.accent_cyan)
+                    .bg(if has_text {
+                        theme.accent_cyan
+                    } else {
+                        theme.bg_tertiary
+                    })
                     .text_size(theme.font_size_sm)
-                    .text_color(theme.bg_primary)
+                    .text_color(if has_text {
+                        theme.bg_primary
+                    } else {
+                        theme.text_muted
+                    })
                     .font_weight(FontWeight::BOLD)
                     .cursor_pointer()
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(|this, _event, window, cx| {
+                            let text = this.input_text(cx);
+                            this.send_user_message(text.clone(), cx);
+                            this.message_input.update(cx, |state, cx| {
+                                state.set_value("".to_string(), window, cx);
+                            });
+                        }),
+                    )
                     .child("Send"),
             );
 
