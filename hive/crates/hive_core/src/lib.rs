@@ -59,7 +59,7 @@ pub use kanban::{
     BoardMetrics, KanbanBoard, KanbanColumn, KanbanTask, Priority, Subtask, TaskComment,
 };
 pub use notifications::{AppNotification, NotificationStore, NotificationType};
-pub use persistence::{ConversationRow, Database, MemoryEntry, MessageRow, ModelCostRow};
+pub use persistence::{ConversationRow, Database, LogRow, MemoryEntry, MessageRow, ModelCostRow};
 pub use scheduler::{CronSchedule, ScheduledJob, Scheduler};
 pub use secure_storage::SecureStorage;
 pub use security::SecurityGateway;

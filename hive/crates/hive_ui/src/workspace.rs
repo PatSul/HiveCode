@@ -19,8 +19,8 @@ use crate::chat_service::{ChatService, StreamCompleted};
 use chrono::Utc;
 use hive_ui_core::{
     // Globals
-    AppAiService, AppAssistant, AppAutomation, AppChannels, AppConfig, AppLearning, AppMarketplace,
-    AppNotifications, AppPersonas, AppSecurity, AppShield, AppSpecs,
+    AppAiService, AppAssistant, AppAutomation, AppChannels, AppConfig, AppDatabase, AppLearning,
+    AppMarketplace, AppNotifications, AppPersonas, AppSecurity, AppShield, AppSpecs,
     // Types
     HiveTheme, Panel, Sidebar,
 };
@@ -170,6 +170,10 @@ pub struct HiveWorkspace {
     discovery_done_flag: Option<Arc<std::sync::atomic::AtomicBool>>,
     /// Recently used workspace roots, persisted to session and shown in the titlebar.
     recent_workspace_roots: Vec<PathBuf>,
+    /// Last observed window size (width, height) in logical pixels.
+    /// Updated on each render frame so `save_session` can persist it without
+    /// needing a `&Window` reference.
+    last_window_size: Option<[u32; 2]>,
 }
 
 const MAX_RECENT_WORKSPACES: usize = 8;
@@ -466,6 +470,7 @@ impl HiveWorkspace {
             last_discovery_scan: None,
             discovery_scan_pending: false,
             discovery_done_flag: None,
+            last_window_size: session.window_size,
         }
     }
 
@@ -753,14 +758,52 @@ impl HiveWorkspace {
         }
     }
 
-    /// Refresh the logs panel.  Logs are appended in real-time via
-    /// `add_log_entry()` calls throughout the application.  This refresh is a
-    /// no-op placeholder — the logs panel already accumulates entries as they
-    /// arrive.  It is wired into `switch_to_panel` so we have a hook to add
-    /// future behaviour (e.g. pulling persisted logs from disk on first visit).
-    fn refresh_logs_data(&mut self, _cx: &App) {
-        // Logs accumulate via push; nothing to pull from a global yet.
-        // TODO: When a persistent log store is added, load recent entries here.
+    /// Refresh the logs panel.  On first visit (when the in-memory log list is
+    /// empty), loads persisted entries from the SQLite database so logs survive
+    /// app restarts.  Subsequent visits are no-ops because new entries are
+    /// already pushed in real-time via `logs_data.add_entry()`.
+    fn refresh_logs_data(&mut self, cx: &App) {
+        if !self.logs_data.entries.is_empty() {
+            return;
+        }
+        if !cx.has_global::<AppDatabase>() {
+            return;
+        }
+        let db = &cx.global::<AppDatabase>().0;
+        match db.recent_logs(500, 0) {
+            Ok(rows) => {
+                use hive_ui_panels::panels::logs::LogLevel;
+                // Rows come newest-first from DB; reverse so oldest is first in the vec.
+                for row in rows.into_iter().rev() {
+                    let level = LogLevel::from_str_lossy(&row.level);
+                    self.logs_data.add_entry(level, row.source, row.message);
+                }
+            }
+            Err(e) => {
+                warn!("Failed to load persisted logs: {e}");
+            }
+        }
+    }
+
+    /// Append a log entry to the in-memory list and persist it to the SQLite
+    /// database.  This is the single entry-point for adding log entries so
+    /// they survive application restarts.
+    pub fn log(
+        &mut self,
+        level: hive_ui_panels::panels::logs::LogLevel,
+        source: impl Into<String>,
+        message: impl Into<String>,
+        cx: &App,
+    ) {
+        let source = source.into();
+        let message = message.into();
+        if cx.has_global::<AppDatabase>() {
+            let db = &cx.global::<AppDatabase>().0;
+            if let Err(e) = db.save_log(level.as_str(), &source, &message) {
+                warn!("Failed to persist log entry: {e}");
+            }
+        }
+        self.logs_data.add_entry(level, source, message);
     }
 
     /// Load Kanban board state from `~/.hive/kanban.json`.  If the file does
@@ -1395,7 +1438,7 @@ impl HiveWorkspace {
         let state = SessionState {
             active_conversation_id: conv_id.clone(),
             active_panel: self.sidebar.active_panel.to_stored().to_string(),
-            window_size: None, // TODO: read from window when GPUI exposes it
+            window_size: self.last_window_size,
             working_directory: Some(self.current_project_root.to_string_lossy().to_string()),
             recent_workspaces: self
                 .recent_workspace_roots
@@ -2880,6 +2923,12 @@ impl HiveWorkspace {
     ) {
         info!("Logs: clear");
         self.logs_data.entries.clear();
+        if cx.has_global::<AppDatabase>() {
+            let db = &cx.global::<AppDatabase>().0;
+            if let Err(e) = db.clear_logs() {
+                warn!("Failed to clear persisted logs: {e}");
+            }
+        }
         cx.notify();
     }
 
@@ -5630,6 +5679,14 @@ impl HiveWorkspace {
 
 impl Render for HiveWorkspace {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // Capture the current window size for session persistence.
+        let bounds = window.bounds();
+        let w = f32::from(bounds.size.width) as u32;
+        let h = f32::from(bounds.size.height) as u32;
+        if w > 0 && h > 0 {
+            self.last_window_size = Some([w, h]);
+        }
+
         self.sync_status_bar(window, cx);
 
         // Auto-focus: when nothing is focused, give focus to the chat input on

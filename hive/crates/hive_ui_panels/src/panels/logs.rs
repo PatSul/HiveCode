@@ -49,6 +49,27 @@ impl LogLevel {
             LogLevel::Debug => 3,
         }
     }
+
+    /// String representation for database persistence.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            LogLevel::Error => "error",
+            LogLevel::Warning => "warning",
+            LogLevel::Info => "info",
+            LogLevel::Debug => "debug",
+        }
+    }
+
+    /// Parse from a database string. Falls back to `Info` for unrecognised values.
+    pub fn from_str_lossy(s: &str) -> Self {
+        match s {
+            "error" => LogLevel::Error,
+            "warning" => LogLevel::Warning,
+            "info" => LogLevel::Info,
+            "debug" => LogLevel::Debug,
+            _ => LogLevel::Info,
+        }
+    }
 }
 
 /// A single log entry captured from agent execution.

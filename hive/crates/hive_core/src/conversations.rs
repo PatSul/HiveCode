@@ -257,8 +257,10 @@ impl ConversationStore {
     }
 
     /// Case-insensitive search across title and message content.
-    // TODO: For large conversation stores, consider a full-text search index
-    // (e.g. SQLite FTS5) instead of scanning every file.
+    ///
+    /// For large conversation stores, prefer `Database::search_conversations`
+    /// which uses an FTS5 full-text index.  This file-scanning fallback
+    /// remains for offline / DB-less operation.
     pub fn search(&self, query: &str) -> Result<Vec<ConversationSummary>> {
         let query_lower = query.to_lowercase();
         let mut results = Vec::new();

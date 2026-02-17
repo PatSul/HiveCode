@@ -41,6 +41,16 @@ pub struct MemoryEntry {
     pub updated_at: String,
 }
 
+/// A persisted log entry.
+#[derive(Debug, Clone)]
+pub struct LogRow {
+    pub id: i64,
+    pub level: String,
+    pub source: String,
+    pub message: String,
+    pub created_at: String,
+}
+
 /// Aggregated cost data for a single model.
 #[derive(Debug, Clone)]
 pub struct ModelCostRow {
@@ -132,6 +142,14 @@ impl Database {
                 created_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
 
+            CREATE TABLE IF NOT EXISTS logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                level TEXT NOT NULL,
+                source TEXT NOT NULL,
+                message TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+
             CREATE INDEX IF NOT EXISTS idx_messages_conversation
                 ON messages(conversation_id);
             CREATE INDEX IF NOT EXISTS idx_memory_category
@@ -140,6 +158,19 @@ impl Database {
                 ON cost_records(created_at);
             CREATE INDEX IF NOT EXISTS idx_cost_records_model
                 ON cost_records(model);
+            CREATE INDEX IF NOT EXISTS idx_logs_created
+                ON logs(created_at);
+            CREATE INDEX IF NOT EXISTS idx_logs_level
+                ON logs(level);
+
+            -- FTS5 full-text index for fast conversation search across
+            -- titles and message content.
+            CREATE VIRTUAL TABLE IF NOT EXISTS conversations_fts USING fts5(
+                conversation_id UNINDEXED,
+                title,
+                content,
+                tokenize = 'porter unicode61'
+            );
             ",
         )?;
         Ok(())
@@ -154,7 +185,7 @@ impl Database {
     // Conversations
     // -----------------------------------------------------------------------
 
-    /// Inserts or replaces a conversation header.
+    /// Inserts or replaces a conversation header and updates the FTS index.
     pub fn save_conversation(&self, id: &str, title: &str, model: &str) -> Result<()> {
         self.conn.execute(
             "INSERT INTO conversations (id, title, model, created_at, updated_at)
@@ -165,6 +196,7 @@ impl Database {
                  updated_at = datetime('now')",
             params![id, title, model],
         )?;
+        self.rebuild_fts_for(id)?;
         Ok(())
     }
 
@@ -196,15 +228,27 @@ impl Database {
         Ok(result)
     }
 
-    /// Deletes a conversation and its messages (via ON DELETE CASCADE).
+    /// Deletes a conversation, its messages (via ON DELETE CASCADE), and FTS index entries.
     pub fn delete_conversation(&self, id: &str) -> Result<()> {
+        self.conn.execute(
+            "DELETE FROM conversations_fts WHERE conversation_id = ?1",
+            params![id],
+        )?;
         self.conn
             .execute("DELETE FROM conversations WHERE id = ?1", params![id])?;
         Ok(())
     }
 
-    /// Searches conversations by title (case-insensitive LIKE).
+    /// Searches conversations using FTS5 full-text search across titles and
+    /// message content.  Falls back to LIKE-based search if the FTS query
+    /// syntax is invalid (e.g. unmatched quotes).
     pub fn search_conversations(&self, query: &str) -> Result<Vec<ConversationRow>> {
+        // Try FTS5 first — much faster for large conversation stores.
+        if let Ok(results) = self.search_conversations_fts(query) {
+            return Ok(results);
+        }
+
+        // Fallback: plain LIKE search (handles edge cases in query syntax).
         let pattern = format!("%{query}%");
         let mut stmt = self.conn.prepare(
             "SELECT c.id, c.title, c.model, c.created_at, c.updated_at,
@@ -237,11 +281,85 @@ impl Database {
         Ok(result)
     }
 
+    /// FTS5-based search implementation.
+    fn search_conversations_fts(&self, query: &str) -> Result<Vec<ConversationRow>> {
+        // Quote the query terms for FTS5 to handle special characters safely.
+        let fts_query = format!("\"{}\"", query.replace('"', "\"\""));
+
+        let mut stmt = self.conn.prepare(
+            "SELECT c.id, c.title, c.model, c.created_at, c.updated_at,
+                    (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id) AS msg_count
+             FROM conversations_fts f
+             JOIN conversations c ON c.id = f.conversation_id
+             WHERE conversations_fts MATCH ?1
+             ORDER BY c.updated_at DESC",
+        )?;
+
+        let rows = stmt.query_map(params![fts_query], |row| {
+            Ok(ConversationRow {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                model: row.get(2)?,
+                created_at: row.get(3)?,
+                updated_at: row.get(4)?,
+                message_count: row.get::<_, i64>(5)? as usize,
+            })
+        })?;
+
+        let mut result = Vec::new();
+        for row in rows {
+            result.push(row.context("Failed to read conversation row")?);
+        }
+        Ok(result)
+    }
+
+    /// Rebuild the FTS5 index entry for a single conversation.  Deletes the
+    /// existing entry (if any) and re-inserts with the current title and all
+    /// message content concatenated.
+    fn rebuild_fts_for(&self, conversation_id: &str) -> Result<()> {
+        // Remove stale entry.
+        self.conn.execute(
+            "DELETE FROM conversations_fts WHERE conversation_id = ?1",
+            params![conversation_id],
+        )?;
+
+        // Fetch the current title.
+        let title: Option<String> = self
+            .conn
+            .query_row(
+                "SELECT title FROM conversations WHERE id = ?1",
+                params![conversation_id],
+                |row| row.get(0),
+            )
+            .ok();
+
+        let title = match title {
+            Some(t) => t,
+            None => return Ok(()), // conversation doesn't exist yet
+        };
+
+        // Concatenate all message content (space separated).
+        let mut stmt = self.conn.prepare(
+            "SELECT content FROM messages WHERE conversation_id = ?1 ORDER BY id ASC",
+        )?;
+        let contents: Vec<String> = stmt
+            .query_map(params![conversation_id], |row| row.get::<_, String>(0))?
+            .filter_map(|r| r.ok())
+            .collect();
+        let all_content = contents.join(" ");
+
+        self.conn.execute(
+            "INSERT INTO conversations_fts (conversation_id, title, content) VALUES (?1, ?2, ?3)",
+            params![conversation_id, title, all_content],
+        )?;
+        Ok(())
+    }
+
     // -----------------------------------------------------------------------
     // Messages
     // -----------------------------------------------------------------------
 
-    /// Saves a message and returns its auto-generated row ID.
+    /// Saves a message, updates the FTS index, and returns its auto-generated row ID.
     pub fn save_message(
         &self,
         conversation_id: &str,
@@ -270,7 +388,9 @@ impl Database {
             ],
         )?;
 
-        Ok(self.conn.last_insert_rowid())
+        let row_id = self.conn.last_insert_rowid();
+        self.rebuild_fts_for(conversation_id)?;
+        Ok(row_id)
     }
 
     /// Returns all messages for a conversation, ordered chronologically.
@@ -411,6 +531,65 @@ impl Database {
         Ok(cost)
     }
 
+    // -----------------------------------------------------------------------
+    // Logs
+    // -----------------------------------------------------------------------
+
+    /// Saves a log entry and returns its auto-generated row ID.
+    pub fn save_log(&self, level: &str, source: &str, message: &str) -> Result<i64> {
+        self.conn.execute(
+            "INSERT INTO logs (level, source, message) VALUES (?1, ?2, ?3)",
+            params![level, source, message],
+        )?;
+        Ok(self.conn.last_insert_rowid())
+    }
+
+    /// Returns the most recent log entries (newest first), with pagination.
+    pub fn recent_logs(&self, limit: usize, offset: usize) -> Result<Vec<LogRow>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT id, level, source, message, created_at
+             FROM logs
+             ORDER BY id DESC
+             LIMIT ?1 OFFSET ?2",
+        )?;
+
+        let rows = stmt.query_map(params![limit as i64, offset as i64], |row| {
+            Ok(LogRow {
+                id: row.get(0)?,
+                level: row.get(1)?,
+                source: row.get(2)?,
+                message: row.get(3)?,
+                created_at: row.get(4)?,
+            })
+        })?;
+
+        let mut result = Vec::new();
+        for row in rows {
+            result.push(row.context("Failed to read log row")?);
+        }
+        Ok(result)
+    }
+
+    /// Deletes log entries older than the given ISO 8601 datetime string.
+    /// Returns the number of rows deleted.
+    pub fn delete_logs_before(&self, before: &str) -> Result<usize> {
+        let deleted = self.conn.execute(
+            "DELETE FROM logs WHERE created_at < ?1",
+            params![before],
+        )?;
+        Ok(deleted)
+    }
+
+    /// Deletes all log entries. Returns the number of rows deleted.
+    pub fn clear_logs(&self) -> Result<usize> {
+        let deleted = self.conn.execute("DELETE FROM logs", [])?;
+        Ok(deleted)
+    }
+
+    // -----------------------------------------------------------------------
+    // Cost tracking
+    // -----------------------------------------------------------------------
+
     /// Returns aggregated cost data grouped by model.
     pub fn cost_by_model(&self) -> Result<Vec<ModelCostRow>> {
         let mut stmt = self.conn.prepare(
@@ -461,18 +640,18 @@ mod tests {
     #[test]
     fn test_schema_creates_tables() {
         let db = test_db();
-        // Verify all four tables exist by querying sqlite_master
+        // Verify all five tables exist by querying sqlite_master
         let count: i64 = db
             .conn
             .query_row(
                 "SELECT COUNT(*) FROM sqlite_master
                  WHERE type = 'table'
-                   AND name IN ('conversations', 'messages', 'memory_entries', 'cost_records')",
+                   AND name IN ('conversations', 'messages', 'memory_entries', 'cost_records', 'logs')",
                 [],
                 |row| row.get(0),
             )
             .unwrap();
-        assert_eq!(count, 4);
+        assert_eq!(count, 5);
     }
 
     #[test]
@@ -813,6 +992,70 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
+    // FTS5 search
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_fts_search_by_title() {
+        let db = test_db();
+        db.save_conversation("c1", "Quantum Physics Discussion", "claude")
+            .unwrap();
+        db.save_conversation("c2", "Cooking Recipes", "gpt-4")
+            .unwrap();
+
+        let results = db.search_conversations("quantum").unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "c1");
+    }
+
+    #[test]
+    fn test_fts_search_by_message_content() {
+        let db = test_db();
+        db.save_conversation("c1", "General Chat", "claude")
+            .unwrap();
+        db.save_message("c1", "user", "Tell me about photosynthesis", None, None, None)
+            .unwrap();
+
+        db.save_conversation("c2", "Another Chat", "claude")
+            .unwrap();
+        db.save_message("c2", "user", "How to bake bread", None, None, None)
+            .unwrap();
+
+        let results = db.search_conversations("photosynthesis").unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "c1");
+    }
+
+    #[test]
+    fn test_fts_search_porter_stemming() {
+        let db = test_db();
+        db.save_conversation("c1", "Running Tips", "claude").unwrap();
+        db.save_message("c1", "user", "I love programming in Rust", None, None, None)
+            .unwrap();
+
+        // Porter stemmer should match "programming" via "program"
+        let results = db.search_conversations("program").unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "c1");
+    }
+
+    #[test]
+    fn test_fts_search_after_delete() {
+        let db = test_db();
+        db.save_conversation("c1", "Delete Me", "claude").unwrap();
+        db.save_message("c1", "user", "unique search term xyzzy", None, None, None)
+            .unwrap();
+
+        let results = db.search_conversations("xyzzy").unwrap();
+        assert_eq!(results.len(), 1);
+
+        db.delete_conversation("c1").unwrap();
+
+        let results = db.search_conversations("xyzzy").unwrap();
+        assert!(results.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
     // Integration: full conversation lifecycle
     // -----------------------------------------------------------------------
 
@@ -854,5 +1097,82 @@ mod tests {
         db.delete_conversation("lifecycle").unwrap();
         assert!(db.list_conversations(10, 0).unwrap().is_empty());
         assert!(db.get_messages("lifecycle").unwrap().is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // Logs
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_save_and_recent_logs() {
+        let db = test_db();
+        db.save_log("info", "agent", "Agent started").unwrap();
+        db.save_log("error", "network", "Connection lost").unwrap();
+        db.save_log("debug", "ui", "Render complete").unwrap();
+
+        let logs = db.recent_logs(10, 0).unwrap();
+        assert_eq!(logs.len(), 3);
+        // newest first
+        assert_eq!(logs[0].source, "ui");
+        assert_eq!(logs[1].source, "network");
+        assert_eq!(logs[2].source, "agent");
+    }
+
+    #[test]
+    fn test_recent_logs_pagination() {
+        let db = test_db();
+        for i in 0..5 {
+            db.save_log("info", "src", &format!("msg {i}")).unwrap();
+        }
+
+        let page1 = db.recent_logs(2, 0).unwrap();
+        assert_eq!(page1.len(), 2);
+
+        let page2 = db.recent_logs(2, 2).unwrap();
+        assert_eq!(page2.len(), 2);
+
+        let page3 = db.recent_logs(2, 4).unwrap();
+        assert_eq!(page3.len(), 1);
+    }
+
+    #[test]
+    fn test_clear_logs() {
+        let db = test_db();
+        db.save_log("info", "a", "msg1").unwrap();
+        db.save_log("warning", "b", "msg2").unwrap();
+
+        let deleted = db.clear_logs().unwrap();
+        assert_eq!(deleted, 2);
+
+        let logs = db.recent_logs(10, 0).unwrap();
+        assert!(logs.is_empty());
+    }
+
+    #[test]
+    fn test_delete_logs_before() {
+        let db = test_db();
+        // Insert two with explicit timestamps for deterministic testing.
+        db.conn
+            .execute(
+                "INSERT INTO logs (level, source, message, created_at)
+                 VALUES ('info', 'old', 'old msg', '2024-01-01 00:00:00')",
+                [],
+            )
+            .unwrap();
+        db.save_log("info", "new", "new msg").unwrap();
+
+        let deleted = db.delete_logs_before("2025-01-01 00:00:00").unwrap();
+        assert_eq!(deleted, 1);
+
+        let logs = db.recent_logs(10, 0).unwrap();
+        assert_eq!(logs.len(), 1);
+        assert_eq!(logs[0].source, "new");
+    }
+
+    #[test]
+    fn test_recent_logs_empty() {
+        let db = test_db();
+        let logs = db.recent_logs(10, 0).unwrap();
+        assert!(logs.is_empty());
     }
 }

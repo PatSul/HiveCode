@@ -364,12 +364,18 @@ fn register_actions(cx: &mut App) {
     });
 }
 
-/// Build the main window options with a centered 1280x800 frame.
+/// Build the main window options, restoring the saved window size if available.
 fn window_options(cx: &App) -> WindowOptions {
+    let session = hive_core::session::SessionState::load().unwrap_or_default();
+    let (w, h) = match session.window_size {
+        Some([w, h]) if w >= 400 && h >= 300 => (w as f32, h as f32),
+        _ => (1280.0, 800.0),
+    };
+
     WindowOptions {
         window_bounds: Some(WindowBounds::Windowed(Bounds::centered(
             None,
-            size(px(1280.0), px(800.0)),
+            size(px(w), px(h)),
             cx,
         ))),
         titlebar: Some(gpui_component::TitleBar::title_bar_options()),
