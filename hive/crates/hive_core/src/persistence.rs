@@ -1,9 +1,10 @@
 use anyhow::{Context, Result};
 use rusqlite::{Connection, params};
-use std::path::PathBuf;
-use tracing::info;
+use std::path::{Path, PathBuf};
+use tracing::{info, warn};
 
 use crate::config::HiveConfig;
+use crate::conversations::Conversation;
 
 // ---------------------------------------------------------------------------
 // Row types
@@ -590,6 +591,102 @@ impl Database {
     // Cost tracking
     // -----------------------------------------------------------------------
 
+    // -----------------------------------------------------------------------
+    // JSON → SQLite backfill
+    // -----------------------------------------------------------------------
+
+    /// Imports conversations from JSON files into SQLite, skipping any that
+    /// already exist.  Also rebuilds the FTS5 index for every imported
+    /// conversation.  Returns the number of conversations imported.
+    ///
+    /// Call this once at startup to consolidate the file-based store into the
+    /// database so that FTS search, cost queries, and list operations all
+    /// reflect the full conversation history.
+    pub fn backfill_from_json(&self, conversations_dir: &Path) -> Result<usize> {
+        let entries = match std::fs::read_dir(conversations_dir) {
+            Ok(e) => e,
+            Err(_) => return Ok(0), // dir doesn't exist yet — nothing to import
+        };
+
+        let mut imported = 0usize;
+
+        for entry in entries {
+            let entry = match entry {
+                Ok(e) => e,
+                Err(_) => continue,
+            };
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) != Some("json") {
+                continue;
+            }
+
+            let content = match std::fs::read_to_string(&path) {
+                Ok(c) => c,
+                Err(e) => {
+                    warn!("Skipping unreadable conversation file {}: {e}", path.display());
+                    continue;
+                }
+            };
+
+            let conv: Conversation = match serde_json::from_str(&content) {
+                Ok(c) => c,
+                Err(e) => {
+                    warn!("Skipping corrupt conversation file {}: {e}", path.display());
+                    continue;
+                }
+            };
+
+            // Skip if already in SQLite.
+            let exists: bool = self
+                .conn
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM conversations WHERE id = ?1)",
+                    params![conv.id],
+                    |row| row.get(0),
+                )
+                .unwrap_or(false);
+            if exists {
+                continue;
+            }
+
+            // Insert conversation header with original timestamps.
+            let created = conv.created_at.format("%Y-%m-%d %H:%M:%S").to_string();
+            let updated = conv.updated_at.format("%Y-%m-%d %H:%M:%S").to_string();
+            self.conn.execute(
+                "INSERT INTO conversations (id, title, model, created_at, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![conv.id, conv.title, conv.model, created, updated],
+            )?;
+
+            // Insert all messages preserving their timestamps.
+            for msg in &conv.messages {
+                let msg_created = msg.timestamp.format("%Y-%m-%d %H:%M:%S").to_string();
+                self.conn.execute(
+                    "INSERT INTO messages (conversation_id, role, content, model, cost, tokens, created_at)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                    params![
+                        conv.id,
+                        msg.role,
+                        msg.content,
+                        msg.model,
+                        msg.cost,
+                        msg.tokens.map(|t| t as i64),
+                        msg_created,
+                    ],
+                )?;
+            }
+
+            // Build FTS index for the imported conversation.
+            self.rebuild_fts_for(&conv.id)?;
+            imported += 1;
+        }
+
+        if imported > 0 {
+            info!("Backfilled {imported} conversation(s) from JSON into SQLite");
+        }
+        Ok(imported)
+    }
+
     /// Returns aggregated cost data grouped by model.
     pub fn cost_by_model(&self) -> Result<Vec<ModelCostRow>> {
         let mut stmt = self.conn.prepare(
@@ -1174,5 +1271,121 @@ mod tests {
         let db = test_db();
         let logs = db.recent_logs(10, 0).unwrap();
         assert!(logs.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // JSON → SQLite backfill
+    // -----------------------------------------------------------------------
+
+    /// Helper: write a JSON conversation file to a temp directory.
+    fn write_json_conversation(dir: &std::path::Path, conv: &crate::conversations::Conversation) {
+        let path = dir.join(format!("{}.json", conv.id));
+        let json = serde_json::to_string_pretty(conv).unwrap();
+        std::fs::write(path, json).unwrap();
+    }
+
+    fn sample_conversation(id: &str, title: &str) -> crate::conversations::Conversation {
+        use chrono::Utc;
+        crate::conversations::Conversation {
+            id: id.to_string(),
+            title: title.to_string(),
+            messages: vec![
+                crate::conversations::StoredMessage {
+                    role: "user".to_string(),
+                    content: "Hello, how are you?".to_string(),
+                    timestamp: Utc::now(),
+                    model: None,
+                    cost: None,
+                    tokens: None,
+                    thinking: None,
+                },
+                crate::conversations::StoredMessage {
+                    role: "assistant".to_string(),
+                    content: "I'm doing great, thanks for asking!".to_string(),
+                    timestamp: Utc::now(),
+                    model: Some("claude-sonnet".to_string()),
+                    cost: Some(0.002),
+                    tokens: Some(42),
+                    thinking: None,
+                },
+            ],
+            model: "claude-sonnet".to_string(),
+            total_cost: 0.002,
+            total_tokens: 42,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    #[test]
+    fn test_backfill_imports_json_conversations() {
+        let db = test_db();
+        let tmp = tempfile::tempdir().unwrap();
+
+        let conv1 = sample_conversation("bf-1", "Backfill Chat One");
+        let conv2 = sample_conversation("bf-2", "Backfill Chat Two");
+        write_json_conversation(tmp.path(), &conv1);
+        write_json_conversation(tmp.path(), &conv2);
+
+        let imported = db.backfill_from_json(tmp.path()).unwrap();
+        assert_eq!(imported, 2);
+
+        let convs = db.list_conversations(10, 0).unwrap();
+        assert_eq!(convs.len(), 2);
+
+        let msgs = db.get_messages("bf-1").unwrap();
+        assert_eq!(msgs.len(), 2);
+        assert_eq!(msgs[0].role, "user");
+        assert_eq!(msgs[1].role, "assistant");
+        assert_eq!(msgs[1].model.as_deref(), Some("claude-sonnet"));
+    }
+
+    #[test]
+    fn test_backfill_skips_existing_conversations() {
+        let db = test_db();
+        let tmp = tempfile::tempdir().unwrap();
+
+        // Pre-insert one conversation into SQLite.
+        db.save_conversation("bf-existing", "Already Here", "gpt-4")
+            .unwrap();
+
+        let conv = sample_conversation("bf-existing", "Already Here");
+        write_json_conversation(tmp.path(), &conv);
+
+        let imported = db.backfill_from_json(tmp.path()).unwrap();
+        assert_eq!(imported, 0);
+
+        // Original title should be unchanged.
+        let convs = db.list_conversations(10, 0).unwrap();
+        assert_eq!(convs.len(), 1);
+        assert_eq!(convs[0].title, "Already Here");
+    }
+
+    #[test]
+    fn test_backfill_builds_fts_index() {
+        let db = test_db();
+        let tmp = tempfile::tempdir().unwrap();
+
+        let conv = sample_conversation("bf-fts", "Quantum Mechanics");
+        write_json_conversation(tmp.path(), &conv);
+
+        db.backfill_from_json(tmp.path()).unwrap();
+
+        // FTS search should find the conversation by title.
+        let results = db.search_conversations("quantum").unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "bf-fts");
+
+        // FTS search should also find by message content.
+        let results = db.search_conversations("great").unwrap();
+        assert_eq!(results.len(), 1);
+    }
+
+    #[test]
+    fn test_backfill_nonexistent_dir() {
+        let db = test_db();
+        let result = db.backfill_from_json(std::path::Path::new("/nonexistent/path"));
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 0);
     }
 }

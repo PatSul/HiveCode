@@ -63,8 +63,6 @@ pub struct ChannelsView {
     streaming_agent: Option<String>,
 
     // UI state
-    #[allow(dead_code)]
-    show_channel_list: bool,
     create_channel_mode: bool,
     new_channel_name: String,
 }
@@ -114,7 +112,6 @@ impl ChannelsView {
             is_streaming: false,
             streaming_content: String::new(),
             streaming_agent: None,
-            show_channel_list: true,
             create_channel_mode: false,
             new_channel_name: String::new(),
         }

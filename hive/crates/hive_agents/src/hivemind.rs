@@ -830,11 +830,6 @@ mod tests {
                 call_count: Arc::new(AtomicUsize::new(0)),
             }
         }
-
-        #[allow(dead_code)]
-        fn calls(&self) -> usize {
-            self.call_count.load(Ordering::SeqCst)
-        }
     }
 
     impl AiExecutor for MockExecutor {

@@ -27,15 +27,6 @@ struct GraphListResponse<T> {
     value: Vec<T>,
 }
 
-/// A Teams team (group).
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
-struct TeamsTeam {
-    id: String,
-    #[serde(rename = "displayName")]
-    display_name: Option<String>,
-}
-
 /// A Teams channel.
 #[derive(Debug, Default, Deserialize)]
 struct TeamsChannel {

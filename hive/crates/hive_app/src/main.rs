@@ -159,6 +159,15 @@ fn init_services(cx: &mut App) -> anyhow::Result<()> {
     // --- Register results with cx sequentially (cx is !Send) ---
 
     let db = db_result.inspect_err(|e| error!("Database open failed: {e}"))?;
+
+    // Backfill: import any JSON conversations that aren't yet in SQLite,
+    // including building their FTS5 search index.
+    if let Ok(conv_dir) = HiveConfig::conversations_dir()
+        && let Err(e) = db.backfill_from_json(&conv_dir)
+    {
+        warn!("JSON→SQLite backfill failed: {e}");
+    }
+
     cx.set_global(AppDatabase(db));
     info!("Database opened");
 

@@ -26,16 +26,6 @@ struct MatrixSendResponse {
     event_id: String,
 }
 
-/// A joined room entry from the sync response.
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
-struct MatrixRoom {
-    room_id: Option<String>,
-    name: Option<String>,
-    canonical_alias: Option<String>,
-    num_joined_members: Option<u32>,
-}
-
 /// Response from `publicRooms` or `joined_rooms`.
 #[derive(Debug, Deserialize)]
 struct MatrixJoinedRoomsResponse {

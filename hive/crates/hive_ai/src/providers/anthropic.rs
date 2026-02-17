@@ -122,14 +122,12 @@ struct SseContentBlockDelta {
 
 #[derive(Debug, Deserialize)]
 struct SseMessageDelta {
-    #[allow(dead_code)]
     delta: Option<SseMessageDeltaInner>,
     usage: Option<SseMessageDeltaUsage>,
 }
 
 #[derive(Debug, Deserialize)]
 struct SseMessageDeltaInner {
-    #[allow(dead_code)]
     stop_reason: Option<String>,
 }
 
