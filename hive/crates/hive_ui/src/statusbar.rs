@@ -1,7 +1,8 @@
 use gpui::*;
+use gpui::prelude::FluentBuilder;
 use gpui_component::{Icon, IconName};
 
-use hive_ui_core::{HiveTheme, SwitchToSettings};
+use hive_ui_core::{HiveTheme, SwitchToSettings, TriggerAppUpdate};
 
 /// Status bar at the bottom of the window.
 /// Shows connectivity, model, privacy mode, project scope, cost, and version.
@@ -12,6 +13,8 @@ pub struct StatusBar {
     pub active_project: String,
     pub total_cost: f64,
     pub version: String,
+    /// If set, a newer version is available for download/install.
+    pub update_available: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -48,6 +51,7 @@ impl Default for StatusBar {
             active_project: "No project".into(),
             total_cost: 0.0,
             version: env!("CARGO_PKG_VERSION").into(),
+            update_available: None,
         }
     }
 }
@@ -81,6 +85,7 @@ impl StatusBar {
         };
         let project = self.active_project.clone();
         let version = format!("v{}", self.version);
+        let update_version = self.update_available.clone();
 
         div()
             .flex()
@@ -157,6 +162,30 @@ impl StatusBar {
                     .flex()
                     .items_center()
                     .gap(theme.space_2)
+                    // Update badge (only visible when update is available)
+                    .when(update_version.is_some(), |el: Div| {
+                        let new_ver = update_version.unwrap_or_default();
+                        el.child(
+                            div()
+                                .id("update-badge")
+                                .flex()
+                                .items_center()
+                                .gap(theme.space_1)
+                                .px(theme.space_2)
+                                .py(px(2.0))
+                                .rounded(theme.radius_sm)
+                                .bg(theme.accent_yellow)
+                                .text_color(hsla(0.0, 0.0, 0.1, 1.0))
+                                .text_size(theme.font_size_xs)
+                                .font_weight(FontWeight::BOLD)
+                                .cursor_pointer()
+                                .on_mouse_down(MouseButton::Left, |_event, window, cx| {
+                                    window.dispatch_action(Box::new(TriggerAppUpdate), cx);
+                                })
+                                .child(Icon::new(IconName::ArrowUp).size_3p5())
+                                .child(format!("Update v{new_ver}")),
+                        )
+                    })
                     .child(
                         div()
                             .flex()

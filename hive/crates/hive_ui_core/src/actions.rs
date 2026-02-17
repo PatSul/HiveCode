@@ -95,6 +95,8 @@ actions!(
         AccountConnect,
         AccountDisconnect,
         AccountRefresh,
+        // Auto-update
+        TriggerAppUpdate,
     ]
 );
 

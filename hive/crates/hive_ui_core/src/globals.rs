@@ -25,6 +25,7 @@ use hive_core::config::ConfigManager;
 use hive_core::notifications::NotificationStore;
 use hive_core::persistence::Database;
 use hive_core::security::SecurityGateway;
+use hive_core::updater::UpdateService;
 use hive_integrations::ide::IdeIntegrationService;
 use hive_learn::LearningService;
 use hive_shield::HiveShield;
@@ -113,3 +114,7 @@ impl Global for AppChannels {}
 /// Global wrapper for the P2P network node (federation, peer discovery).
 pub struct AppNetwork(pub Arc<HiveNode>);
 impl Global for AppNetwork {}
+
+/// Global wrapper for the auto-update service (version check, binary replacement).
+pub struct AppUpdater(pub UpdateService);
+impl Global for AppUpdater {}

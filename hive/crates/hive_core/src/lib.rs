@@ -37,6 +37,8 @@ pub mod secure_storage;
 pub mod security;
 /// Session state persistence for crash recovery and workspace restoration.
 pub mod session;
+/// Auto-update service — checks GitHub for newer releases and installs updates.
+pub mod updater;
 
 pub use background::{BackgroundService, BackgroundTask, TaskStatus};
 pub use canvas::{CanvasElement, CanvasState, Connection, ElementType, LiveCanvas, Point, Size};
@@ -65,3 +67,4 @@ pub use secure_storage::SecureStorage;
 pub use security::SecurityGateway;
 pub use session::SessionState;
 pub use channels::{AgentChannel, ChannelMessage, ChannelStore, ChannelThread, MessageAuthor};
+pub use updater::{UpdateInfo, UpdateService};

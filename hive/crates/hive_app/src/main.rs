@@ -17,10 +17,11 @@ use hive_core::logging;
 use hive_core::notifications::{AppNotification, NotificationType};
 use hive_core::persistence::Database;
 use hive_core::security::SecurityGateway;
+use hive_core::updater::UpdateService;
 use hive_ui::globals::{
     AppAiService, AppAssistant, AppAutomation, AppChannels, AppCli, AppConfig, AppDatabase,
     AppIde, AppLearning, AppMarketplace, AppMcpServer, AppNotifications, AppPersonas, AppRpcConfig,
-    AppSecurity, AppShield, AppSkills, AppSpecs, AppTts, AppWallets,
+    AppSecurity, AppShield, AppSkills, AppSpecs, AppTts, AppUpdater, AppWallets,
 };
 use hive_ui::workspace::{
     ClearChat, HiveWorkspace, NewConversation, SwitchPanel, SwitchToAgents, SwitchToChannels,
@@ -301,6 +302,11 @@ fn init_services(cx: &mut App) -> anyhow::Result<()> {
     channel_store.ensure_default_channels();
     cx.set_global(AppChannels(channel_store));
     info!("ChannelStore initialized with default channels");
+
+    // Auto-update service — checks GitHub releases for newer versions.
+    let updater = UpdateService::new(VERSION);
+    cx.set_global(AppUpdater(updater));
+    info!("UpdateService initialized (current: v{VERSION})");
 
     Ok(())
 }
@@ -586,5 +592,78 @@ fn main() {
         // Without this, running the binary directly (e.g. `cargo run`) may not
         // display the app in the dock.
         cx.activate(true);
+
+        // Background update check — runs 5s after startup and every 4 hours.
+        // The blocking HTTP call runs on an OS thread; results are polled on the
+        // main thread to update the status bar.
+        if cx.has_global::<AppConfig>() && cx.global::<AppConfig>().0.get().auto_update {
+            let updater = cx.global::<AppUpdater>().0.clone();
+            cx.spawn(async move |app: &mut AsyncApp| {
+                // Wait 5 seconds before first check to avoid slowing startup.
+                app.background_executor()
+                    .timer(Duration::from_secs(5))
+                    .await;
+
+                loop {
+                    // Run the blocking HTTP check on a background OS thread.
+                    let updater_clone = updater.clone();
+                    let (tx, rx) = std::sync::mpsc::channel();
+                    std::thread::spawn(move || {
+                        let result = updater_clone.check_for_updates();
+                        let _ = tx.send(result);
+                    });
+
+                    // Poll for the result.
+                    let check_result = loop {
+                        match rx.try_recv() {
+                            Ok(result) => break result,
+                            Err(std::sync::mpsc::TryRecvError::Empty) => {
+                                app.background_executor()
+                                    .timer(Duration::from_millis(500))
+                                    .await;
+                            }
+                            Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                                break Err(anyhow::anyhow!("Update check thread died"));
+                            }
+                        }
+                    };
+
+                    match check_result {
+                        Ok(Some(update_info)) => {
+                            info!(
+                                "Update available: v{} (release: {})",
+                                update_info.version, update_info.release_url
+                            );
+                            let version = update_info.version.clone();
+                            let _ = app.update(|cx| {
+                                if cx.has_global::<AppNotifications>() {
+                                    cx.global_mut::<AppNotifications>().0.push(
+                                        AppNotification::new(
+                                            NotificationType::Info,
+                                            format!(
+                                                "Hive v{version} is available. Click the update badge in the status bar to install."
+                                            ),
+                                        )
+                                        .with_title("Update Available"),
+                                    );
+                                }
+                            });
+                        }
+                        Ok(None) => {
+                            info!("No updates available");
+                        }
+                        Err(e) => {
+                            warn!("Update check failed: {e}");
+                        }
+                    }
+
+                    // Re-check every 4 hours.
+                    app.background_executor()
+                        .timer(Duration::from_secs(4 * 60 * 60))
+                        .await;
+                }
+            })
+            .detach();
+        }
     });
 }

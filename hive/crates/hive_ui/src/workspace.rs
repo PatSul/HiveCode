@@ -20,7 +20,7 @@ use chrono::Utc;
 use hive_ui_core::{
     // Globals
     AppAiService, AppAssistant, AppAutomation, AppChannels, AppConfig, AppDatabase, AppLearning,
-    AppMarketplace, AppNotifications, AppPersonas, AppSecurity, AppShield, AppSpecs,
+    AppMarketplace, AppNotifications, AppPersonas, AppSecurity, AppShield, AppSpecs, AppUpdater,
     // Types
     HiveTheme, Panel, Sidebar,
 };
@@ -56,6 +56,7 @@ pub use hive_ui_core::{
     WorkflowBuilderLoadWorkflow, ChannelSelect,
     AccountConnect, AccountDisconnect, AccountRefresh,
     AccountConnectPlatform, AccountDisconnectPlatform,
+    TriggerAppUpdate,
 };
 use hive_ui_panels::panels::chat::{DisplayMessage, ToolCallDisplay};
 use hive_ui_panels::panels::{
@@ -1694,6 +1695,12 @@ impl HiveWorkspace {
             self.session_dirty = true;
             // Save session on actual state change — not every frame.
             self.save_session(cx);
+        }
+
+        // -- Auto-update: check if the updater has found a newer version --
+        if cx.has_global::<AppUpdater>() {
+            let info = cx.global::<AppUpdater>().0.available_update();
+            self.status_bar.update_available = info.map(|i| i.version);
         }
 
         // -- Discovery: periodic scan + connectivity update --
@@ -5801,6 +5808,91 @@ impl HiveWorkspace {
             },
         }
     }
+
+    // -- Auto-update handler -------------------------------------------------
+
+    fn handle_trigger_app_update(
+        &mut self,
+        _action: &TriggerAppUpdate,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if !cx.has_global::<AppUpdater>() {
+            return;
+        }
+
+        let updater = cx.global::<AppUpdater>().0.clone();
+        if updater.is_updating() {
+            info!("Update already in progress");
+            return;
+        }
+
+        info!("User triggered app update");
+
+        // Push a notification that the update is downloading.
+        if cx.has_global::<AppNotifications>() {
+            cx.global_mut::<AppNotifications>().0.push(
+                AppNotification::new(
+                    NotificationType::Info,
+                    "Downloading update... The app will need to restart when complete.",
+                )
+                .with_title("Updating Hive"),
+            );
+        }
+
+        // Run the blocking install on a background OS thread.
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let result = updater.install_update();
+            let _ = tx.send(result);
+        });
+
+        // Poll for the result on the main thread.
+        cx.spawn(async move |_entity, app: &mut AsyncApp| {
+            loop {
+                match rx.try_recv() {
+                    Ok(result) => {
+                        let _ = app.update(|cx| {
+                            match result {
+                                Ok(_path) => {
+                                    if cx.has_global::<AppNotifications>() {
+                                        cx.global_mut::<AppNotifications>().0.push(
+                                            AppNotification::new(
+                                                NotificationType::Info,
+                                                "Update installed! Please restart Hive to use the new version.",
+                                            )
+                                            .with_title("Update Complete"),
+                                        );
+                                    }
+                                    info!("Update installed successfully — restart needed");
+                                }
+                                Err(e) => {
+                                    error!("Update installation failed: {e}");
+                                    if cx.has_global::<AppNotifications>() {
+                                        cx.global_mut::<AppNotifications>().0.push(
+                                            AppNotification::new(
+                                                NotificationType::Error,
+                                                format!("Update failed: {e}. You can update manually with: brew upgrade hive"),
+                                            )
+                                            .with_title("Update Failed"),
+                                        );
+                                    }
+                                }
+                            }
+                        });
+                        return;
+                    }
+                    Err(std::sync::mpsc::TryRecvError::Empty) => {
+                        app.background_executor()
+                            .timer(std::time::Duration::from_millis(500))
+                            .await;
+                    }
+                    Err(std::sync::mpsc::TryRecvError::Disconnected) => return,
+                }
+            }
+        })
+        .detach();
+    }
 }
 
 impl Render for HiveWorkspace {
@@ -5953,6 +6045,8 @@ impl Render for HiveWorkspace {
             .on_action(cx.listener(Self::handle_agents_run_workflow))
             // Connected Accounts
             .on_action(cx.listener(Self::handle_account_connect_platform))
+            // Auto-update
+            .on_action(cx.listener(Self::handle_trigger_app_update))
             // Titlebar
                 .child(Titlebar::render(theme, window, &self.current_project_root))
             // Main content area: sidebar + panel
