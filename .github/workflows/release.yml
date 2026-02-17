@@ -4,12 +4,19 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v0.2.3)'
+        required: true
 
 permissions:
   contents: write
 
 env:
   CARGO_TERM_COLOR: always
+  # Support both tag push (github.ref_name) and workflow_dispatch (inputs.tag)
+  RELEASE_TAG: ${{ github.ref_name || inputs.tag }}
 
 jobs:
   build:

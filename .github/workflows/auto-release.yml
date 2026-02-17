@@ -72,3 +72,16 @@ jobs:
           git tag "${{ steps.bump.outputs.tag }}"
           git push origin "${{ steps.bump.outputs.tag }}"
           echo "Created and pushed tag ${{ steps.bump.outputs.tag }}"
+
+      - name: Trigger Release workflow
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Tags pushed by GITHUB_TOKEN don't trigger other workflows,
+          # so we explicitly dispatch the Release workflow.
+          curl -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/release.yml/dispatches" \
+            -d '{"ref":"${{ steps.bump.outputs.tag }}","inputs":{"tag":"${{ steps.bump.outputs.tag }}"}}'
+          echo "Dispatched Release workflow for ${{ steps.bump.outputs.tag }}"
