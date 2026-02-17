@@ -12,10 +12,10 @@
   <a href="https://github.com/PatSul/Hive/releases"><img src="https://img.shields.io/github/v/release/PatSul/Hive?label=download&color=brightgreen&cache=1" alt="Download" /></a>
   <img src="https://img.shields.io/badge/version-0.2.0-blue" alt="Version" />
   <img src="https://img.shields.io/badge/language-Rust-orange?logo=rust" alt="Rust" />
-  <img src="https://img.shields.io/badge/tests-2%2C531-brightgreen" alt="Tests" />
+  <img src="https://img.shields.io/badge/tests-2%2C544-brightgreen" alt="Tests" />
   <img src="https://img.shields.io/badge/crates-16-blue" alt="Crates" />
   <img src="https://img.shields.io/badge/warnings-0-brightgreen" alt="Warnings" />
-  <img src="https://img.shields.io/badge/lines-127k%2B-informational" alt="Lines of Rust" />
+  <img src="https://img.shields.io/badge/lines-128k%2B-informational" alt="Lines of Rust" />
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20(Apple%20Silicon)%20%7C%20Linux-informational" alt="Windows | macOS (Apple Silicon) | Linux" />
   <img src="https://img.shields.io/badge/UI-GPUI-blueviolet" alt="GPUI" />
 </p>
@@ -349,16 +349,21 @@ All state persists between sessions. Nothing is lost on restart.
 
 | Data | Storage | Location |
 |---|---|---|
-| **Conversations** | JSON files | `~/.hive/conversations/{id}.json` |
+| **Conversations** | SQLite + JSON files | `~/.hive/memory.db` + `~/.hive/conversations/{id}.json` |
+| **Messages** | SQLite | `~/.hive/memory.db` |
+| **Conversation search** | SQLite FTS5 | `~/.hive/memory.db` (Porter stemming + unicode61) |
+| **Cost records** | SQLite | `~/.hive/memory.db` |
+| **Application logs** | SQLite | `~/.hive/memory.db` |
 | **Collective memory** | SQLite (WAL mode) | `~/.hive/memory.db` |
 | **Learning data** | SQLite | `~/.hive/learning.db` |
 | **Kanban boards** | JSON | `~/.hive/kanban.json` |
 | **Config & API keys** | JSON + encrypted vault | `~/.hive/config.json` |
+| **Session state** | JSON | `~/.hive/session.json` (window size, crash recovery) |
 | **Knowledge cache** | HTML/text files | `~/.hive/knowledge/` |
 | **Workflows** | YAML definitions | `~/.hive/workflows/` |
 | **Installed skills** | Managed by ClawdHub | `~/.hive/skills/` |
 
-Path traversal protection on all file operations. SQLite databases use WAL mode with `NORMAL` synchronous and foreign key enforcement.
+On startup, Hive automatically backfills any JSON-only conversations into SQLite and builds FTS5 search indexes. Path traversal protection on all file operations. SQLite databases use WAL mode with `NORMAL` synchronous and foreign key enforcement.
 
 ---
 
@@ -461,7 +466,7 @@ Hive is built for production robustness:
 - **Zero compiler warnings** — The full workspace compiles with `cargo build --workspace` producing 0 errors and 0 warnings.
 - **Clippy clean** — All `cargo clippy` lints addressed: no collapsible ifs, no unnecessary closures, no naming conflicts.
 - **Documented APIs** — Public structs, enums, traits, and functions have `///` documentation comments describing purpose and behavior.
-- **2,531 tests** — Unit and integration tests across the workspace, all passing.
+- **2,544 tests** — Unit and integration tests across the workspace, all passing.
 
 ---
 
@@ -584,8 +589,8 @@ Configure provider preferences, model routing rules, budget limits, and security
 | Version | 0.2.0 |
 | Crates | 16 |
 | Rust source files | 256 |
-| Lines of Rust | 127,119 |
-| Tests | 2,531 |
+| Lines of Rust | 127,665 |
+| Tests | 2,544 |
 | Compiler warnings | 0 |
 | Clippy warnings | 0 |
 | Memory footprint | < 50 MB |
@@ -614,8 +619,14 @@ Production hardening:
 - Fixed all clippy warnings (collapsible ifs, never-loop, unused imports, naming conflicts).
 - Added doc comments to public APIs across core crates.
 - Added serde derives to Kanban types for JSON persistence.
+- **SQLite persistence** for conversations, messages, cost records, and application logs (`memory.db`).
+- **FTS5 full-text search** across all conversations with Porter stemming and unicode61 tokenizer.
+- **JSON→SQLite backfill** automatically imports file-based conversations into SQLite on startup.
+- **Persistent logs** stored in SQLite with level filtering, pagination, and retention management.
+- **Window size persistence** restored across sessions via `session.json`.
+- Dead code cleanup: removed stale structs, narrowed annotations to field-level.
 
-Stats: 256 source files, 127,119 lines of Rust, 2,531 tests, 0 warnings.
+Stats: 256 source files, 127,665 lines of Rust, 2,544 tests, 0 warnings.
 
 ### v0.1.0
 

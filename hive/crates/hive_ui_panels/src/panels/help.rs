@@ -32,6 +32,8 @@ impl HelpPanel {
                     .child(render_workflows_section(theme))
                     .child(render_channels_section(theme))
                     .child(render_connected_accounts_section(theme))
+                    .child(render_assistant_section(theme))
+                    .child(render_security_search_section(theme))
                     .child(render_project_workflow(theme))
                     .child(render_keyboard_shortcuts(theme))
                     .child(render_features_overview(theme))
@@ -472,7 +474,7 @@ fn render_channels_section(theme: &HiveTheme) -> AnyElement {
         .child(feature_card(
             "\u{1F4AC}",
             "#general",
-            "All 6 agents available \u{2014} Investigate, Implement, Verify, Critique, Debug, CodeReview",
+            "All 9 agent roles \u{2014} Architect, Coder, Reviewer, Tester, Documenter, Debugger, Security, Output Reviewer, Task Verifier",
             theme,
         ))
         .child(feature_card(
@@ -577,6 +579,135 @@ fn render_connected_accounts_section(theme: &HiveTheme) -> AnyElement {
             "\u{2708}",
             "Telegram",
             "Chats, Groups, Bots",
+            theme,
+        ))
+        .into_any_element()
+}
+
+// ---------------------------------------------------------------------------
+// Section: Personal Assistant
+// ---------------------------------------------------------------------------
+
+fn render_assistant_section(theme: &HiveTheme) -> AnyElement {
+    card(theme)
+        .child(section_title("\u{1F4E7}", "Personal Assistant", theme))
+        .child(section_desc(
+            "Email, calendar, reminders, and more \u{2014} powered by the same AI and security stack.",
+            theme,
+        ))
+        .child(separator(theme))
+        .child(feature_card(
+            "\u{1F4EC}",
+            "Email Triage",
+            "Gmail and Outlook inbox polling, digest generation, AI-powered reply drafting",
+            theme,
+        ))
+        .child(feature_card(
+            "\u{1F4C5}",
+            "Calendar Integration",
+            "Google Calendar and Outlook event fetching, daily briefings, conflict detection",
+            theme,
+        ))
+        .child(feature_card(
+            "\u{23F0}",
+            "Reminders",
+            "Time-based, recurring (cron), and event-triggered with native OS notifications",
+            theme,
+        ))
+        .child(feature_card(
+            "\u{2705}",
+            "Approval Workflows",
+            "Multi-level approval (Low/Medium/High/Critical) with audit trails",
+            theme,
+        ))
+        .child(feature_card(
+            "\u{1F4C4}",
+            "Document Generation",
+            "Export to 7 formats: PDF, DOCX, XLSX, PPTX, CSV, HTML, and Markdown",
+            theme,
+        ))
+        .child(feature_card(
+            "\u{1F3E0}",
+            "Smart Home",
+            "Philips Hue lighting control \u{2014} scenes, routines, and individual light states",
+            theme,
+        ))
+        .child(feature_card(
+            "\u{1F399}",
+            "Voice Assistant",
+            "Wake-word detection, natural-language commands, and intent recognition",
+            theme,
+        ))
+        .into_any_element()
+}
+
+// ---------------------------------------------------------------------------
+// Section: Security & Search
+// ---------------------------------------------------------------------------
+
+fn render_security_search_section(theme: &HiveTheme) -> AnyElement {
+    card(theme)
+        .child(section_title("\u{1F6E1}", "Security & Search", theme))
+        .child(section_desc(
+            "HiveShield scans every outbound message. FTS5 makes your history instantly searchable.",
+            theme,
+        ))
+        .child(separator(theme))
+        .child(
+            div()
+                .text_size(theme.font_size_sm)
+                .text_color(theme.text_secondary)
+                .font_weight(FontWeight::BOLD)
+                .child("HiveShield \u{2014} 4 Layers of Protection"),
+        )
+        .child(feature_card(
+            "\u{1F575}",
+            "PII Detection",
+            "11+ types (email, phone, SSN, credit card, IP, and more) with cloaking modes",
+            theme,
+        ))
+        .child(feature_card(
+            "\u{1F510}",
+            "Secrets Scanning",
+            "API keys, tokens, passwords, and private keys with risk levels",
+            theme,
+        ))
+        .child(feature_card(
+            "\u{26A0}",
+            "Vulnerability Assessment",
+            "Prompt injection detection, jailbreak attempts, unsafe code patterns",
+            theme,
+        ))
+        .child(feature_card(
+            "\u{1F512}",
+            "Access Control",
+            "Policy-based data classification with provider trust levels",
+            theme,
+        ))
+        .child(separator(theme))
+        .child(
+            div()
+                .text_size(theme.font_size_sm)
+                .text_color(theme.text_secondary)
+                .font_weight(FontWeight::BOLD)
+                .child("Search & Data"),
+        )
+        .child(feature_card(
+            "\u{1F50E}",
+            "Full-Text Search",
+            "FTS5-powered search across all conversations with Porter stemming and unicode support",
+            theme,
+        ))
+        .child(feature_card(
+            "\u{1F4BE}",
+            "SQLite Persistence",
+            "Conversations, messages, costs, and logs stored in SQLite with automatic JSON backfill",
+            theme,
+        ))
+        .child(feature_card(
+            "\u{1F512}",
+            "Encrypted Storage",
+            "AES-256-GCM encryption with Argon2id key derivation for API keys and secrets",
             theme,
         ))
         .into_any_element()
@@ -695,7 +826,7 @@ fn render_features_overview(theme: &HiveTheme) -> AnyElement {
         (
             "\u{1F916}",
             "Multi-Provider AI",
-            "Route to 6+ providers with smart fallback",
+            "11 cloud + local providers with smart fallback and auto-routing",
         ),
         (
             "\u{1F4DA}",
@@ -705,32 +836,32 @@ fn render_features_overview(theme: &HiveTheme) -> AnyElement {
         (
             "\u{1F3E0}",
             "Local-First",
-            "Run Ollama, LM Studio, or any local AI",
+            "Run Ollama, LM Studio, or any local AI \u{2014} no telemetry, no cloud dependency",
         ),
         (
             "\u{1F4B0}",
             "Cost Intelligence",
-            "Track spending, predict costs, optimize routing",
+            "Track spending per model, enforce budgets, CSV export",
         ),
         (
             "\u{1F41D}",
             "Agent System",
-            "9-role HiveMind with autonomous iteration",
+            "9-role HiveMind swarm with Queen meta-coordinator and autonomous iteration",
         ),
         (
-            "\u{1FA99}",
-            "Launch Workflow",
-            "Token launch flow with deployment validation",
+            "\u{1F9E0}",
+            "Autonomous Skill Acquisition",
+            "Self-teaching: competence detection, knowledge research, and skill authoring",
         ),
         (
             "\u{1F6D2}",
             "Skills Marketplace",
-            "Extend with community skills",
+            "Browse, install, create, and security-scan community skills",
         ),
         (
             "\u{2699}",
             "Custom Workflows",
-            "Define JSON workflows in .hive/workflows and run them from Agents",
+            "YAML workflows with cron, event, and webhook triggers",
         ),
         (
             "\u{1F5FA}",
@@ -750,12 +881,47 @@ fn render_features_overview(theme: &HiveTheme) -> AnyElement {
         (
             "\u{1F50D}",
             "Code Review",
-            "Git-aware diff viewing and analysis",
+            "Full Git Ops: staging, commits, PRs, branches, gitflow, LFS",
         ),
         (
             "\u{1F4C4}",
             "Document Generation",
-            "Export to PDF, DOCX, XLSX, CSV",
+            "Export to PDF, DOCX, XLSX, PPTX, CSV, HTML, and Markdown",
+        ),
+        (
+            "\u{1F4E7}",
+            "Personal Assistant",
+            "Email triage, calendar briefings, reminders, and approval workflows",
+        ),
+        (
+            "\u{1F50E}",
+            "Full-Text Search",
+            "FTS5-powered conversation search with Porter stemming across all history",
+        ),
+        (
+            "\u{1F6E1}",
+            "HiveShield Security",
+            "PII detection, secrets scanning, vulnerability assessment, access control",
+        ),
+        (
+            "\u{1F310}",
+            "P2P Federation",
+            "Discover peers on LAN, sync channels and learning across instances",
+        ),
+        (
+            "\u{1FA99}",
+            "Blockchain / Web3",
+            "EVM + Solana wallets, token deployment, encrypted key storage",
+        ),
+        (
+            "\u{1F40B}",
+            "Docker Sandbox",
+            "Containerized execution with full lifecycle management",
+        ),
+        (
+            "\u{1F399}",
+            "Voice Assistant",
+            "Wake-word detection, intent recognition, and voice commands",
         ),
     ];
 
@@ -1080,10 +1246,13 @@ fn render_about_section(theme: &HiveTheme) -> AnyElement {
                 .text_size(theme.font_size_base)
                 .text_color(theme.text_secondary)
                 .child(
-                    "Hive is an AI-powered desktop assistant for software engineering, \
-                     built from the ground up in Rust with GPU-accelerated rendering via GPUI. \
-                     It supports multi-provider AI routing, local-first privacy, cost intelligence, \
-                     multi-agent orchestration, and a skills marketplace.",
+                    "Hive is a native Rust desktop AI platform built on GPUI \u{2014} no Electron, \
+                     no web wrappers. It unifies a development environment, personal assistant, \
+                     and security-first architecture into a single application. Instead of one chatbot, \
+                     Hive runs a multi-agent swarm that can plan, build, test, and orchestrate workflows \
+                     while learning your preferences over time. It detects its own knowledge gaps, \
+                     autonomously researches documentation, and authors new skills. All data stays \
+                     local in ~/.hive/ with AES-256-GCM encryption and zero telemetry.",
                 ),
         )
         .child(separator(theme))
