@@ -9,6 +9,11 @@
 </p>
 
 <p align="center">
+  <a href="https://hivecode.app"><strong>hivecode.app</strong></a>
+</p>
+
+<p align="center">
+  <a href="https://hivecode.app"><img src="https://img.shields.io/badge/website-hivecode.app-f59e0b" alt="Website" /></a>
   <a href="https://github.com/PatSul/Hive/releases"><img src="https://img.shields.io/github/v/release/PatSul/Hive?label=download&color=brightgreen&cache=1" alt="Download" /></a>
   <img src="https://img.shields.io/badge/version-0.2.0-blue" alt="Version" />
   <img src="https://img.shields.io/badge/language-Rust-orange?logo=rust" alt="Rust" />
@@ -44,7 +49,7 @@ What makes Hive different: it **learns from every interaction** (locally, privat
 - Context engine (TF-IDF scoring + RAG)
 - Cost tracking & budget enforcement
 - Code review & testing automation
-- ClawdHub skill marketplace
+- Skills Marketplace (34+ skills from 5 sources)
 - Autonomous skill acquisition (self-teaching)
 - Automation workflows (cron, event, webhook triggers)
 - Docker sandbox with real CLI integration
@@ -281,7 +286,7 @@ All learning data stored locally in SQLite (`~/.hive/learning.db`). Every prefer
 | Feature | Details |
 |---|---|
 | **Automation Workflows** | Multi-step workflows with triggers (manual, cron schedule, event, webhook) and 6 action types (run command, send message, call API, create task, send notification, execute skill). YAML-based definitions in `~/.hive/workflows/`. Visual drag-and-drop workflow builder in the UI. |
-| **ClawdHub Marketplace** | Browse, install, remove, and toggle skills. Create custom skills. Add remote skill sources. Built-in directory of curated skills. Security scanning on install. |
+| **Skills Marketplace** | Browse, install, remove, and toggle skills from 5 sources (ClawdHub, Anthropic, OpenAI, Google, Community). Create custom skills. Add remote skill sources. 34+ built-in skills. Security scanning on install. |
 | **Autonomous Skill Creation** | When Hive encounters an unfamiliar domain, it searches existing skill sources first, then researches documentation and authors a new skill if nothing sufficient exists. See [Autonomous Skill Acquisition](#autonomous-skill-acquisition). |
 | **Personas** | Named agent personalities with custom system prompts, prompt overrides per task type, and configurable model preferences. |
 | **Auto-Commit** | Watches for staged changes and generates AI-powered commit messages. |
@@ -361,7 +366,7 @@ All state persists between sessions. Nothing is lost on restart.
 | **Session state** | JSON | `~/.hive/session.json` (window size, crash recovery) |
 | **Knowledge cache** | HTML/text files | `~/.hive/knowledge/` |
 | **Workflows** | YAML definitions | `~/.hive/workflows/` |
-| **Installed skills** | Managed by ClawdHub | `~/.hive/skills/` |
+| **Installed skills** | Managed by Skills Marketplace | `~/.hive/skills/` |
 
 On startup, Hive automatically backfills any JSON-only conversations into SQLite and builds FTS5 search indexes. Path traversal protection on all file operations. SQLite databases use WAL mode with `NORMAL` synchronous and foreign key enforcement.
 
@@ -446,7 +451,7 @@ All panels are wired to live backend data. No mock data in the production path.
 | Logs | Application logs viewer with level filtering | Tracing subscriber |
 | Costs | AI cost tracking and budget with CSV export | `CostTracker` |
 | Git Ops | Full git workflow: staging, commits, push, PRs, branches, gitflow, LFS | `git2` + CLI |
-| ClawdHub | Skill marketplace: browse, install, remove, toggle, create, sources | `SkillMarketplace` |
+| Skills | Skill marketplace: browse, install, remove, toggle, create (5 sources) | `SkillMarketplace` |
 | Routing | Model routing configuration | `ModelRouter` |
 | Models | Model registry browser | Provider catalogs |
 | Learning | Self-improvement dashboard with metrics, preferences, insights | `LearningService` |
