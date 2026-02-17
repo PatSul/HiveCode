@@ -251,7 +251,7 @@ fn init_services(cx: &mut App) -> anyhow::Result<()> {
     cx.set_global(AppMcpServer(hive_agents::mcp_server::McpServer::new(
         workspace_root,
     )));
-    info!("McpServer initialized (6 built-in + 12 integration tools)");
+    info!("McpServer initialized (6 built-in + 13 integration tools)");
 
     // Spec manager — project specifications.
     cx.set_global(AppSpecs(hive_agents::SpecManager::new()));
@@ -381,6 +381,39 @@ fn init_services(cx: &mut App) -> anyhow::Result<()> {
             info!("DocsIndexer initialized");
         }
         Err(e) => warn!("DocsIndexer init failed: {e}"),
+    }
+
+    // Wire integration tool handlers to real services (replaces stubs).
+    // DocsIndexer is conditionally initialized — create a fallback if needed.
+    {
+        use hive_agents::integration_tools::IntegrationServices;
+        let docs_indexer = if cx.has_global::<AppDocsIndexer>() {
+            cx.global::<AppDocsIndexer>().0.clone()
+        } else {
+            // Fallback: create a minimal indexer so wiring still proceeds.
+            std::sync::Arc::new(
+                hive_integrations::docs_indexer::DocsIndexer::new().unwrap_or_else(|e| {
+                    warn!("DocsIndexer fallback creation failed: {e}");
+                    // Return a DocsIndexer with no indexed content.
+                    hive_integrations::docs_indexer::DocsIndexer::empty()
+                }),
+            )
+        };
+        let services = IntegrationServices {
+            messaging: cx.global::<AppMessaging>().0.clone(),
+            project_management: cx.global::<AppProjectManagement>().0.clone(),
+            knowledge: cx.global::<AppKnowledge>().0.clone(),
+            database: cx.global::<AppIntegrationDb>().0.clone(),
+            docker: cx.global::<AppDocker>().0.clone(),
+            kubernetes: cx.global::<AppKubernetes>().0.clone(),
+            browser: cx.global::<AppBrowser>().0.clone(),
+            aws: cx.global::<AppAws>().0.clone(),
+            azure: cx.global::<AppAzure>().0.clone(),
+            gcp: cx.global::<AppGcp>().0.clone(),
+            docs_indexer,
+        };
+        cx.global_mut::<AppMcpServer>().0.wire_integrations(services);
+        info!("MCP integration tools wired to live services");
     }
 
     // Channel store — AI agent messaging channels.

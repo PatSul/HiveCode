@@ -59,6 +59,17 @@ impl McpServer {
         self.tools.insert(tool.name.clone(), (tool, handler));
     }
 
+    /// Replace stub integration handlers with real service-backed implementations.
+    ///
+    /// Call this after the integration services have been initialized as GPUI
+    /// globals. Each handler captures an `Arc` to the relevant service and
+    /// bridges async calls via `block_on`.
+    pub fn wire_integrations(&mut self, services: crate::integration_tools::IntegrationServices) {
+        for (tool, handler) in crate::integration_tools::wire_integration_handlers(services) {
+            self.register(tool, handler);
+        }
+    }
+
     /// List all available tools.
     pub fn list_tools(&self) -> Vec<&McpTool> {
         let mut tools: Vec<_> = self.tools.values().map(|(def, _)| def).collect();
@@ -500,7 +511,7 @@ mod tests {
         let (_dir, server) = setup_workspace();
         let tools = server.list_tools();
 
-        assert_eq!(tools.len(), 18);
+        assert_eq!(tools.len(), 19);
         let names: Vec<&str> = tools.iter().map(|t| t.name.as_str()).collect();
         assert!(names.contains(&"read_file"));
         assert!(names.contains(&"write_file"));
@@ -530,7 +541,7 @@ mod tests {
         assert!(resp.is_success());
         let result = resp.result.unwrap();
         let tools = result["tools"].as_array().unwrap();
-        assert_eq!(tools.len(), 18);
+        assert_eq!(tools.len(), 19);
     }
 
     // -- Initialize tests --

@@ -151,47 +151,47 @@ impl SkillsRegistry {
             (
                 "slack",
                 "Send a message to Slack (or other messaging platform)",
-                "Use the MCP slack/send_message tool to send a message. Format the user's arguments as: channel (first argument) and message body (remaining arguments). If no channel is specified, ask the user which channel to post to. Confirm the message was sent successfully and display the channel and timestamp.",
+                "Use the MCP send_message tool to send a message. Arguments: platform (slack, discord, or teams), channel (channel name or ID), message (the message text). If no channel is specified, ask the user which channel to post to. Confirm the message was sent successfully and display the channel and timestamp.",
             ),
             (
                 "jira",
                 "Create or list Jira/Linear/Asana issues",
-                "Use the MCP project_management/issues tool to interact with the issue tracker. Supported sub-commands: 'create <title> [description]' to create an issue, 'list [project]' to list open issues, 'show <key>' to display issue details. Format the response as a readable summary with issue keys, titles, and statuses.",
+                "Use the MCP create_issue or list_issues tools to interact with the issue tracker. For creating: call create_issue with platform (jira, linear, or asana), project, title, and optionally description and priority. For listing: call list_issues with platform, project, and optionally status (open, in_progress, done, all). Format the response as a readable summary with issue keys, titles, and statuses.",
             ),
             (
                 "notion",
                 "Search or create Notion/Obsidian pages",
-                "Use the MCP knowledge/pages tool to interact with the knowledge base. Supported sub-commands: 'search <query>' to find pages, 'create <title> [content]' to create a new page. Display results with page titles, URLs, and brief content previews.",
+                "Use the MCP search_knowledge tool to search the knowledge base. Arguments: query (search text), platform (notion, obsidian, or all). Display results with page titles, URLs, and brief content previews.",
             ),
             (
                 "db",
                 "Query a connected database (read-only)",
-                "Use the MCP database/query tool to run a read-only SQL query against the connected database. The user provides a natural language question or a raw SQL query. If given natural language, translate it to SQL first and show the generated query. Always use read-only mode. Format results as a Markdown table.",
+                "Use the MCP query_database tool to run a read-only SQL query, or describe_schema to see available tables. For queries: pass connection (database name) and query (SELECT-only SQL). If given natural language, translate it to SQL first and show the generated query. Format results as a Markdown table.",
             ),
             (
                 "docker",
                 "List/manage Docker containers",
-                "Use the MCP docker/containers tool to interact with Docker. Supported sub-commands: 'ls' to list containers, 'logs <container>' to show recent logs, 'stats' to show resource usage. Format output as a readable table with container ID, image, status, and ports.",
+                "Use the MCP docker_list tool to list containers (pass all=true to include stopped), or docker_logs to fetch container logs (pass container name/ID and optional tail line count). Format output as a readable table with container ID, image, status, and ports.",
             ),
             (
                 "k8s",
                 "List/manage Kubernetes resources",
-                "Use the MCP kubernetes/resources tool to interact with the Kubernetes cluster. Supported sub-commands: 'pods [namespace]' to list pods, 'services [namespace]' to list services, 'describe <resource> <name>' to show resource details, 'logs <pod>' to show pod logs. Format output clearly with resource names, statuses, and ages.",
+                "Use the MCP k8s_pods tool to list pods in a namespace (pass namespace, defaults to 'default'). Format output clearly with pod names, statuses, restarts, and ages.",
             ),
             (
                 "deploy",
                 "Trigger a deployment workflow",
-                "Use the MCP deploy/trigger tool to start a deployment workflow. The user specifies a target environment (e.g. staging, production) and optionally a branch or tag. Confirm the deployment parameters before triggering. Display the deployment status URL and current progress.",
+                "Use the MCP deploy_trigger tool to start a deployment workflow. Arguments: environment (staging, production, or development) and optionally branch (defaults to main). Confirm the deployment parameters before triggering. Display the deployment status.",
             ),
             (
                 "browse",
                 "Fetch and extract web content",
-                "Use the MCP browser/fetch tool to retrieve and extract content from a URL. The user provides a URL and optionally a CSS selector or content type to extract. Return the page title, a clean text extraction of the main content, and any relevant metadata. Summarize long pages concisely.",
+                "Use the MCP browse_url tool to retrieve and extract content from a URL. Arguments: url (the page to fetch), and optionally selector (CSS selector to extract specific content). Return the page title, a clean text extraction of the main content, and any relevant links. Summarize long pages concisely.",
             ),
             (
                 "index-docs",
                 "Index project documentation for search",
-                "Use the MCP docs_indexer/index tool to index project documentation. The user specifies a directory path or glob pattern for documentation files to index. Supported formats: Markdown, RST, HTML, and plain text. Report the number of files indexed and confirm the index is ready for search queries.",
+                "Use the MCP search_docs tool to search indexed project documentation. Arguments: query (search text) and optionally max_results. To build the index first, use the docs indexer in Settings. Report the results with titles, URLs, and snippets.",
             ),
         ];
 

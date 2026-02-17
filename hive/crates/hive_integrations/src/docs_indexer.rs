@@ -71,6 +71,22 @@ impl DocsIndexer {
         })
     }
 
+    /// Create a minimal indexer with no indexes and a default HTTP client.
+    ///
+    /// Used as a fallback when `new()` fails, so that downstream code
+    /// that holds an `Arc<DocsIndexer>` can still call `search()` (which
+    /// returns empty results).
+    pub fn empty() -> Self {
+        let client = Client::builder()
+            .user_agent("Hive-DocsIndexer/1.0")
+            .build()
+            .unwrap_or_else(|_| Client::new());
+        Self {
+            indexes: HashMap::new(),
+            client,
+        }
+    }
+
     /// Create a new indexer with a custom HTTP client (useful for testing).
     pub fn with_client(client: Client) -> Self {
         Self {

@@ -58,7 +58,7 @@ What makes Hive different: it **learns from every interaction** (locally, privat
 - Project management (Jira, Linear, Asana)
 - Knowledge base sync (Notion, Obsidian)
 - Git hosting (GitHub, GitLab, Bitbucket)
-- MCP client + server (18 tools)
+- MCP client + server (19 tools)
 - P2P federation across instances
 
 </td>
@@ -345,7 +345,7 @@ All integrations make **real API calls** — no stubs or simulated backends.
 <tr><td><strong>Smart Home</strong></td><td>Philips Hue</td></tr>
 <tr><td><strong>Voice</strong></td><td>ClawdTalk (voice-over-phone via Telnyx)</td></tr>
 <tr><td><strong>Browser</strong></td><td>Headless Chrome automation (navigation, screenshots, JS evaluation, DOM interaction)</td></tr>
-<tr><td><strong>Protocol</strong></td><td>MCP client + server (18 tools), OAuth2 (PKCE), Webhooks, P2P federation</td></tr>
+<tr><td><strong>Protocol</strong></td><td>MCP client + server (19 tools), OAuth2 (PKCE), Webhooks, P2P federation</td></tr>
 </table>
 
 ---
@@ -400,7 +400,7 @@ hive/crates/
 │                      18 files · 9,808 lines
 ├── hive_ai            11 AI providers, capability-aware router, complexity classifier, context engine, RAG
 │                      41 files · 19,732 lines
-├── hive_agents        Queen, HiveMind, Coordinator, collective memory, MCP (18 tools), skills,
+├── hive_agents        Queen, HiveMind, Coordinator, collective memory, MCP (19 tools), skills,
 │                      personas, knowledge acquisition, competence detection, skill authoring
 │                      26 files · 21,963 lines
 ├── hive_shield        PII detection, secrets scanning, vulnerability assessment, access control
@@ -640,7 +640,7 @@ New capabilities:
 
 - **9 New Integration Skills** — `/slack`, `/jira`, `/notion`, `/db`, `/docker`, `/k8s`, `/deploy`, `/browse`, `/index-docs` — each providing natural-language access to their respective services.
 
-- **12 New MCP Integration Tools** — `send_message`, `create_issue`, `list_issues`, `search_knowledge`, `query_database`, `describe_schema`, `docker_list`, `docker_logs`, `k8s_pods`, `cloud_resources`, `browse_url`, `search_docs` — exposing integration capabilities to external MCP clients.
+- **13 New MCP Integration Tools** — `send_message`, `create_issue`, `list_issues`, `search_knowledge`, `query_database`, `describe_schema`, `docker_list`, `docker_logs`, `k8s_pods`, `cloud_resources`, `browse_url`, `search_docs`, `deploy_trigger` — exposing integration capabilities to external MCP clients. All tools are wired to live service backends at startup.
 
 Stats: 280 source files, 150,285 lines of Rust, 3,046 tests, 0 warnings.
 
