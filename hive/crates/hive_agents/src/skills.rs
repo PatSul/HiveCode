@@ -147,6 +147,52 @@ impl SkillsRegistry {
                 "Generate tests",
                 "Generate unit tests for the specified code.",
             ),
+            // ----- Integration-aware skills -----
+            (
+                "slack",
+                "Send a message to Slack (or other messaging platform)",
+                "Use the MCP slack/send_message tool to send a message. Format the user's arguments as: channel (first argument) and message body (remaining arguments). If no channel is specified, ask the user which channel to post to. Confirm the message was sent successfully and display the channel and timestamp.",
+            ),
+            (
+                "jira",
+                "Create or list Jira/Linear/Asana issues",
+                "Use the MCP project_management/issues tool to interact with the issue tracker. Supported sub-commands: 'create <title> [description]' to create an issue, 'list [project]' to list open issues, 'show <key>' to display issue details. Format the response as a readable summary with issue keys, titles, and statuses.",
+            ),
+            (
+                "notion",
+                "Search or create Notion/Obsidian pages",
+                "Use the MCP knowledge/pages tool to interact with the knowledge base. Supported sub-commands: 'search <query>' to find pages, 'create <title> [content]' to create a new page. Display results with page titles, URLs, and brief content previews.",
+            ),
+            (
+                "db",
+                "Query a connected database (read-only)",
+                "Use the MCP database/query tool to run a read-only SQL query against the connected database. The user provides a natural language question or a raw SQL query. If given natural language, translate it to SQL first and show the generated query. Always use read-only mode. Format results as a Markdown table.",
+            ),
+            (
+                "docker",
+                "List/manage Docker containers",
+                "Use the MCP docker/containers tool to interact with Docker. Supported sub-commands: 'ls' to list containers, 'logs <container>' to show recent logs, 'stats' to show resource usage. Format output as a readable table with container ID, image, status, and ports.",
+            ),
+            (
+                "k8s",
+                "List/manage Kubernetes resources",
+                "Use the MCP kubernetes/resources tool to interact with the Kubernetes cluster. Supported sub-commands: 'pods [namespace]' to list pods, 'services [namespace]' to list services, 'describe <resource> <name>' to show resource details, 'logs <pod>' to show pod logs. Format output clearly with resource names, statuses, and ages.",
+            ),
+            (
+                "deploy",
+                "Trigger a deployment workflow",
+                "Use the MCP deploy/trigger tool to start a deployment workflow. The user specifies a target environment (e.g. staging, production) and optionally a branch or tag. Confirm the deployment parameters before triggering. Display the deployment status URL and current progress.",
+            ),
+            (
+                "browse",
+                "Fetch and extract web content",
+                "Use the MCP browser/fetch tool to retrieve and extract content from a URL. The user provides a URL and optionally a CSS selector or content type to extract. Return the page title, a clean text extraction of the main content, and any relevant metadata. Summarize long pages concisely.",
+            ),
+            (
+                "index-docs",
+                "Index project documentation for search",
+                "Use the MCP docs_indexer/index tool to index project documentation. The user specifies a directory path or glob pattern for documentation files to index. Supported formats: Markdown, RST, HTML, and plain text. Report the number of files indexed and confirm the index is ready for search queries.",
+            ),
         ];
 
         for (name, desc, instructions) in builtins {
@@ -367,5 +413,60 @@ mod tests {
     fn dispatch_without_slash() {
         let registry = SkillsRegistry::new();
         assert!(registry.dispatch("help").is_ok());
+    }
+
+    #[test]
+    fn integration_skills_registered() {
+        let registry = SkillsRegistry::new();
+        let integration_skills = [
+            "slack", "jira", "notion", "db", "docker", "k8s", "deploy", "browse", "index-docs",
+        ];
+        for name in &integration_skills {
+            let skill = registry.get(name);
+            assert!(skill.is_some(), "Integration skill '/{name}' should be registered");
+            let skill = skill.unwrap();
+            assert_eq!(skill.source, SkillSource::BuiltIn);
+            assert!(skill.enabled);
+        }
+    }
+
+    #[test]
+    fn dispatch_integration_skills() {
+        let registry = SkillsRegistry::new();
+        let integration_skills = [
+            "slack", "jira", "notion", "db", "docker", "k8s", "deploy", "browse", "index-docs",
+        ];
+        for name in &integration_skills {
+            let result = registry.dispatch(&format!("/{name}"));
+            assert!(result.is_ok(), "Dispatch '/{name}' should succeed");
+            let instructions = result.unwrap();
+            assert!(
+                instructions.contains("MCP"),
+                "Instructions for '/{name}' should reference MCP tools"
+            );
+        }
+    }
+
+    #[test]
+    fn integration_skills_have_valid_integrity() {
+        let registry = SkillsRegistry::new();
+        let integration_skills = [
+            "slack", "jira", "notion", "db", "docker", "k8s", "deploy", "browse", "index-docs",
+        ];
+        for name in &integration_skills {
+            let skill = registry.get(name).unwrap();
+            assert!(
+                verify_integrity(&skill.instructions, &skill.integrity_hash),
+                "Integrity check should pass for '/{name}'"
+            );
+        }
+    }
+
+    #[test]
+    fn total_builtin_count() {
+        let registry = SkillsRegistry::new();
+        let builtins: Vec<_> = registry.list().iter().filter(|s| s.source == SkillSource::BuiltIn).cloned().collect();
+        // 6 original + 9 integration = 15
+        assert_eq!(builtins.len(), 15, "Should have 15 built-in skills total");
     }
 }

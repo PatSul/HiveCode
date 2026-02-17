@@ -19,8 +19,10 @@ use hive_core::persistence::Database;
 use hive_core::security::SecurityGateway;
 use hive_core::updater::UpdateService;
 use hive_ui::globals::{
-    AppAiService, AppAssistant, AppAutomation, AppChannels, AppCli, AppConfig, AppDatabase,
-    AppIde, AppLearning, AppMarketplace, AppMcpServer, AppNotifications, AppPersonas, AppRpcConfig,
+    AppAiService, AppAssistant, AppAutomation, AppAws, AppAzure, AppBitbucket, AppBrowser,
+    AppChannels, AppCli, AppConfig, AppDatabase, AppDocker, AppDocsIndexer, AppGcp, AppGitLab,
+    AppIde, AppIntegrationDb, AppKnowledge, AppKubernetes, AppLearning, AppMarketplace,
+    AppMcpServer, AppMessaging, AppNotifications, AppPersonas, AppProjectManagement, AppRpcConfig,
     AppSecurity, AppShield, AppSkills, AppSpecs, AppTts, AppUpdater, AppWallets,
 };
 use hive_ui::workspace::{
@@ -249,7 +251,7 @@ fn init_services(cx: &mut App) -> anyhow::Result<()> {
     cx.set_global(AppMcpServer(hive_agents::mcp_server::McpServer::new(
         workspace_root,
     )));
-    info!("McpServer initialized (6 built-in tools)");
+    info!("McpServer initialized (6 built-in + 12 integration tools)");
 
     // Spec manager — project specifications.
     cx.set_global(AppSpecs(hive_agents::SpecManager::new()));
@@ -296,6 +298,90 @@ fn init_services(cx: &mut App) -> anyhow::Result<()> {
     // IDE integration — workspace and file tracking.
     cx.set_global(AppIde(hive_integrations::ide::IdeIntegrationService::new()));
     info!("IdeIntegrationService initialized");
+
+    // --- Integration hubs (conditionally initialized) ---
+
+    // Messaging hub — always create, providers added when tokens configured.
+    let messaging = std::sync::Arc::new(hive_integrations::messaging::MessagingHub::new());
+    cx.set_global(AppMessaging(messaging));
+    info!("MessagingHub initialized");
+
+    // Project management hub — always create, providers added when tokens configured.
+    let pm = std::sync::Arc::new(hive_integrations::project_management::ProjectManagementHub::new());
+    cx.set_global(AppProjectManagement(pm));
+    info!("ProjectManagementHub initialized");
+
+    // Knowledge hub — always create, providers added when tokens configured.
+    let knowledge = std::sync::Arc::new(hive_integrations::knowledge::KnowledgeHub::new());
+    cx.set_global(AppKnowledge(knowledge));
+    info!("KnowledgeHub initialized");
+
+    // Database hub — always create, connections added at runtime.
+    let db_hub = std::sync::Arc::new(hive_integrations::database::DatabaseHub::new());
+    cx.set_global(AppIntegrationDb(db_hub));
+    info!("DatabaseHub initialized");
+
+    // Docker client — initialize with default docker CLI path.
+    let docker = std::sync::Arc::new(hive_integrations::docker::DockerClient::new());
+    cx.set_global(AppDocker(docker));
+    info!("DockerClient initialized");
+
+    // Kubernetes client — initialize with default kubeconfig.
+    let k8s = std::sync::Arc::new(hive_integrations::kubernetes::KubernetesClient::new());
+    cx.set_global(AppKubernetes(k8s));
+    info!("KubernetesClient initialized");
+
+    // Browser automation — headless by default.
+    let browser = std::sync::Arc::new(hive_integrations::browser::BrowserAutomation::new());
+    cx.set_global(AppBrowser(browser));
+    info!("BrowserAutomation initialized");
+
+    // Bitbucket client — needs username + app password from environment.
+    if let (Ok(bb_user), Ok(bb_pass)) = (
+        std::env::var("BITBUCKET_USERNAME"),
+        std::env::var("BITBUCKET_APP_PASSWORD"),
+    ) {
+        match hive_integrations::bitbucket::BitbucketClient::new(bb_user, bb_pass) {
+            Ok(client) => {
+                cx.set_global(AppBitbucket(std::sync::Arc::new(client)));
+                info!("BitbucketClient initialized");
+            }
+            Err(e) => warn!("BitbucketClient init failed: {e}"),
+        }
+    }
+
+    // GitLab client — needs private token from environment.
+    if let Ok(gl_token) = std::env::var("GITLAB_PRIVATE_TOKEN") {
+        match hive_integrations::gitlab::GitLabClient::new(gl_token) {
+            Ok(client) => {
+                cx.set_global(AppGitLab(std::sync::Arc::new(client)));
+                info!("GitLabClient initialized");
+            }
+            Err(e) => warn!("GitLabClient init failed: {e}"),
+        }
+    }
+
+    // Cloud clients — initialize with default credential chains.
+    let aws = std::sync::Arc::new(hive_integrations::cloud::AwsClient::new(None, None));
+    cx.set_global(AppAws(aws));
+    info!("AwsClient initialized");
+
+    let azure = std::sync::Arc::new(hive_integrations::cloud::AzureClient::new(None));
+    cx.set_global(AppAzure(azure));
+    info!("AzureClient initialized");
+
+    let gcp = std::sync::Arc::new(hive_integrations::cloud::GcpClient::new(None));
+    cx.set_global(AppGcp(gcp));
+    info!("GcpClient initialized");
+
+    // Docs indexer — workspace-scoped documentation search.
+    match hive_integrations::docs_indexer::DocsIndexer::new() {
+        Ok(indexer) => {
+            cx.set_global(AppDocsIndexer(std::sync::Arc::new(indexer)));
+            info!("DocsIndexer initialized");
+        }
+        Err(e) => warn!("DocsIndexer init failed: {e}"),
+    }
 
     // Channel store — AI agent messaging channels.
     let mut channel_store = hive_core::channels::ChannelStore::new();

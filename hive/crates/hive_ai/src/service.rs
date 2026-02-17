@@ -298,6 +298,43 @@ impl AiService {
         None
     }
 
+    /// Resolve the best provider using capability-aware routing when auto-routing.
+    ///
+    /// When `model` is the configured default (i.e. the user has not explicitly
+    /// chosen a model), this method uses the capability router to pick the best
+    /// model for the task based on the conversation content. Otherwise it
+    /// delegates to the standard provider resolution.
+    fn resolve_provider_smart(
+        &self,
+        messages: &[ChatMessage],
+        model: &str,
+    ) -> Option<(ProviderType, Arc<dyn AiProvider>, String)> {
+        // If the user picked a specific model, use standard resolution.
+        let is_auto = model == self.config.default_model || model == "auto";
+        if !is_auto || !self.config.auto_routing {
+            let (pt, provider) = self.resolve_provider(model)?;
+            return Some((pt, provider, model.to_string()));
+        }
+
+        // Capability-aware auto-routing: use discovered models + conversation content.
+        let available = self.all_available_models();
+        let decision = self.router.route_with_capabilities(
+            messages,
+            &available,
+            None, // no explicit model
+            None, // no classification context
+        );
+
+        let provider_type = map_router_provider(decision.provider);
+        if let Some(provider) = self.providers.get(&provider_type) {
+            return Some((provider_type, provider.clone(), decision.model_id));
+        }
+
+        // Fallback: try standard resolution with the decided model
+        let (pt, provider) = self.resolve_provider(&decision.model_id)?;
+        Some((pt, provider, decision.model_id))
+    }
+
     /// Send a non-streaming chat request.
     pub async fn chat(
         &mut self,
@@ -305,13 +342,13 @@ impl AiService {
         model: &str,
         tools: Option<Vec<ToolDefinition>>,
     ) -> Result<ChatResponse, ProviderError> {
-        let (provider_type, provider) = self
-            .resolve_provider(model)
+        let (provider_type, provider, resolved_model) = self
+            .resolve_provider_smart(&messages, model)
             .ok_or_else(|| ProviderError::Other("No providers available".into()))?;
 
         let request = ChatRequest {
             messages,
-            model: model.to_string(),
+            model: resolved_model.clone(),
             max_tokens: 4096,
             temperature: None,
             system_prompt: None,
@@ -320,18 +357,18 @@ impl AiService {
 
         info!(
             "Sending chat request to {:?} model={}",
-            provider_type, model
+            provider_type, resolved_model
         );
         let response = provider.chat(&request).await?;
 
         // Track cost
         let cost = calculate_cost(
-            model,
+            &resolved_model,
             response.usage.prompt_tokens as usize,
             response.usage.completion_tokens as usize,
         );
         self.cost_tracker.record(
-            model,
+            &resolved_model,
             response.usage.prompt_tokens as usize,
             response.usage.completion_tokens as usize,
         );
@@ -355,20 +392,20 @@ impl AiService {
         system_prompt: Option<String>,
         tools: Option<Vec<ToolDefinition>>,
     ) -> Result<mpsc::Receiver<StreamChunk>, ProviderError> {
-        let (provider_type, provider) = self
-            .resolve_provider(model)
+        let (provider_type, provider, resolved_model) = self
+            .resolve_provider_smart(&messages, model)
             .ok_or_else(|| ProviderError::Other("No providers available".into()))?;
 
         let request = ChatRequest {
             messages,
-            model: model.to_string(),
+            model: resolved_model.clone(),
             max_tokens: 4096,
             temperature: None,
             system_prompt,
             tools,
         };
 
-        info!("Starting stream to {:?} model={}", provider_type, model);
+        info!("Starting stream to {:?} model={}", provider_type, resolved_model);
         provider.stream_chat(&request).await
     }
 
@@ -394,10 +431,11 @@ impl AiService {
         system_prompt: Option<String>,
         tools: Option<Vec<ToolDefinition>>,
     ) -> Option<(Arc<dyn AiProvider>, ChatRequest)> {
-        let (_provider_type, provider) = self.resolve_provider(model)?;
+        let (_provider_type, provider, resolved_model) =
+            self.resolve_provider_smart(&messages, model)?;
         let request = ChatRequest {
             messages,
-            model: model.to_string(),
+            model: resolved_model,
             max_tokens: 4096,
             temperature: None,
             system_prompt,
@@ -639,10 +677,12 @@ mod tests {
     fn test_prepare_stream_returns_provider_and_request() {
         let svc = AiService::new(test_config());
         let messages = vec![ChatMessage::text(MessageRole::User, "Hello")];
-        let result = svc.prepare_stream(messages, "claude-sonnet-4-5", None, None);
+        // Use a model that differs from default_model so resolve_provider_smart
+        // takes the explicit-model path (standard resolution).
+        let result = svc.prepare_stream(messages, "claude-opus-4-20250514", None, None);
         assert!(result.is_some());
         let (provider, request) = result.unwrap();
-        assert_eq!(request.model, "claude-sonnet-4-5");
+        assert_eq!(request.model, "claude-opus-4-20250514");
         assert_eq!(request.messages.len(), 1);
         assert!(!provider.name().is_empty());
     }

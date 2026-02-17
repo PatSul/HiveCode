@@ -9,9 +9,10 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use tracing::{debug, info};
 
-use crate::types::{ChatMessage, ModelTier};
+use crate::types::{ChatMessage, ModelInfo, ModelTier};
 
 use super::auto_fallback::{AutoFallbackManager, FallbackConfig, FallbackReason, ProviderType};
+use super::capability_router::CapabilityRouter;
 use super::complexity_classifier::{ClassificationContext, ComplexityClassifier, ComplexityResult};
 
 // ---------------------------------------------------------------------------
@@ -223,9 +224,91 @@ impl ModelRouter {
         self.classifier.classify(messages, context)
     }
 
+    /// Route with capability-aware model selection.
+    ///
+    /// When no explicit model is provided, this method:
+    /// 1. Classifies complexity to determine the preferred tier
+    /// 2. Uses [`CapabilityRouter`] to rank available models by task-specific strengths
+    /// 3. Merges capability insight with tier preference and provider health
+    ///
+    /// Falls back to standard [`route()`](Self::route) when `available_models`
+    /// is empty or the user explicitly chose a model.
+    pub fn route_with_capabilities(
+        &self,
+        messages: &[ChatMessage],
+        available_models: &[ModelInfo],
+        explicit_model: Option<&str>,
+        context: Option<&ClassificationContext>,
+    ) -> RoutingDecision {
+        // Explicit model — respect the user's choice.
+        if explicit_model.is_some() {
+            return self.route(messages, explicit_model, context);
+        }
+
+        // No models to rank — fall back to standard routing.
+        if available_models.is_empty() {
+            return self.route(messages, None, context);
+        }
+
+        // 1. Classify complexity to get the preferred tier.
+        let result = self.classify(messages, context);
+        let tier = self.adjust_tier_if_needed(&result);
+
+        // 2. Use CapabilityRouter to rank models for the detected task.
+        let cap_router = CapabilityRouter::new();
+        let recommendation = cap_router.recommend(messages, available_models, Some(tier));
+
+        // 3. Check provider health before committing.
+        if self.fallback_manager.is_available(recommendation.provider) {
+            return RoutingDecision {
+                provider: recommendation.provider,
+                model_id: recommendation.model_id,
+                tier,
+                reasoning: format!(
+                    "{} | capability: {}",
+                    result.reasoning, recommendation.reasoning,
+                ),
+            };
+        }
+
+        // Provider unhealthy — fall back to standard routing.
+        self.route(messages, None, context)
+    }
+
     // ------------------------------------------------------------------
     // Private helpers
     // ------------------------------------------------------------------
+
+    /// Apply the tier adjuster (if configured) to a classification result,
+    /// returning the potentially adjusted tier.
+    fn adjust_tier_if_needed(&self, result: &ComplexityResult) -> ModelTier {
+        if let Some(ref adjuster) = self.tier_adjuster {
+            let tier_str = format!("{:?}", result.tier).to_lowercase();
+            let task_type = result.factors.task_type.to_string();
+            if let Some(adjusted) = adjuster.adjust_tier(&task_type, &tier_str) {
+                let new_tier = match adjusted.as_str() {
+                    "free" => ModelTier::Free,
+                    "budget" => ModelTier::Budget,
+                    "standard" | "mid" => ModelTier::Mid,
+                    "premium" | "enterprise" => ModelTier::Premium,
+                    _ => result.tier,
+                };
+                if new_tier != result.tier {
+                    info!(
+                        original_tier = ?result.tier,
+                        adjusted_tier = ?new_tier,
+                        task = %task_type,
+                        "Tier adjusted by learning system"
+                    );
+                }
+                new_tier
+            } else {
+                result.tier
+            }
+        } else {
+            result.tier
+        }
+    }
 
     /// Route when the user has explicitly chosen a model.
     fn route_explicit(
@@ -302,32 +385,7 @@ impl ModelRouter {
         let result = self.classifier.classify(messages, context);
 
         // Check if the learning system wants to override the tier
-        let tier = if let Some(ref adjuster) = self.tier_adjuster {
-            let tier_str = format!("{:?}", result.tier).to_lowercase();
-            let task_type = result.factors.task_type.to_string();
-            if let Some(adjusted) = adjuster.adjust_tier(&task_type, &tier_str) {
-                let new_tier = match adjusted.as_str() {
-                    "free" => ModelTier::Free,
-                    "budget" => ModelTier::Budget,
-                    "standard" | "mid" => ModelTier::Mid,
-                    "premium" | "enterprise" => ModelTier::Premium,
-                    _ => result.tier,
-                };
-                if new_tier != result.tier {
-                    info!(
-                        original_tier = ?result.tier,
-                        adjusted_tier = ?new_tier,
-                        task = %task_type,
-                        "Tier adjusted by learning system"
-                    );
-                }
-                new_tier
-            } else {
-                result.tier
-            }
-        } else {
-            result.tier
-        };
+        let tier = self.adjust_tier_if_needed(&result);
 
         info!(
             tier = ?tier,
@@ -481,7 +539,7 @@ fn default_for_tier(tier: ModelTier) -> (&'static str, ProviderType) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::MessageRole;
+    use crate::types::{MessageRole, ModelCapabilities, ProviderType as TypesProviderType};
     use chrono::Utc;
 
     fn user_msg(content: &str) -> ChatMessage {
@@ -654,5 +712,124 @@ mod tests {
         let decision = router.route(&[user_msg("hello")], Some("claude-opus-4-20250514"), None);
         // Should have fallen back — either via OpenRouter proxy or another provider
         assert_ne!(decision.provider, ProviderType::Anthropic);
+    }
+
+    // ------------------------------------------------------------------
+    // route_with_capabilities tests
+    // ------------------------------------------------------------------
+
+    fn make_model(id: &str, tier: ModelTier, provider: TypesProviderType) -> ModelInfo {
+        ModelInfo {
+            id: id.to_string(),
+            name: id.to_string(),
+            provider: provider.to_string(),
+            provider_type: provider,
+            tier,
+            context_window: 128_000,
+            input_price_per_mtok: 0.0,
+            output_price_per_mtok: 0.0,
+            capabilities: ModelCapabilities::default(),
+        }
+    }
+
+    fn sample_models() -> Vec<ModelInfo> {
+        vec![
+            make_model(
+                "claude-opus-4-20250514",
+                ModelTier::Premium,
+                TypesProviderType::Anthropic,
+            ),
+            make_model(
+                "claude-sonnet-4-20250514",
+                ModelTier::Mid,
+                TypesProviderType::Anthropic,
+            ),
+            make_model(
+                "gpt-4o",
+                ModelTier::Premium,
+                TypesProviderType::OpenAI,
+            ),
+            make_model(
+                "gpt-4o-mini",
+                ModelTier::Mid,
+                TypesProviderType::OpenAI,
+            ),
+            make_model(
+                "deepseek/deepseek-chat",
+                ModelTier::Budget,
+                TypesProviderType::OpenRouter,
+            ),
+            make_model(
+                "o3",
+                ModelTier::Premium,
+                TypesProviderType::OpenAI,
+            ),
+        ]
+    }
+
+    #[test]
+    fn route_with_capabilities_selects_best_for_math() {
+        let router = setup_router();
+        router
+            .fallback_manager()
+            .set_available(ProviderType::Google, true);
+        let models = sample_models();
+
+        // A complex math prompt that triggers Premium tier via the complexity
+        // classifier, so the capability router will prefer Premium models.
+        // Among Premium models, o3 has the highest math_score (0.99).
+        let decision = router.route_with_capabilities(
+            &[user_msg(
+                "Design a system to solve partial differential equations \
+                 using spectral methods. Prove convergence for the Navier-Stokes \
+                 equations in 3D, derive the error bounds, and implement \
+                 the architecture for a parallel solver.",
+            )],
+            &models,
+            None,
+            None,
+        );
+
+        // Capability-aware routing should include "capability:" in the reasoning
+        assert!(
+            decision.reasoning.contains("capability:"),
+            "Reasoning should contain capability insight: {}",
+            decision.reasoning,
+        );
+        // The result should be a Premium-tier model with strong math capability
+        assert_eq!(decision.tier, ModelTier::Premium);
+    }
+
+    #[test]
+    fn route_with_capabilities_respects_explicit_model() {
+        let router = setup_router();
+        let models = sample_models();
+
+        let decision = router.route_with_capabilities(
+            &[user_msg("Solve this equation: x^2 + 3x - 10 = 0")],
+            &models,
+            Some("claude-sonnet-4-20250514"),
+            None,
+        );
+
+        // Explicit model should be respected regardless of capability scores.
+        assert_eq!(decision.model_id, "claude-sonnet-4-20250514");
+        assert_eq!(decision.provider, ProviderType::Anthropic);
+    }
+
+    #[test]
+    fn route_with_capabilities_empty_models_falls_back() {
+        let router = setup_router();
+
+        let decision = router.route_with_capabilities(
+            &[user_msg("What is Rust?")],
+            &[],
+            None,
+            None,
+        );
+
+        // With empty models, should fall back to standard route() behaviour
+        // which classifies "What is Rust?" as Budget tier.
+        assert_eq!(decision.tier, ModelTier::Budget);
     }
 }

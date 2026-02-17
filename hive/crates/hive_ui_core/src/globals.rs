@@ -26,7 +26,18 @@ use hive_core::notifications::NotificationStore;
 use hive_core::persistence::Database;
 use hive_core::security::SecurityGateway;
 use hive_core::updater::UpdateService;
+use hive_integrations::bitbucket::BitbucketClient;
+use hive_integrations::browser::BrowserAutomation;
+use hive_integrations::cloud::{AwsClient, AzureClient, GcpClient};
+use hive_integrations::database::DatabaseHub;
+use hive_integrations::docker::DockerClient;
+use hive_integrations::docs_indexer::DocsIndexer;
+use hive_integrations::gitlab::GitLabClient;
 use hive_integrations::ide::IdeIntegrationService;
+use hive_integrations::knowledge::KnowledgeHub;
+use hive_integrations::kubernetes::KubernetesClient;
+use hive_integrations::messaging::MessagingHub;
+use hive_integrations::project_management::ProjectManagementHub;
 use hive_learn::LearningService;
 use hive_shield::HiveShield;
 use hive_terminal::CliService;
@@ -112,8 +123,64 @@ pub struct AppChannels(pub ChannelStore);
 impl Global for AppChannels {}
 
 /// Global wrapper for the P2P network node (federation, peer discovery).
+///
+/// NOTE: Not yet initialized at startup — P2P networking is planned but not
+/// wired.  The wrapper exists so that the type is available when the feature
+/// lands without a breaking change to the globals module.
 pub struct AppNetwork(pub Arc<HiveNode>);
 impl Global for AppNetwork {}
+
+/// Global wrapper for the messaging hub (Slack, Discord, Teams, etc.).
+pub struct AppMessaging(pub Arc<MessagingHub>);
+impl Global for AppMessaging {}
+
+/// Global wrapper for project management (Jira, Linear, Asana).
+pub struct AppProjectManagement(pub Arc<ProjectManagementHub>);
+impl Global for AppProjectManagement {}
+
+/// Global wrapper for knowledge bases (Notion, Obsidian).
+pub struct AppKnowledge(pub Arc<KnowledgeHub>);
+impl Global for AppKnowledge {}
+
+/// Global wrapper for database integrations (Postgres, MySQL, SQLite).
+pub struct AppIntegrationDb(pub Arc<DatabaseHub>);
+impl Global for AppIntegrationDb {}
+
+/// Global wrapper for Docker integration.
+pub struct AppDocker(pub Arc<DockerClient>);
+impl Global for AppDocker {}
+
+/// Global wrapper for Kubernetes integration.
+pub struct AppKubernetes(pub Arc<KubernetesClient>);
+impl Global for AppKubernetes {}
+
+/// Global wrapper for browser automation.
+pub struct AppBrowser(pub Arc<BrowserAutomation>);
+impl Global for AppBrowser {}
+
+/// Global wrapper for Bitbucket integration.
+pub struct AppBitbucket(pub Arc<BitbucketClient>);
+impl Global for AppBitbucket {}
+
+/// Global wrapper for GitLab integration.
+pub struct AppGitLab(pub Arc<GitLabClient>);
+impl Global for AppGitLab {}
+
+/// Global wrapper for AWS cloud integration.
+pub struct AppAws(pub Arc<AwsClient>);
+impl Global for AppAws {}
+
+/// Global wrapper for Azure cloud integration.
+pub struct AppAzure(pub Arc<AzureClient>);
+impl Global for AppAzure {}
+
+/// Global wrapper for GCP cloud integration.
+pub struct AppGcp(pub Arc<GcpClient>);
+impl Global for AppGcp {}
+
+/// Global wrapper for documentation indexer.
+pub struct AppDocsIndexer(pub Arc<DocsIndexer>);
+impl Global for AppDocsIndexer {}
 
 /// Global wrapper for the auto-update service (version check, binary replacement).
 pub struct AppUpdater(pub UpdateService);

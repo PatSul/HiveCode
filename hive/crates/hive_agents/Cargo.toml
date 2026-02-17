@@ -1,6 +1,6 @@
 [package]
 name = "hive_agents"
-version = "0.2.3"
+version = "0.3.0"
 edition = "2024"
 license = "MIT"
 
@@ -8,6 +8,7 @@ license = "MIT"
 hive_core = { path = "../hive_core" }
 hive_ai = { path = "../hive_ai" }
 hive_fs = { path = "../hive_fs" }
+hive_integrations = { path = "../hive_integrations" }
 hive_learn = { path = "../hive_learn" }
 hive_terminal = { path = "../hive_terminal" }
 

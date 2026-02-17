@@ -47,6 +47,10 @@ impl McpServer {
             tools: HashMap::new(),
         };
         server.register_builtins(workspace_root);
+        // Register integration tools (stubs that are swapped when hubs connect)
+        for (tool, handler) in crate::integration_tools::integration_tools() {
+            server.register(tool, handler);
+        }
         server
     }
 
@@ -496,7 +500,7 @@ mod tests {
         let (_dir, server) = setup_workspace();
         let tools = server.list_tools();
 
-        assert_eq!(tools.len(), 6);
+        assert_eq!(tools.len(), 18);
         let names: Vec<&str> = tools.iter().map(|t| t.name.as_str()).collect();
         assert!(names.contains(&"read_file"));
         assert!(names.contains(&"write_file"));
@@ -526,7 +530,7 @@ mod tests {
         assert!(resp.is_success());
         let result = resp.result.unwrap();
         let tools = result["tools"].as_array().unwrap();
-        assert_eq!(tools.len(), 6);
+        assert_eq!(tools.len(), 18);
     }
 
     // -- Initialize tests --

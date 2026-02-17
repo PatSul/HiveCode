@@ -15,12 +15,12 @@
 <p align="center">
   <a href="https://hivecode.app"><img src="https://img.shields.io/badge/website-hivecode.app-f59e0b" alt="Website" /></a>
   <a href="https://github.com/PatSul/Hive/releases"><img src="https://img.shields.io/github/v/release/PatSul/Hive?label=download&color=brightgreen&cache=1" alt="Download" /></a>
-  <img src="https://img.shields.io/badge/version-0.2.0-blue" alt="Version" />
+  <img src="https://img.shields.io/badge/version-0.3.0-blue" alt="Version" />
   <img src="https://img.shields.io/badge/language-Rust-orange?logo=rust" alt="Rust" />
-  <img src="https://img.shields.io/badge/tests-2%2C544-brightgreen" alt="Tests" />
+  <img src="https://img.shields.io/badge/tests-3%2C046-brightgreen" alt="Tests" />
   <img src="https://img.shields.io/badge/crates-16-blue" alt="Crates" />
   <img src="https://img.shields.io/badge/warnings-0-brightgreen" alt="Warnings" />
-  <img src="https://img.shields.io/badge/lines-128k%2B-informational" alt="Lines of Rust" />
+  <img src="https://img.shields.io/badge/lines-150k%2B-informational" alt="Lines of Rust" />
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20(Apple%20Silicon)%20%7C%20Linux-informational" alt="Windows | macOS (Apple Silicon) | Linux" />
   <img src="https://img.shields.io/badge/UI-GPUI-blueviolet" alt="GPUI" />
 </p>
@@ -43,17 +43,22 @@ What makes Hive different: it **learns from every interaction** (locally, privat
 
 ### Development Excellence
 - Multi-agent swarm (Queen + teams)
-- 11 AI providers with auto-routing
+- 11 AI providers with capability-aware routing
 - Git worktree isolation per team
 - Full Git Ops (commits, PRs, branches, gitflow, LFS)
 - Context engine (TF-IDF scoring + RAG)
 - Cost tracking & budget enforcement
 - Code review & testing automation
-- Skills Marketplace (34+ skills from 5 sources)
+- Skills Marketplace (43+ skills from 5 sources)
 - Autonomous skill acquisition (self-teaching)
 - Automation workflows (cron, event, webhook triggers)
-- Docker sandbox with real CLI integration
-- MCP client + server
+- Docker & Kubernetes orchestration
+- Database connectivity (Postgres, MySQL, SQLite)
+- Cloud platform integration (AWS, Azure, GCP)
+- Project management (Jira, Linear, Asana)
+- Knowledge base sync (Notion, Obsidian)
+- Git hosting (GitHub, GitLab, Bitbucket)
+- MCP client + server (18 tools)
 - P2P federation across instances
 
 </td>
@@ -118,7 +123,7 @@ Every team gets its own **git worktree** (`swarm/{run_id}/{team_id}`) for confli
 
 ### AI Providers
 
-11 providers with automatic complexity-based routing and fallback:
+11 providers with **capability-aware routing** and fallback:
 
 | Cloud | Local |
 |---|---|
@@ -129,7 +134,7 @@ Every team gets its own **git worktree** (`swarm/{run_id}/{team_id}`) for confli
 | Groq (fast inference) | |
 | HuggingFace | |
 
-Features: complexity classification, 14-entry fallback chain, per-model cost tracking, streaming support, budget enforcement.
+Features: **capability-aware task routing** (12 task types, 19 model profiles), complexity classification, 14-entry fallback chain, per-model cost tracking, streaming support, budget enforcement, speculative decoding.
 
 ### Streaming
 
@@ -286,7 +291,7 @@ All learning data stored locally in SQLite (`~/.hive/learning.db`). Every prefer
 | Feature | Details |
 |---|---|
 | **Automation Workflows** | Multi-step workflows with triggers (manual, cron schedule, event, webhook) and 6 action types (run command, send message, call API, create task, send notification, execute skill). YAML-based definitions in `~/.hive/workflows/`. Visual drag-and-drop workflow builder in the UI. |
-| **Skills Marketplace** | Browse, install, remove, and toggle skills from 5 sources (ClawdHub, Anthropic, OpenAI, Google, Community). Create custom skills. Add remote skill sources. 34+ built-in skills. Security scanning on install. |
+| **Skills Marketplace** | Browse, install, remove, and toggle skills from 5 sources (ClawdHub, Anthropic, OpenAI, Google, Community). Create custom skills. Add remote skill sources. 43+ built-in skills including 9 integration skills (/slack, /jira, /notion, /db, /docker, /k8s, /deploy, /browse, /index-docs). Security scanning on install. |
 | **Autonomous Skill Creation** | When Hive encounters an unfamiliar domain, it searches existing skill sources first, then researches documentation and authors a new skill if nothing sufficient exists. See [Autonomous Skill Acquisition](#autonomous-skill-acquisition). |
 | **Personas** | Named agent personalities with custom system prompts, prompt overrides per task type, and configurable model preferences. |
 | **Auto-Commit** | Watches for staged changes and generates AI-powered commit messages. |
@@ -330,10 +335,17 @@ All integrations make **real API calls** — no stubs or simulated backends.
 <tr><td><strong>Google</strong></td><td>Gmail (REST API), Calendar, Contacts, Drive, Docs, Sheets, Tasks</td></tr>
 <tr><td><strong>Microsoft</strong></td><td>Outlook Email (Graph v1.0), Outlook Calendar</td></tr>
 <tr><td><strong>Messaging</strong></td><td>Slack (Web API), Discord, Teams, Telegram, Matrix, WebChat</td></tr>
-<tr><td><strong>Cloud</strong></td><td>GitHub (REST API), Cloudflare, Vercel, Supabase</td></tr>
+<tr><td><strong>Git Hosting</strong></td><td>GitHub (REST API), GitLab (REST API), Bitbucket (REST API v2.0)</td></tr>
+<tr><td><strong>Cloud Platforms</strong></td><td>AWS (EC2, S3, Lambda, CloudWatch), Azure (VMs, Blob, Functions, Monitor), GCP (Compute, Storage, Functions, Logging)</td></tr>
+<tr><td><strong>Databases</strong></td><td>PostgreSQL, MySQL, SQLite — query execution, schema introspection, connection pooling</td></tr>
+<tr><td><strong>DevOps</strong></td><td>Docker (full container lifecycle), Kubernetes (pods, deployments, services, logs)</td></tr>
+<tr><td><strong>Knowledge</strong></td><td>Notion (pages, databases, blocks), Obsidian (vault management, frontmatter)</td></tr>
+<tr><td><strong>Project Mgmt</strong></td><td>Jira (issues, projects, transitions), Linear (issues, teams, cycles), Asana (tasks, projects, sections)</td></tr>
+<tr><td><strong>Cloud Services</strong></td><td>Cloudflare, Vercel, Supabase</td></tr>
 <tr><td><strong>Smart Home</strong></td><td>Philips Hue</td></tr>
 <tr><td><strong>Voice</strong></td><td>ClawdTalk (voice-over-phone via Telnyx)</td></tr>
-<tr><td><strong>Protocol</strong></td><td>MCP client + server, OAuth2 (PKCE), Webhooks, P2P federation</td></tr>
+<tr><td><strong>Browser</strong></td><td>Headless Chrome automation (navigation, screenshots, JS evaluation, DOM interaction)</td></tr>
+<tr><td><strong>Protocol</strong></td><td>MCP client + server (18 tools), OAuth2 (PKCE), Webhooks, P2P federation</td></tr>
 </table>
 
 ---
@@ -386,11 +398,11 @@ hive/crates/
 │                      42 files · 26,256 lines
 ├── hive_core          Config, SecurityGateway, persistence (SQLite), Kanban, channels, scheduling
 │                      18 files · 9,808 lines
-├── hive_ai            11 AI providers, model router, complexity classifier, context engine, RAG
-│                      39 files · 17,692 lines
-├── hive_agents        Queen, HiveMind, Coordinator, collective memory, MCP, skills, personas,
-│                      knowledge acquisition, competence detection, skill authoring
-│                      25 files · 21,402 lines
+├── hive_ai            11 AI providers, capability-aware router, complexity classifier, context engine, RAG
+│                      41 files · 19,732 lines
+├── hive_agents        Queen, HiveMind, Coordinator, collective memory, MCP (18 tools), skills,
+│                      personas, knowledge acquisition, competence detection, skill authoring
+│                      26 files · 21,963 lines
 ├── hive_shield        PII detection, secrets scanning, vulnerability assessment, access control
 │                      6 files · 2,005 lines
 ├── hive_learn         Outcome tracking, routing learner, preference model, prompt evolution
@@ -405,8 +417,9 @@ hive/crates/
 │                      8 files · 1,478 lines
 ├── hive_blockchain    EVM + Solana wallets, RPC config, token deployment with real JSON-RPC
 │                      6 files · 1,669 lines
-├── hive_integrations  Google, Microsoft, GitHub, messaging, OAuth2, smart home, cloud, webhooks
-│                      35 files · 14,493 lines
+├── hive_integrations  Google, Microsoft, GitHub, GitLab, Bitbucket, messaging, databases,
+│                      cloud platforms, DevOps, knowledge bases, project management, OAuth2
+│                      55 files · 33,007 lines
 └── hive_network       P2P federation, WebSocket transport, UDP discovery, peer registry, sync
                        11 files · 2,765 lines
 ```
@@ -471,7 +484,7 @@ Hive is built for production robustness:
 - **Zero compiler warnings** — The full workspace compiles with `cargo build --workspace` producing 0 errors and 0 warnings.
 - **Clippy clean** — All `cargo clippy` lints addressed: no collapsible ifs, no unnecessary closures, no naming conflicts.
 - **Documented APIs** — Public structs, enums, traits, and functions have `///` documentation comments describing purpose and behavior.
-- **2,544 tests** — Unit and integration tests across the workspace, all passing.
+- **3,046 tests** — Unit and integration tests across the workspace, all passing.
 
 ---
 
@@ -591,11 +604,11 @@ Configure provider preferences, model routing rules, budget limits, and security
 
 | Metric | Value |
 |---|---|
-| Version | 0.2.0 |
+| Version | 0.3.0 |
 | Crates | 16 |
-| Rust source files | 256 |
-| Lines of Rust | 127,665 |
-| Tests | 2,544 |
+| Rust source files | 280 |
+| Lines of Rust | 150,285 |
+| Tests | 3,046 |
 | Compiler warnings | 0 |
 | Clippy warnings | 0 |
 | Memory footprint | < 50 MB |
@@ -605,6 +618,31 @@ Configure provider preferences, model routing rules, budget limits, and security
 ---
 
 ## Changelog
+
+### v0.3.0
+
+**Integration Platform + Capability-Aware AI Routing**
+
+New capabilities:
+- **Integration Platform** — 13 new external service integrations, all with real API clients, connection pooling, and comprehensive test coverage:
+  - **Git Hosting**: GitLab (REST API) and Bitbucket (REST API v2.0) alongside existing GitHub integration
+  - **Cloud Platforms**: AWS (EC2, S3, Lambda, CloudWatch), Azure (VMs, Blob Storage, Functions, Monitor), GCP (Compute, Cloud Storage, Cloud Functions, Logging)
+  - **Databases**: PostgreSQL, MySQL, and SQLite with query execution, schema introspection, and connection pooling
+  - **DevOps**: Docker (full container lifecycle, image management, network/volume ops) and Kubernetes (pods, deployments, services, namespaces, log streaming)
+  - **Knowledge Bases**: Notion (pages, databases, blocks, search) and Obsidian (vault management, frontmatter parsing, wikilink resolution)
+  - **Project Management**: Jira (issues, projects, sprints, transitions), Linear (issues, teams, cycles, labels), Asana (tasks, projects, sections, tags)
+  - **Browser Automation**: Headless Chrome with navigation, screenshots, JS evaluation, and DOM interaction
+  - **Documentation Indexer**: Multi-format document indexing with TF-IDF search
+
+- **Capability-Aware AI Routing** — New `CapabilityRouter` (1,365 lines) that ranks AI models by task-specific strengths across 12 task types (coding, math, creative writing, analysis, etc.) with 19 model profiles. Integrated into `ModelRouter` via `route_with_capabilities()` and wired through `AiService.resolve_provider_smart()`.
+
+- **Speculative Decoding** — Guess-and-check optimization for faster AI responses. A smaller, faster model generates draft tokens that are verified by the target model in parallel.
+
+- **9 New Integration Skills** — `/slack`, `/jira`, `/notion`, `/db`, `/docker`, `/k8s`, `/deploy`, `/browse`, `/index-docs` — each providing natural-language access to their respective services.
+
+- **12 New MCP Integration Tools** — `send_message`, `create_issue`, `list_issues`, `search_knowledge`, `query_database`, `describe_schema`, `docker_list`, `docker_logs`, `k8s_pods`, `cloud_resources`, `browse_url`, `search_docs` — exposing integration capabilities to external MCP clients.
+
+Stats: 280 source files, 150,285 lines of Rust, 3,046 tests, 0 warnings.
 
 ### v0.2.0
 
@@ -632,6 +670,13 @@ Production hardening:
 - Dead code cleanup: removed stale structs, narrowed annotations to field-level.
 
 Stats: 256 source files, 127,665 lines of Rust, 2,544 tests, 0 warnings.
+
+### v0.2.1 – v0.2.3
+
+- Auto-update feature across all platforms
+- Speculative decoding (guess-and-check) for faster AI responses
+- Auto-release pipeline fixes
+- Bug fixes and stability improvements
 
 ### v0.1.0
 

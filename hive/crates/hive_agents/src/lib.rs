@@ -7,6 +7,7 @@ pub mod guardian;
 pub mod heartbeat;
 pub mod hiveloop;
 pub mod hivemind;
+pub mod integration_tools;
 pub mod knowledge_acquisition;
 pub mod mcp_client;
 pub mod mcp_server;

@@ -94,6 +94,10 @@ fn infer_tier_from_model(model_id: &str) -> ModelTier {
         || lower.contains("o3")
         || lower.contains("gemini-2")
     {
+        // o3-mini / gpt-4o-mini are Mid, not Premium
+        if lower.contains("mini") {
+            return ModelTier::Mid;
+        }
         return ModelTier::Premium;
     }
 
@@ -110,7 +114,7 @@ fn infer_tier_from_model(model_id: &str) -> ModelTier {
         return ModelTier::Budget;
     }
 
-    ModelTier::Mid
+    ModelTier::Free
 }
 
 // ---------------------------------------------------------------------------
@@ -389,7 +393,7 @@ mod tests {
     #[test]
     fn test_select_draft_free_returns_none() {
         let config = SpeculativeConfig::default();
-        let draft = select_draft_model("llama3.2", &config);
+        let draft = select_draft_model("local-custom-model", &config);
         assert!(draft.is_none());
     }
 
