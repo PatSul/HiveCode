@@ -15,7 +15,7 @@
 <p align="center">
   <a href="https://hivecode.app"><img src="https://img.shields.io/badge/website-hivecode.app-f59e0b" alt="Website" /></a>
   <a href="https://github.com/PatSul/Hive/releases"><img src="https://img.shields.io/github/v/release/PatSul/Hive?label=download&color=brightgreen&cache=1" alt="Download" /></a>
-  <img src="https://img.shields.io/badge/version-0.3.0-blue" alt="Version" />
+  <img src="https://img.shields.io/badge/version-0.3.1-blue" alt="Version" />
   <img src="https://img.shields.io/badge/language-Rust-orange?logo=rust" alt="Rust" />
   <img src="https://img.shields.io/badge/tests-3%2C046-brightgreen" alt="Tests" />
   <img src="https://img.shields.io/badge/crates-16-blue" alt="Crates" />
@@ -604,7 +604,7 @@ Configure provider preferences, model routing rules, budget limits, and security
 
 | Metric | Value |
 |---|---|
-| Version | 0.3.0 |
+| Version | 0.3.1 |
 | Crates | 16 |
 | Rust source files | 280 |
 | Lines of Rust | 150,285 |
@@ -618,6 +618,17 @@ Configure provider preferences, model routing rules, budget limits, and security
 ---
 
 ## Changelog
+
+### v0.3.1
+
+**Integration Wiring + Tool Fixes**
+
+- Wired all 13 MCP integration tools to live services (replaced stub handlers)
+- Added `deploy_trigger` as 13th integration tool
+- Fixed all 9 integration skill `/commands` to reference correct tool names
+- Added `IntegrationServices` struct for clean dependency injection of Arc services
+- Added `block_on_async()` helper for sync→async bridging in tool handlers
+- DocsIndexer graceful fallback when not configured
 
 ### v0.3.0
 
