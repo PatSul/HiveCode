@@ -286,6 +286,11 @@ pub struct HiveConfig {
     pub auto_routing: bool,
     pub project_models: Vec<String>,
 
+    // Speculative decoding ("guess and check")
+    pub speculative_decoding: bool,
+    pub speculative_draft_model: Option<String>,
+    pub speculative_show_metrics: bool,
+
     // Budget
     pub daily_budget_usd: f64,
     pub monthly_budget_usd: f64,
@@ -339,6 +344,9 @@ impl Default for HiveConfig {
             default_model: "gpt-4o-mini".into(),
             auto_routing: true,
             project_models: Vec::new(),
+            speculative_decoding: false,
+            speculative_draft_model: None,
+            speculative_show_metrics: true,
             daily_budget_usd: 10.0,
             monthly_budget_usd: 100.0,
             theme: "dark".into(),

@@ -25,6 +25,8 @@ actions!(
         SettingsToggleTts,
         SettingsToggleTtsAutoSpeak,
         SettingsToggleClawdTalk,
+        SettingsToggleSpeculativeDecoding,
+        SettingsToggleSpeculativeMetrics,
     ]
 );
 
@@ -56,6 +58,8 @@ pub struct SettingsData {
     pub privacy_mode: bool,
     pub default_model: String,
     pub auto_routing: bool,
+    pub speculative_decoding: bool,
+    pub speculative_show_metrics: bool,
     pub daily_budget_usd: f64,
     pub monthly_budget_usd: f64,
     pub theme: String,
@@ -89,6 +93,8 @@ impl Default for SettingsData {
             privacy_mode: false,
             default_model: String::new(),
             auto_routing: true,
+            speculative_decoding: false,
+            speculative_show_metrics: true,
             daily_budget_usd: 10.0,
             monthly_budget_usd: 100.0,
             theme: "dark".into(),
@@ -137,6 +143,8 @@ impl SettingsData {
             privacy_mode: cfg.privacy_mode,
             default_model: cfg.default_model.clone(),
             auto_routing: cfg.auto_routing,
+            speculative_decoding: cfg.speculative_decoding,
+            speculative_show_metrics: cfg.speculative_show_metrics,
             daily_budget_usd: cfg.daily_budget_usd,
             monthly_budget_usd: cfg.monthly_budget_usd,
             theme: cfg.theme.clone(),
@@ -218,6 +226,8 @@ pub struct SettingsView {
     // Toggle states
     privacy_mode: bool,
     auto_routing: bool,
+    speculative_decoding: bool,
+    speculative_show_metrics: bool,
     auto_update: bool,
     notifications_enabled: bool,
 
@@ -491,6 +501,8 @@ impl SettingsView {
             monthly_budget_input,
             privacy_mode: cfg.privacy_mode,
             auto_routing: cfg.auto_routing,
+            speculative_decoding: cfg.speculative_decoding,
+            speculative_show_metrics: cfg.speculative_show_metrics,
             auto_update: cfg.auto_update,
             notifications_enabled: cfg.notifications_enabled,
             elevenlabs_key_input,
@@ -608,6 +620,8 @@ impl SettingsView {
 
             privacy_mode: self.privacy_mode,
             auto_routing: self.auto_routing,
+            speculative_decoding: self.speculative_decoding,
+            speculative_show_metrics: self.speculative_show_metrics,
             auto_update: self.auto_update,
             notifications_enabled: self.notifications_enabled,
             tts_enabled: self.tts_enabled,
@@ -768,6 +782,8 @@ pub struct SettingsSnapshot {
     pub monthly_budget: f64,
     pub privacy_mode: bool,
     pub auto_routing: bool,
+    pub speculative_decoding: bool,
+    pub speculative_show_metrics: bool,
     pub auto_update: bool,
     pub notifications_enabled: bool,
     pub tts_enabled: bool,
@@ -861,6 +877,20 @@ impl Render for SettingsView {
             .on_action(
                 cx.listener(|this: &mut Self, _: &SettingsToggleNotifications, _, cx| {
                     this.notifications_enabled = !this.notifications_enabled;
+                    cx.emit(SettingsSaved);
+                    cx.notify();
+                }),
+            )
+            .on_action(
+                cx.listener(|this: &mut Self, _: &SettingsToggleSpeculativeDecoding, _, cx| {
+                    this.speculative_decoding = !this.speculative_decoding;
+                    cx.emit(SettingsSaved);
+                    cx.notify();
+                }),
+            )
+            .on_action(
+                cx.listener(|this: &mut Self, _: &SettingsToggleSpeculativeMetrics, _, cx| {
+                    this.speculative_show_metrics = !this.speculative_show_metrics;
                     cx.emit(SettingsSaved);
                     cx.notify();
                 }),
@@ -1090,6 +1120,59 @@ impl SettingsView {
                         "All requests will use the default model above."
                     }),
             )
+            .child(separator(theme))
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap(theme.space_2)
+                    .child(
+                        div()
+                            .text_size(theme.font_size_base)
+                            .text_color(theme.text_primary)
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .child("Speculative Decoding"),
+                    )
+                    .child(
+                        div()
+                            .px(theme.space_2)
+                            .py(px(1.0))
+                            .rounded(theme.radius_sm)
+                            .bg(theme.accent_cyan.opacity(0.15))
+                            .text_size(px(10.0))
+                            .text_color(theme.accent_cyan)
+                            .font_weight(FontWeight::BOLD)
+                            .child("BETA"),
+                    ),
+            )
+            .child(
+                div()
+                    .px(theme.space_3)
+                    .py(theme.space_2)
+                    .rounded(theme.radius_sm)
+                    .bg(theme.bg_primary)
+                    .text_size(theme.font_size_xs)
+                    .text_color(theme.text_muted)
+                    .child(
+                        "\"Guess and Check\" — sends your request to a fast draft model and primary model simultaneously. See instant results from the draft while the high-quality response loads."
+                    ),
+            )
+            .child(switch_row(
+                "Enable Speculative Decoding",
+                "speculative-decoding-switch",
+                self.speculative_decoding,
+                SettingsToggleSpeculativeDecoding,
+                theme,
+            ))
+            .when(self.speculative_decoding, |el| {
+                el.child(switch_row(
+                    "Show Speed Metrics",
+                    "speculative-metrics-switch",
+                    self.speculative_show_metrics,
+                    SettingsToggleSpeculativeMetrics,
+                    theme,
+                ))
+            })
             .into_any_element()
     }
 

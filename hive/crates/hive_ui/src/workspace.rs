@@ -8,6 +8,7 @@ use std::sync::Arc;
 use tracing::{error, info, warn};
 
 use hive_ai::providers::AiProvider;
+use hive_ai::speculative::{self, SpeculativeConfig};
 use hive_ai::types::{ChatRequest, ToolDefinition as AiToolDefinition};
 use hive_core::config::HiveConfig;
 use hive_core::notifications::{AppNotification, NotificationType};
@@ -1604,13 +1605,36 @@ impl HiveWorkspace {
             None
         };
 
-        // 4b. Extract provider + request from the global (sync — no await).
+        // 4b. Check if speculative decoding is enabled.
+        let spec_config = if cx.has_global::<AppConfig>() {
+            let cfg = cx.global::<AppConfig>().0.get();
+            SpeculativeConfig {
+                enabled: cfg.speculative_decoding,
+                draft_model: cfg.speculative_draft_model.clone(),
+                show_metrics: cfg.speculative_show_metrics,
+            }
+        } else {
+            SpeculativeConfig::default()
+        };
+
+        // 4c. Extract provider + request from the global (sync — no await).
+        //     If speculative decoding is enabled, also prepare the draft stream.
+        let use_speculative = spec_config.enabled
+            && cx.has_global::<AppAiService>()
+            && cx.global::<AppAiService>().0.prepare_speculative_stream(
+                ai_messages.clone(),
+                &model,
+                system_prompt.clone(),
+                Some(tool_defs.clone()),
+                &spec_config,
+            ).is_some();
+
         let stream_setup: Option<(Arc<dyn AiProvider>, ChatRequest)> = if cx
             .has_global::<AppAiService>()
         {
             cx.global::<AppAiService>()
                 .0
-                .prepare_stream(ai_messages, &model, system_prompt, Some(tool_defs))
+                .prepare_stream(ai_messages.clone(), &model, system_prompt.clone(), Some(tool_defs.clone()))
         } else {
             None
         };
@@ -1631,27 +1655,144 @@ impl HiveWorkspace {
         let provider_for_loop = provider.clone();
         let request_for_loop = request.clone();
 
-        let task = cx.spawn(async move |_this, app: &mut AsyncApp| {
-            match provider.stream_chat(&request).await {
-                Ok(rx) => {
-                    let _ = chat_svc.update(app, |svc, cx| {
-                        svc.attach_tool_stream(
-                            rx,
-                            model_for_attach,
-                            provider_for_loop,
-                            request_for_loop,
-                            cx,
-                        );
-                    });
-                }
-                Err(e) => {
-                    error!("Stream error: {e}");
-                    let _ = chat_svc.update(app, |svc, cx| {
-                        svc.set_error(format!("AI request failed: {e}"), cx);
-                    });
-                }
+        let task = if use_speculative {
+            // Speculative decoding path: dual-stream from draft + primary.
+            let speculative_setup = cx.global::<AppAiService>().0.prepare_speculative_stream(
+                ai_messages,
+                &model,
+                system_prompt,
+                Some(tool_defs),
+                &spec_config,
+            );
+
+            if let Some((draft_provider, draft_request, primary_provider, primary_request)) = speculative_setup {
+                let spec_config_clone = spec_config.clone();
+                cx.spawn(async move |_this, app: &mut AsyncApp| {
+                    match speculative::speculative_stream(
+                        draft_provider,
+                        draft_request,
+                        primary_provider.clone(),
+                        primary_request.clone(),
+                        spec_config_clone,
+                    ).await {
+                        Ok(mut spec_rx) => {
+                            // Convert speculative chunks into regular StreamChunk stream.
+                            // Draft chunks get a "[speculating] " visual prefix.
+                            // When primary starts, we send a reset-content signal.
+                            let (tx, rx) = tokio::sync::mpsc::channel(256);
+                            let _model_for_metrics = model_for_attach.clone();
+
+                            tokio::spawn(async move {
+                                let mut in_draft_phase = true;
+                                while let Some(spec_chunk) = spec_rx.recv().await {
+                                    if spec_chunk.is_draft {
+                                        // Forward draft content as-is (UI can style it)
+                                        let _ = tx.send(spec_chunk.chunk).await;
+                                    } else {
+                                        if in_draft_phase {
+                                            // Transition: send a special "reset" chunk
+                                            // The content field carries a marker the UI can detect
+                                            let _ = tx.send(hive_ai::types::StreamChunk {
+                                                content: "\n\n---\n\n".to_string(),
+                                                done: false,
+                                                thinking: None,
+                                                usage: None,
+                                                tool_calls: None,
+                                                stop_reason: None,
+                                            }).await;
+                                            in_draft_phase = false;
+                                        }
+
+                                        // Append metrics info to the final chunk if available
+                                        let mut chunk = spec_chunk.chunk;
+                                        if let Some(metrics) = spec_chunk.metrics {
+                                            if chunk.done {
+                                                let metrics_text = format!(
+                                                    "\n\n> Speculative decoding saved ~{}ms | Draft: {} ({}ms) | Primary: {} ({}ms)",
+                                                    metrics.time_saved_ms,
+                                                    metrics.draft_model,
+                                                    metrics.draft_first_token_ms,
+                                                    metrics.primary_model,
+                                                    metrics.primary_first_token_ms,
+                                                );
+                                                chunk.content.push_str(&metrics_text);
+                                            }
+                                        }
+                                        let _ = tx.send(chunk).await;
+                                    }
+                                }
+                            });
+
+                            let _ = chat_svc.update(app, |svc, cx| {
+                                svc.attach_tool_stream(
+                                    rx,
+                                    model_for_attach,
+                                    primary_provider,
+                                    primary_request,
+                                    cx,
+                                );
+                            });
+                        }
+                        Err(e) => {
+                            error!("Speculative stream error: {e}");
+                            // Fall back to normal stream
+                            match provider.stream_chat(&request).await {
+                                Ok(rx) => {
+                                    let _ = chat_svc.update(app, |svc, cx| {
+                                        svc.attach_tool_stream(rx, model_for_attach, provider_for_loop, request_for_loop, cx);
+                                    });
+                                }
+                                Err(e2) => {
+                                    let _ = chat_svc.update(app, |svc, cx| {
+                                        svc.set_error(format!("AI request failed: {e2}"), cx);
+                                    });
+                                }
+                            }
+                        }
+                    }
+                })
+            } else {
+                // Speculative setup failed, fall back to normal
+                cx.spawn(async move |_this, app: &mut AsyncApp| {
+                    match provider.stream_chat(&request).await {
+                        Ok(rx) => {
+                            let _ = chat_svc.update(app, |svc, cx| {
+                                svc.attach_tool_stream(rx, model_for_attach, provider_for_loop, request_for_loop, cx);
+                            });
+                        }
+                        Err(e) => {
+                            error!("Stream error: {e}");
+                            let _ = chat_svc.update(app, |svc, cx| {
+                                svc.set_error(format!("AI request failed: {e}"), cx);
+                            });
+                        }
+                    }
+                })
             }
-        });
+        } else {
+            // Normal (non-speculative) path
+            cx.spawn(async move |_this, app: &mut AsyncApp| {
+                match provider.stream_chat(&request).await {
+                    Ok(rx) => {
+                        let _ = chat_svc.update(app, |svc, cx| {
+                            svc.attach_tool_stream(
+                                rx,
+                                model_for_attach,
+                                provider_for_loop,
+                                request_for_loop,
+                                cx,
+                            );
+                        });
+                    }
+                    Err(e) => {
+                        error!("Stream error: {e}");
+                        let _ = chat_svc.update(app, |svc, cx| {
+                            svc.set_error(format!("AI request failed: {e}"), cx);
+                        });
+                    }
+                }
+            })
+        };
 
         self._stream_task = Some(task);
         self.chat_input.update(cx, |input, cx| {
@@ -5032,6 +5173,8 @@ impl HiveWorkspace {
                 cfg.monthly_budget_usd = snapshot.monthly_budget;
                 cfg.privacy_mode = snapshot.privacy_mode;
                 cfg.auto_routing = snapshot.auto_routing;
+                cfg.speculative_decoding = snapshot.speculative_decoding;
+                cfg.speculative_show_metrics = snapshot.speculative_show_metrics;
                 cfg.auto_update = snapshot.auto_update;
                 cfg.notifications_enabled = snapshot.notifications_enabled;
                 cfg.tts_enabled = snapshot.tts_enabled;

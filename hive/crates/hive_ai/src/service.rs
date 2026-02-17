@@ -406,6 +406,56 @@ impl AiService {
         Some((provider, request))
     }
 
+    /// Prepare a speculative decoding stream.
+    ///
+    /// Returns `(draft_provider, draft_request, primary_provider, primary_request)`
+    /// so the caller can spawn `speculative::speculative_stream()`.
+    ///
+    /// Returns `None` if speculative decoding is not possible (no draft model,
+    /// or providers not available).
+    pub fn prepare_speculative_stream(
+        &self,
+        messages: Vec<ChatMessage>,
+        model: &str,
+        system_prompt: Option<String>,
+        tools: Option<Vec<ToolDefinition>>,
+        spec_config: &crate::speculative::SpeculativeConfig,
+    ) -> Option<(
+        Arc<dyn AiProvider>,
+        ChatRequest,
+        Arc<dyn AiProvider>,
+        ChatRequest,
+    )> {
+        // Select a draft model
+        let draft_model = crate::speculative::select_draft_model(model, spec_config)?;
+
+        // Resolve primary provider
+        let (_pt_primary, primary_provider) = self.resolve_provider(model)?;
+        // Resolve draft provider
+        let (_pt_draft, draft_provider) = self.resolve_provider(&draft_model)?;
+
+        let primary_request = ChatRequest {
+            messages: messages.clone(),
+            model: model.to_string(),
+            max_tokens: 4096,
+            temperature: None,
+            system_prompt: system_prompt.clone(),
+            tools: tools.clone(),
+        };
+
+        let draft_request = ChatRequest {
+            messages,
+            model: draft_model,
+            max_tokens: 4096,
+            temperature: None,
+            system_prompt,
+            // Don't pass tools to draft model — keep it simple and fast
+            tools: None,
+        };
+
+        Some((draft_provider, draft_request, primary_provider, primary_request))
+    }
+
     /// Estimate the cost of a message before sending.
     pub fn estimate_cost(&self, text: &str, model: &str) -> CostBreakdown {
         let input_tokens = crate::cost::estimate_tokens(text);
