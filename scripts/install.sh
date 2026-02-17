@@ -18,6 +18,19 @@ ok()    { echo -e "${GREEN}==>${NC} $1"; }
 warn()  { echo -e "${YELLOW}==>${NC} $1"; }
 err()   { echo -e "${RED}Error:${NC} $1" >&2; exit 1; }
 
+# ── Try Homebrew first (recommended on macOS) ────────────────────────
+if command -v brew &>/dev/null; then
+  info "Homebrew detected — installing via brew (recommended)"
+  brew install PatSul/tap/hive
+  echo ""
+  echo -e "${GREEN}  ╔══════════════════════════════════╗${NC}"
+  echo -e "${GREEN}  ║${NC}   🐝 Hive installed successfully  ${GREEN}║${NC}"
+  echo -e "${GREEN}  ╚══════════════════════════════════╝${NC}"
+  echo ""
+  info "Run 'hive' to start."
+  exit 0
+fi
+
 # ── Detect platform ────────────────────────────────────────────────
 OS="$(uname -s)"
 ARCH="$(uname -m)"
@@ -25,7 +38,7 @@ ARCH="$(uname -m)"
 case "$OS" in
   Darwin)
     case "$ARCH" in
-      arm64) ASSET="hive-macos-arm64.dmg" ;;
+      arm64) ASSET="hive-macos-arm64.tar.gz" ;;
       *)     err "Unsupported macOS architecture: $ARCH (Apple Silicon required)" ;;
     esac
     ;;
@@ -52,7 +65,7 @@ if [ -z "$RELEASE_URL" ]; then
   err "Could not find $ASSET in the latest release. Check https://github.com/$REPO/releases"
 fi
 
-VERSION=$(echo "$RELEASE_URL" | grep -oP 'v[\d.]+' | head -1)
+VERSION=$(echo "$RELEASE_URL" | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+' | head -1)
 info "Latest version: $VERSION"
 
 # ── Download ───────────────────────────────────────────────────────
@@ -63,46 +76,27 @@ info "Downloading $ASSET..."
 curl -fsSL "$RELEASE_URL" -o "$TMPDIR/$ASSET"
 
 # ── Install ────────────────────────────────────────────────────────
-case "$OS" in
-  Darwin)
-    info "Mounting DMG..."
-    MOUNT_POINT=$(hdiutil attach "$TMPDIR/$ASSET" -nobrowse -readonly | tail -1 | awk '{print $NF}')
+info "Extracting..."
+tar xzf "$TMPDIR/$ASSET" -C "$TMPDIR"
 
-    if [ -d "/Applications/Hive.app" ]; then
-      warn "Removing previous installation..."
-      rm -rf "/Applications/Hive.app"
-    fi
+if [ -w "$INSTALL_DIR" ]; then
+  cp "$TMPDIR/hive" "$INSTALL_DIR/hive"
+else
+  info "Installing to $INSTALL_DIR (requires sudo)..."
+  sudo cp "$TMPDIR/hive" "$INSTALL_DIR/hive"
+fi
+chmod +x "$INSTALL_DIR/hive"
 
-    info "Installing Hive.app to /Applications..."
-    cp -R "$MOUNT_POINT/Hive.app" "/Applications/"
+# Remove macOS quarantine attribute if present
+if [ "$OS" = "Darwin" ]; then
+  xattr -dr com.apple.quarantine "$INSTALL_DIR/hive" 2>/dev/null || true
+fi
 
-    hdiutil detach "$MOUNT_POINT" -quiet
-
-    ok "Hive installed to /Applications/Hive.app"
-    echo ""
-    info "Launch Hive from your Applications folder or Spotlight."
-    ;;
-
-  Linux)
-    info "Extracting..."
-    tar xzf "$TMPDIR/$ASSET" -C "$TMPDIR"
-
-    if [ -w "$INSTALL_DIR" ]; then
-      cp "$TMPDIR/hive" "$INSTALL_DIR/hive"
-    else
-      info "Installing to $INSTALL_DIR (requires sudo)..."
-      sudo cp "$TMPDIR/hive" "$INSTALL_DIR/hive"
-    fi
-    chmod +x "$INSTALL_DIR/hive"
-
-    ok "Hive installed to $INSTALL_DIR/hive"
-    echo ""
-    info "Run 'hive' to start."
-    ;;
-esac
+ok "Hive installed to $INSTALL_DIR/hive"
 
 echo ""
 echo -e "${GREEN}  ╔══════════════════════════════════╗${NC}"
 echo -e "${GREEN}  ║${NC}   🐝 Hive installed successfully  ${GREEN}║${NC}"
 echo -e "${GREEN}  ╚══════════════════════════════════╝${NC}"
 echo ""
+info "Run 'hive' to start."
