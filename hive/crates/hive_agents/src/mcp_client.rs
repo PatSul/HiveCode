@@ -4,6 +4,7 @@
 //! stdio or SSE transports, discovering their tools, and invoking them.
 
 use anyhow::Context;
+use futures::StreamExt;
 use hive_core::SecurityGateway;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -483,18 +484,506 @@ impl StdioTransport {
 }
 
 // ---------------------------------------------------------------------------
+// SseTransport
+// ---------------------------------------------------------------------------
+
+/// Manages an SSE-based MCP connection.
+///
+/// The MCP SSE protocol works as follows:
+/// 1. Client opens an SSE stream by GET-ing the server's SSE endpoint URL.
+/// 2. Server sends an `endpoint` event whose `data` field is the absolute or
+///    relative URL to which JSON-RPC requests should be POSTed.
+/// 3. Client POSTs JSON-RPC requests/notifications to that endpoint.
+/// 4. Server sends JSON-RPC responses (and notifications) back over the SSE
+///    stream as `message` events with `data` containing the JSON.
+struct SseTransport {
+    /// The HTTP client used for POSTing requests.
+    http: reqwest::Client,
+    /// The URL to POST JSON-RPC messages to (received from the `endpoint` SSE event).
+    post_url: String,
+    /// Pending JSON-RPC response messages received from the SSE stream.
+    pending_messages: Vec<RawJsonRpcMessage>,
+    /// Background task handle that reads the SSE stream and forwards messages.
+    reader_task: tokio::task::JoinHandle<()>,
+    /// Channel receiver for messages coming from the SSE stream reader.
+    message_rx: tokio::sync::mpsc::UnboundedReceiver<RawJsonRpcMessage>,
+    /// Whether we have been shut down.
+    closed: bool,
+}
+
+impl SseTransport {
+    /// Connect to an MCP SSE server.
+    ///
+    /// Opens the SSE stream, waits for the `endpoint` event, and then starts
+    /// a background reader task.
+    async fn connect(sse_url: &str, server_name: &str) -> anyhow::Result<Self> {
+        let http = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(120))
+            .build()
+            .context("Failed to build HTTP client for SSE transport")?;
+
+        debug!(server = %server_name, url = %sse_url, "Opening SSE connection to MCP server");
+
+        // Open the SSE stream.
+        let response = http
+            .get(sse_url)
+            .header("Accept", "text/event-stream")
+            .header("Cache-Control", "no-cache")
+            .send()
+            .await
+            .with_context(|| format!("Failed to connect to SSE endpoint: {sse_url}"))?;
+
+        let status = response.status();
+        if !status.is_success() {
+            anyhow::bail!(
+                "SSE endpoint returned HTTP {status} for server '{server_name}' at {sse_url}"
+            );
+        }
+
+        // We need to read the SSE stream to find the `endpoint` event.
+        // First, consume bytes until we get the POST URL.
+        let mut byte_stream = response.bytes_stream();
+        let mut buffer = String::new();
+        let mut post_url: Option<String> = None;
+
+        // Give the server up to 30 seconds to send the endpoint event.
+        let endpoint_timeout = std::time::Duration::from_secs(30);
+        let deadline = tokio::time::Instant::now() + endpoint_timeout;
+
+        while post_url.is_none() {
+            let chunk = tokio::time::timeout_at(deadline, byte_stream.next())
+                .await
+                .map_err(|_| {
+                    anyhow::anyhow!(
+                        "Timed out waiting for 'endpoint' event from SSE server '{server_name}'"
+                    )
+                })?
+                .ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "SSE stream closed before sending 'endpoint' event (server '{server_name}')"
+                    )
+                })?
+                .with_context(|| {
+                    format!("Error reading SSE stream from server '{server_name}'")
+                })?;
+
+            buffer.push_str(&String::from_utf8_lossy(&chunk));
+
+            // Parse SSE events from the buffer.
+            // SSE events are separated by blank lines (\n\n).
+            while let Some(event_end) = buffer.find("\n\n") {
+                let event_block = buffer[..event_end].to_string();
+                buffer.drain(..event_end + 2);
+
+                let mut event_type: Option<&str> = None;
+                let mut event_data: Option<String> = None;
+
+                for line in event_block.lines() {
+                    let line = line.trim();
+                    if line.is_empty() || line.starts_with(':') {
+                        // Comment or blank line within the event block.
+                        continue;
+                    }
+                    if let Some(value) = line.strip_prefix("event:") {
+                        event_type = Some(value.trim());
+                    } else if let Some(value) = line.strip_prefix("data:") {
+                        event_data = Some(value.trim().to_string());
+                    }
+                }
+
+                // We need the lifetime of event_type to work with string comparisons
+                // after we've processed the event_block. Since event_type borrows from
+                // event_block which is owned by this scope, this is fine.
+                if event_type == Some("endpoint") {
+                    if let Some(ref data) = event_data {
+                        // The endpoint URL may be relative or absolute.
+                        let resolved = if data.starts_with("http://") || data.starts_with("https://")
+                        {
+                            data.clone()
+                        } else {
+                            // Resolve relative to the SSE URL's origin.
+                            let base = url::Url::parse(sse_url).with_context(|| {
+                                format!("Failed to parse SSE URL as base: {sse_url}")
+                            })?;
+                            base.join(data)
+                                .with_context(|| {
+                                    format!(
+                                        "Failed to resolve relative endpoint URL '{data}' against '{sse_url}'"
+                                    )
+                                })?
+                                .to_string()
+                        };
+                        debug!(
+                            server = %server_name,
+                            post_url = %resolved,
+                            "Received SSE endpoint URL"
+                        );
+                        post_url = Some(resolved);
+                    }
+                } else if event_type == Some("message") || event_type.is_none() {
+                    // This might be a JSON-RPC message arriving before we set up
+                    // the reader task. We just need the endpoint event to proceed,
+                    // so early messages are ignored here. The reader task will
+                    // handle all subsequent messages once it starts.
+                    if event_data.is_some() {
+                        debug!("Received early SSE message before reader task started (skipping)");
+                    }
+                }
+            }
+        }
+
+        let post_url =
+            post_url.ok_or_else(|| anyhow::anyhow!("No endpoint URL received from SSE server"))?;
+
+        // Now set up the background SSE reader task.
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<RawJsonRpcMessage>();
+
+        // Map the reqwest byte stream to a boxed stream of Vec<u8> / String
+        // so that the reader loop does not depend on the `bytes` crate.
+        use futures::stream::StreamExt as _;
+        let boxed_stream: futures::stream::BoxStream<'static, Result<Vec<u8>, String>> =
+            byte_stream
+                .map(|result| result.map(|b| b.to_vec()).map_err(|e| e.to_string()))
+                .boxed();
+
+        // Pass any remaining buffer content to the reader.
+        let reader_server_name = server_name.to_string();
+        let reader_task = tokio::spawn(async move {
+            Self::sse_reader_loop(boxed_stream, buffer, tx, &reader_server_name).await;
+        });
+
+        Ok(Self {
+            http,
+            post_url,
+            pending_messages: Vec::new(),
+            reader_task,
+            message_rx: rx,
+            closed: false,
+        })
+    }
+
+    /// Background task that reads SSE events from the byte stream and sends
+    /// parsed JSON-RPC messages through the channel.
+    ///
+    /// Accepts a boxed byte stream so that the concrete reqwest stream type
+    /// does not leak into the function signature (avoids a direct `bytes`
+    /// crate dependency).
+    async fn sse_reader_loop(
+        mut stream: futures::stream::BoxStream<'static, Result<Vec<u8>, String>>,
+        mut buffer: String,
+        tx: tokio::sync::mpsc::UnboundedSender<RawJsonRpcMessage>,
+        server_name: &str,
+    ) {
+        while let Some(chunk_result) = stream.next().await {
+            let bytes = match chunk_result {
+                Ok(b) => b,
+                Err(e) => {
+                    warn!(server = %server_name, error = %e, "SSE stream read error");
+                    break;
+                }
+            };
+
+            buffer.push_str(&String::from_utf8_lossy(&bytes));
+
+            // Parse complete SSE events (separated by \n\n).
+            Self::drain_sse_events(&mut buffer, &tx, server_name);
+        }
+
+        debug!(server = %server_name, "SSE stream ended");
+    }
+
+    /// Parse and drain complete SSE events from the buffer, sending any
+    /// JSON-RPC messages through the channel.
+    fn drain_sse_events(
+        buffer: &mut String,
+        tx: &tokio::sync::mpsc::UnboundedSender<RawJsonRpcMessage>,
+        server_name: &str,
+    ) {
+        while let Some(event_end) = buffer.find("\n\n") {
+            let event_block = buffer[..event_end].to_string();
+            buffer.drain(..event_end + 2);
+
+            let mut event_type: Option<String> = None;
+            let mut event_data: Option<String> = None;
+
+            for line in event_block.lines() {
+                let line = line.trim();
+                if line.is_empty() || line.starts_with(':') {
+                    continue;
+                }
+                if let Some(value) = line.strip_prefix("event:") {
+                    event_type = Some(value.trim().to_string());
+                } else if let Some(value) = line.strip_prefix("data:") {
+                    // SSE spec: multi-line data is joined with newlines.
+                    match &mut event_data {
+                        Some(existing) => {
+                            existing.push('\n');
+                            existing.push_str(value.trim());
+                        }
+                        None => {
+                            event_data = Some(value.trim().to_string());
+                        }
+                    }
+                }
+            }
+
+            // We only care about `message` events (or events with no explicit type,
+            // which SSE treats as `message`). The `endpoint` event was already handled.
+            let is_message =
+                event_type.as_deref() == Some("message") || event_type.is_none();
+
+            if is_message {
+                if let Some(ref data) = event_data {
+                    match serde_json::from_str::<RawJsonRpcMessage>(data) {
+                        Ok(msg) => {
+                            if tx.send(msg).is_err() {
+                                // Receiver dropped — transport is shutting down.
+                                debug!(
+                                    server = %server_name,
+                                    "SSE reader channel closed, stopping"
+                                );
+                                return;
+                            }
+                        }
+                        Err(e) => {
+                            warn!(
+                                server = %server_name,
+                                error = %e,
+                                data = %data,
+                                "Failed to parse SSE message data as JSON-RPC"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Send a JSON-RPC request via HTTP POST to the server's endpoint.
+    async fn send_request(&self, request: &JsonRpcRequest) -> anyhow::Result<()> {
+        debug!(
+            id = request.id,
+            method = %request.method,
+            post_url = %self.post_url,
+            "Sending JSON-RPC request via SSE POST"
+        );
+
+        let response = self
+            .http
+            .post(&self.post_url)
+            .header("Content-Type", "application/json")
+            .json(request)
+            .send()
+            .await
+            .with_context(|| {
+                format!(
+                    "Failed to POST JSON-RPC request to {}",
+                    self.post_url
+                )
+            })?;
+
+        let status = response.status();
+        if !status.is_success() {
+            let body = response.text().await.unwrap_or_default();
+            anyhow::bail!(
+                "SSE POST to {} returned HTTP {status}: {body}",
+                self.post_url
+            );
+        }
+
+        Ok(())
+    }
+
+    /// Send a JSON-RPC notification via HTTP POST (no id, no response expected).
+    async fn send_notification(&self, notification: &JsonRpcNotification) -> anyhow::Result<()> {
+        debug!(
+            method = %notification.method,
+            post_url = %self.post_url,
+            "Sending JSON-RPC notification via SSE POST"
+        );
+
+        let response = self
+            .http
+            .post(&self.post_url)
+            .header("Content-Type", "application/json")
+            .json(notification)
+            .send()
+            .await
+            .with_context(|| {
+                format!(
+                    "Failed to POST JSON-RPC notification to {}",
+                    self.post_url
+                )
+            })?;
+
+        let status = response.status();
+        if !status.is_success() {
+            let body = response.text().await.unwrap_or_default();
+            anyhow::bail!(
+                "SSE POST notification to {} returned HTTP {status}: {body}",
+                self.post_url
+            );
+        }
+
+        Ok(())
+    }
+
+    /// Read the next JSON-RPC message from the SSE stream.
+    ///
+    /// Returns `None` if the stream has closed.
+    async fn read_message(&mut self) -> anyhow::Result<Option<RawJsonRpcMessage>> {
+        // First check if we have any pending messages buffered.
+        if !self.pending_messages.is_empty() {
+            return Ok(Some(self.pending_messages.remove(0)));
+        }
+
+        // Otherwise wait for the next message from the reader task.
+        match self.message_rx.recv().await {
+            Some(msg) => Ok(Some(msg)),
+            None => {
+                // Channel closed — the reader task has ended.
+                Ok(None)
+            }
+        }
+    }
+
+    /// Read messages until we get a response with the given `id`.
+    ///
+    /// Any notifications received while waiting are logged and discarded.
+    /// Any responses with non-matching IDs produce a warning and are discarded.
+    async fn read_response(&mut self, expected_id: u64) -> anyhow::Result<JsonRpcResponse> {
+        // Apply a timeout so we don't hang forever waiting for a response.
+        let timeout = std::time::Duration::from_secs(120);
+        let deadline = tokio::time::Instant::now() + timeout;
+
+        loop {
+            let msg = tokio::time::timeout_at(deadline, self.read_message())
+                .await
+                .map_err(|_| {
+                    anyhow::anyhow!(
+                        "Timed out waiting for SSE response with id {expected_id}"
+                    )
+                })?? // First ? unwraps the timeout, second ? unwraps the read_message result.
+                .ok_or_else(|| {
+                    anyhow::anyhow!("SSE stream closed before receiving response with id {expected_id}")
+                })?;
+
+            if msg.is_notification() {
+                let notification = msg
+                    .into_notification()
+                    .expect("is_notification() was true so into_notification() must succeed");
+                debug!(
+                    method = %notification.method,
+                    "Received SSE notification while waiting for response (discarding)"
+                );
+                continue;
+            }
+
+            if let Some(response) = msg.into_response() {
+                if response.id == expected_id {
+                    return Ok(response);
+                }
+                warn!(
+                    expected_id,
+                    actual_id = response.id,
+                    "Received SSE response with unexpected id (discarding)"
+                );
+                continue;
+            }
+
+            // Message has neither id nor method — malformed.
+            warn!("Received malformed JSON-RPC message via SSE (no id and no method)");
+        }
+    }
+
+    /// Shut down the SSE transport.
+    async fn shutdown(&mut self) -> anyhow::Result<()> {
+        if self.closed {
+            return Ok(());
+        }
+        self.closed = true;
+
+        debug!("Shutting down SSE transport");
+
+        // Abort the background reader task.
+        self.reader_task.abort();
+
+        // Close the message channel.
+        self.message_rx.close();
+
+        Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TransportHandle
+// ---------------------------------------------------------------------------
+
+/// Wrapper enum that dispatches transport operations to the active transport.
+enum TransportHandle {
+    Stdio(StdioTransport),
+    Sse(SseTransport),
+}
+
+impl TransportHandle {
+    async fn send_request(&mut self, request: &JsonRpcRequest) -> anyhow::Result<()> {
+        match self {
+            Self::Stdio(t) => t.send_request(request).await,
+            Self::Sse(t) => t.send_request(request).await,
+        }
+    }
+
+    #[allow(dead_code)]
+    async fn send_notification(
+        &mut self,
+        notification: &JsonRpcNotification,
+    ) -> anyhow::Result<()> {
+        match self {
+            Self::Stdio(t) => t.send_notification(notification).await,
+            Self::Sse(t) => t.send_notification(notification).await,
+        }
+    }
+
+    async fn read_response(&mut self, expected_id: u64) -> anyhow::Result<JsonRpcResponse> {
+        match self {
+            Self::Stdio(t) => t.read_response(expected_id).await,
+            Self::Sse(t) => t.read_response(expected_id).await,
+        }
+    }
+
+    async fn shutdown(&mut self) -> anyhow::Result<()> {
+        match self {
+            Self::Stdio(t) => t.shutdown().await,
+            Self::Sse(t) => t.shutdown().await,
+        }
+    }
+
+    /// Returns `true` if this is a Stdio transport (needed for Drop cleanup).
+    fn is_stdio(&self) -> bool {
+        matches!(self, Self::Stdio(_))
+    }
+
+    /// Attempt to kill the child process (stdio only). No-op for SSE.
+    fn try_kill_child(&mut self) {
+        if let Self::Stdio(t) = self {
+            let _ = t.child.start_kill();
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // MCP Client
 // ---------------------------------------------------------------------------
 
 /// Client for communicating with an external MCP server.
 ///
 /// Handles request ID generation, protocol message construction, and
-/// communication over a stdio transport (spawned child process).
+/// communication over stdio or SSE transports.
 pub struct McpClient {
     config: McpServerConfig,
     next_id: AtomicU64,
     /// The live transport connection (populated after `connect()`).
-    transport: Arc<Mutex<Option<StdioTransport>>>,
+    transport: Arc<Mutex<Option<TransportHandle>>>,
     /// Server capabilities returned from the `initialize` handshake.
     server_info: Arc<Mutex<Option<serde_json::Value>>>,
 }
@@ -568,18 +1057,13 @@ impl McpClient {
 
     /// Establish the transport connection and perform the MCP `initialize` handshake.
     ///
-    /// For stdio transports, this spawns the child process, sends `initialize`,
-    /// waits for the server's response, and sends the `initialized` notification.
+    /// For stdio transports, this spawns the child process. For SSE transports,
+    /// this opens the SSE connection and discovers the POST endpoint. In both
+    /// cases, the MCP `initialize` / `initialized` handshake is performed.
     pub async fn connect(&self) -> anyhow::Result<serde_json::Value> {
         match &self.config.transport {
             McpTransport::Stdio => self.connect_stdio().await,
-            McpTransport::Sse { url } => {
-                anyhow::bail!(
-                    "SSE transport not yet implemented (server '{}', url '{}')",
-                    self.config.name,
-                    url
-                )
-            }
+            McpTransport::Sse { url } => self.connect_sse(url.clone()).await,
         }
     }
 
@@ -636,7 +1120,66 @@ impl McpClient {
             .await?;
 
         // Store transport and server info.
-        *self.transport.lock().await = Some(transport);
+        *self.transport.lock().await = Some(TransportHandle::Stdio(transport));
+        *self.server_info.lock().await = Some(server_info.clone());
+
+        Ok(server_info)
+    }
+
+    /// Internal: connect via SSE transport.
+    async fn connect_sse(&self, url: String) -> anyhow::Result<serde_json::Value> {
+        // Prevent double-connect.
+        {
+            let guard = self.transport.lock().await;
+            if guard.is_some() {
+                anyhow::bail!("Already connected to server '{}'", self.config.name);
+            }
+        }
+
+        let mut transport = SseTransport::connect(&url, &self.config.name).await?;
+
+        // Step 1: Send `initialize` request.
+        let init_req = self.build_initialize_request();
+        let init_id = init_req.id;
+        transport.send_request(&init_req).await?;
+
+        // Step 2: Read the initialize response.
+        let init_response = transport.read_response(init_id).await.with_context(|| {
+            format!(
+                "Failed to read initialize response from SSE server '{}'",
+                self.config.name
+            )
+        })?;
+
+        if let Some(err) = &init_response.error {
+            anyhow::bail!(
+                "SSE server '{}' returned error on initialize: {} (code {})",
+                self.config.name,
+                err.message,
+                err.code
+            );
+        }
+
+        let server_info = init_response
+            .result
+            .clone()
+            .unwrap_or(serde_json::Value::Null);
+
+        debug!(
+            server = %self.config.name,
+            server_info = %server_info,
+            "MCP SSE initialize handshake complete"
+        );
+
+        // Step 3: Send `initialized` notification to confirm.
+        let initialized_notification =
+            JsonRpcNotification::new("notifications/initialized", serde_json::json!({}));
+        transport
+            .send_notification(&initialized_notification)
+            .await?;
+
+        // Store transport and server info.
+        *self.transport.lock().await = Some(TransportHandle::Sse(transport));
         *self.server_info.lock().await = Some(server_info.clone());
 
         Ok(server_info)
@@ -743,17 +1286,27 @@ impl McpClient {
 
 impl Drop for McpClient {
     fn drop(&mut self) {
-        // Best-effort: if we still have a transport, try to kill the child.
-        // We can't do async cleanup in Drop, so we just attempt a sync kill.
+        // Best-effort: if we still have a transport, try to clean it up.
+        // We can't do async cleanup in Drop, so we do what we can synchronously.
         if let Ok(mut guard) = self.transport.try_lock()
-            && let Some(ref mut transport) = *guard {
+            && let Some(ref mut transport) = *guard
+        {
+            if transport.is_stdio() {
                 // Attempt to start a kill. The OS will clean up the zombie.
-                let _ = transport.child.start_kill();
+                transport.try_kill_child();
                 error!(
                     server = %self.config.name,
                     "McpClient dropped without calling disconnect() — child process killed"
                 );
+            } else {
+                // SSE transport: just log a warning. The background task
+                // will be cleaned up when the JoinHandle is dropped.
+                error!(
+                    server = %self.config.name,
+                    "McpClient dropped without calling disconnect() — SSE connection abandoned"
+                );
             }
+        }
     }
 }
 

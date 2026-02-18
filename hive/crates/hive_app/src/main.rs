@@ -22,8 +22,8 @@ use hive_ui::globals::{
     AppAiService, AppAssistant, AppAutomation, AppAws, AppAzure, AppBitbucket, AppBrowser,
     AppChannels, AppCli, AppConfig, AppDatabase, AppDocker, AppDocsIndexer, AppGcp, AppGitLab,
     AppIde, AppIntegrationDb, AppKnowledge, AppKubernetes, AppLearning, AppMarketplace,
-    AppMcpServer, AppMessaging, AppNotifications, AppPersonas, AppProjectManagement, AppRpcConfig,
-    AppSecurity, AppShield, AppSkills, AppSpecs, AppTts, AppUpdater, AppWallets,
+    AppMcpServer, AppMessaging, AppNetwork, AppNotifications, AppPersonas, AppProjectManagement,
+    AppRpcConfig, AppSecurity, AppShield, AppSkills, AppSpecs, AppTts, AppUpdater, AppWallets,
 };
 use hive_ui::workspace::{
     ClearChat, HiveWorkspace, NewConversation, SwitchPanel, SwitchToAgents, SwitchToChannels,
@@ -421,6 +421,75 @@ fn init_services(cx: &mut App) -> anyhow::Result<()> {
     channel_store.ensure_default_channels();
     cx.set_global(AppChannels(channel_store));
     info!("ChannelStore initialized with default channels");
+
+    // P2P network node — federation, peer discovery, WebSocket server.
+    //
+    // The node is created with the persisted config and started on a dedicated
+    // background thread with its own tokio runtime.  We store a *query handle*
+    // (a separate HiveNode with matching identity) in the GPUI global for
+    // read-only access to peer info.  The running node lives on the background
+    // thread for the lifetime of the application.
+    {
+        let network_config_path = HiveConfig::base_dir()
+            .map(|d| d.join("network.json"))
+            .unwrap_or_else(|_| std::path::PathBuf::from("network.json"));
+        let net_config = hive_network::NetworkConfig::load_or_default(&network_config_path);
+
+        let node_name = std::env::var("HIVE_NODE_NAME").unwrap_or_else(|_| {
+            #[cfg(unix)]
+            {
+                let mut buf = [0u8; 256];
+                let c_str = unsafe {
+                    libc::gethostname(buf.as_mut_ptr() as *mut libc::c_char, buf.len());
+                    std::ffi::CStr::from_ptr(buf.as_ptr() as *const libc::c_char)
+                };
+                c_str.to_string_lossy().to_string()
+            }
+            #[cfg(not(unix))]
+            {
+                "hive-node".to_string()
+            }
+        });
+
+        // Create the global handle — a separate node instance for read-only queries.
+        let global_node = std::sync::Arc::new(
+            hive_network::HiveNode::with_defaults(&node_name),
+        );
+        cx.set_global(AppNetwork(global_node));
+
+        let listen_addr = net_config.listen_addr;
+
+        // Start the *real* node on a background thread with its own tokio runtime.
+        std::thread::Builder::new()
+            .name("hive-p2p".into())
+            .spawn(move || {
+                let rt = tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .expect("P2P tokio runtime");
+                rt.block_on(async {
+                    let mut node = hive_network::HiveNode::with_defaults(&node_name);
+                    // Replace the default config with the loaded one.
+                    let identity = node.identity().clone();
+                    let mut node = hive_network::HiveNode::new(identity, net_config);
+
+                    match node.start().await {
+                        Ok(()) => info!("P2P network started — listening on {listen_addr}"),
+                        Err(e) => {
+                            error!("P2P network start failed (non-fatal): {e}");
+                            return;
+                        }
+                    }
+                    // Park the runtime so spawned tasks (server, discovery,
+                    // heartbeat) keep running for the lifetime of the app.
+                    loop {
+                        tokio::time::sleep(std::time::Duration::from_secs(3600)).await;
+                    }
+                });
+            })
+            .ok();
+        info!("P2P network node initialized (background start in progress)");
+    }
 
     // Auto-update service — checks GitHub releases for newer versions.
     let updater = UpdateService::new(VERSION);

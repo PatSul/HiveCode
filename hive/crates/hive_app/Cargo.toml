@@ -20,8 +20,10 @@ hive_blockchain = { path = "../hive_blockchain" }
 hive_integrations = { path = "../hive_integrations" }
 hive_learn = { path = "../hive_learn" }
 hive_shield = { path = "../hive_shield" }
+hive_network = { path = "../hive_network" }
 
 gpui.workspace = true
+tokio.workspace = true
 gpui-component.workspace = true
 anyhow.workspace = true
 tracing.workspace = true
@@ -29,6 +31,9 @@ tracing-subscriber.workspace = true
 tray-icon = "0.21"
 rust-embed.workspace = true
 image.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
 
 [target.'cfg(windows)'.build-dependencies]
 winres = "0.1"

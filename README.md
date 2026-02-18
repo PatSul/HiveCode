@@ -15,7 +15,7 @@
 <p align="center">
   <a href="https://hivecode.app"><img src="https://img.shields.io/badge/website-hivecode.app-f59e0b" alt="Website" /></a>
   <a href="https://github.com/PatSul/Hive/releases"><img src="https://img.shields.io/github/v/release/PatSul/Hive?label=download&color=brightgreen&cache=1" alt="Download" /></a>
-  <img src="https://img.shields.io/badge/version-0.3.1-blue" alt="Version" />
+  <img src="https://img.shields.io/badge/version-0.3.2-blue" alt="Version" />
   <img src="https://img.shields.io/badge/language-Rust-orange?logo=rust" alt="Rust" />
   <img src="https://img.shields.io/badge/tests-3%2C046-brightgreen" alt="Tests" />
   <img src="https://img.shields.io/badge/crates-16-blue" alt="Crates" />
@@ -329,7 +329,7 @@ Hive instances can discover and communicate with each other over the network, en
 
 ## Integrations
 
-All integrations make **real API calls** — no stubs or simulated backends.
+All integrations make **real API calls** to their respective services. Blockchain token deployment operates in simulation mode with real gas/rent price queries. The `deploy_trigger` tool dispatches via deploy scripts, Makefile targets, or GitHub Actions CLI.
 
 <table>
 <tr><td><strong>Google</strong></td><td>Gmail (REST API), Calendar, Contacts, Drive, Docs, Sheets, Tasks</td></tr>
@@ -480,7 +480,7 @@ All panels are wired to live backend data. No mock data in the production path.
 
 Hive is built for production robustness:
 
-- **Graceful error handling** — `.unwrap()` calls eliminated from production code paths across all 16 crates. All fallible operations use `Result<T>` with `?` propagation, `.unwrap_or_default()`, or explicit `match` blocks.
+- **Graceful error handling** — Production code paths use `Result<T>` with `?` propagation, `.unwrap_or_default()`, or explicit `match` blocks. Remaining `expect()` calls are limited to compile-time-constant regex patterns and application startup invariants.
 - **Zero compiler warnings** — The full workspace compiles with `cargo build --workspace` producing 0 errors and 0 warnings.
 - **Clippy clean** — All `cargo clippy` lints addressed: no collapsible ifs, no unnecessary closures, no naming conflicts.
 - **Documented APIs** — Public structs, enums, traits, and functions have `///` documentation comments describing purpose and behavior.
@@ -604,7 +604,7 @@ Configure provider preferences, model routing rules, budget limits, and security
 
 | Metric | Value |
 |---|---|
-| Version | 0.3.1 |
+| Version | 0.3.2 |
 | Crates | 16 |
 | Rust source files | 280 |
 | Lines of Rust | 150,285 |
@@ -618,6 +618,22 @@ Configure provider preferences, model routing rules, budget limits, and security
 ---
 
 ## Changelog
+
+### v0.3.2
+
+**Gap Closure + P2P Wiring + Website Overhaul**
+
+- Wired `hive_network` P2P federation to app startup — node starts on background thread with dedicated tokio runtime, LAN discovery and WebSocket server active
+- Replaced `deploy_trigger` stub with real deployment dispatch (deploy.sh, Makefile targets, or `gh workflow run`)
+- Implemented real CLI doctor checks — `check_disk_space()` reads filesystem stats via `statvfs`, `check_network()` performs DNS resolution
+- Implemented MCP SSE transport — HTTP POST for requests, Server-Sent Events for streaming responses
+- Fixed README accuracy: version bump to 0.3.2, corrected error handling claims, clarified blockchain simulation mode
+- Website: added favicon, robots.txt, sitemap.xml, og:image, manifest.json, JSON-LD structured data
+- Website: custom 404 and error pages with Hive branding
+- Website: enabled Next.js image optimization (removed `unoptimized: true`)
+- Website: added mobile docs navigation (floating bottom sheet)
+- Website: accessibility fixes — skip-to-content link, aria-hidden on decorative SVGs, aria-expanded on FAQ, focus-visible styles
+- Website: SEO meta tags — metadataBase, canonical URLs, og:image, twitter:image, theme-color
 
 ### v0.3.1
 

@@ -124,9 +124,9 @@ impl Global for AppChannels {}
 
 /// Global wrapper for the P2P network node (federation, peer discovery).
 ///
-/// NOTE: Not yet initialized at startup — P2P networking is planned but not
-/// wired.  The wrapper exists so that the type is available when the feature
-/// lands without a breaking change to the globals module.
+/// The node is initialized at startup and begins listening for connections
+/// and discovering LAN peers in the background.  Use `AppNetwork::0` to
+/// access the `HiveNode` handle for peer queries and message sending.
 pub struct AppNetwork(pub Arc<HiveNode>);
 impl Global for AppNetwork {}
 

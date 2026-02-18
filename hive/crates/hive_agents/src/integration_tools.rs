@@ -384,16 +384,64 @@ pub fn wire_integration_handlers(services: IntegrationServices) -> Vec<(McpTool,
         }) as ToolHandler));
     }
 
-    // --- Deploy (delegates to automation workflows) ---
+    // --- Deploy (dispatches via deploy scripts, Makefile, or GitHub Actions) ---
     tools.push((deploy_trigger_tool(), Box::new(|args: serde_json::Value| {
-        let environment = args["environment"].as_str().unwrap_or("staging");
-        let branch = args["branch"].as_str().unwrap_or("main");
-        Ok(json!({
-            "status": "triggered",
-            "environment": environment,
-            "branch": branch,
-            "note": "Deployment workflow dispatched. Check the Workflows panel for progress."
-        }))
+        let environment = args["environment"].as_str().unwrap_or("staging").to_string();
+        let branch = args["branch"].as_str().unwrap_or("main").to_string();
+
+        // Try common deployment dispatch mechanisms in order of preference:
+        // 1. deploy.sh in current directory
+        // 2. Makefile "deploy" target
+        // 3. GitHub Actions via `gh workflow run`
+        let deploy_result = std::process::Command::new("sh")
+            .arg("-c")
+            .arg(format!(
+                "if [ -f deploy.sh ]; then \
+                    DEPLOY_ENV='{env}' DEPLOY_BRANCH='{branch}' bash deploy.sh 2>&1; \
+                elif [ -f Makefile ] && grep -q '^deploy:' Makefile 2>/dev/null; then \
+                    DEPLOY_ENV='{env}' DEPLOY_BRANCH='{branch}' make deploy 2>&1; \
+                elif command -v gh >/dev/null 2>&1; then \
+                    gh workflow run deploy.yml -f environment='{env}' -f branch='{branch}' 2>&1; \
+                else \
+                    echo '__NO_DEPLOY_MECHANISM__'; \
+                fi",
+                env = environment,
+                branch = branch,
+            ))
+            .output();
+
+        match deploy_result {
+            Ok(output) => {
+                let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+
+                if stdout.contains("__NO_DEPLOY_MECHANISM__") {
+                    Ok(json!({
+                        "status": "no_deploy_mechanism",
+                        "environment": environment,
+                        "branch": branch,
+                        "note": "No deploy.sh, Makefile deploy target, or gh CLI found. Add a deploy.sh to your project root or configure a GitHub Actions deploy workflow."
+                    }))
+                } else if output.status.success() {
+                    Ok(json!({
+                        "status": "triggered",
+                        "environment": environment,
+                        "branch": branch,
+                        "output": if stdout.len() > 500 { stdout[..500].to_string() } else { stdout },
+                        "note": "Deployment initiated successfully."
+                    }))
+                } else {
+                    Ok(json!({
+                        "status": "failed",
+                        "environment": environment,
+                        "branch": branch,
+                        "error": if stderr.is_empty() { stdout } else { stderr },
+                        "exit_code": output.status.code()
+                    }))
+                }
+            }
+            Err(e) => Err(format!("Failed to execute deploy command: {e}")),
+        }
     }) as ToolHandler));
 
     tools
