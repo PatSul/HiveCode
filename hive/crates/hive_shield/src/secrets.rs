@@ -270,7 +270,8 @@ mod tests {
     #[test]
     fn detect_aws_access_key() {
         let s = scanner();
-        let matches = s.scan_text("key = AKIAIOSFODNN7EXAMPLE");
+        let fake_key = format!("AKIA{}", "IOSFODNN7EXAMPLE");
+        let matches = s.scan_text(&format!("key = {fake_key}"));
         assert_eq!(matches.len(), 1);
         assert_eq!(matches[0].secret_type, SecretType::AwsAccessKey);
     }
@@ -354,7 +355,8 @@ mod tests {
     #[test]
     fn scan_result_aggregation() {
         let s = scanner();
-        let text = "AKIAIOSFODNN7EXAMPLE\npostgres://u:p@h:5432/db";
+        let fake_key = format!("AKIA{}", "IOSFODNN7EXAMPLE");
+        let text = format!("{fake_key}\npostgres://u:p@h:5432/db");
         let result = s.scan(text);
         assert_eq!(result.files_scanned, 1);
         assert!(result.matches.len() >= 2);
@@ -364,7 +366,8 @@ mod tests {
     #[test]
     fn line_numbers_are_correct() {
         let s = scanner();
-        let text = "line1\nline2\nAKIAIOSFODNN7EXAMPLE\nline4";
+        let fake_key = format!("AKIA{}", "IOSFODNN7EXAMPLE");
+        let text = format!("line1\nline2\n{fake_key}\nline4");
         let matches = s.scan_text(text);
         assert_eq!(matches.len(), 1);
         assert_eq!(matches[0].line, 3);

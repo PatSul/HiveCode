@@ -832,8 +832,10 @@ mod tests {
 
     #[test]
     fn scan_detects_api_key_reference() {
-        let issues =
-            SkillMarketplace::scan_for_injection("Use api_key = sk-abc123def456ghi789jkl012mno");
+        // Build the fake key at runtime so GitHub secret scanning doesn't flag it.
+        let fake_key = format!("sk-{}", "abc123def456ghi789jkl012mno");
+        let input = format!("Use api_key = {fake_key}");
+        let issues = SkillMarketplace::scan_for_injection(&input);
         assert!(!issues.is_empty());
         assert!(
             issues

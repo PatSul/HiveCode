@@ -451,7 +451,7 @@ mod tests {
         let result = service.send_email(
             "user@example.com",
             "Credentials",
-            "Here is the key: AKIAIOSFODNN7EXAMPLE",
+            &format!("Here is the key: AKIA{}", "IOSFODNN7EXAMPLE"),
             &shield,
         );
         assert!(result.is_err());

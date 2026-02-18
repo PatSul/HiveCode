@@ -329,7 +329,8 @@ mod tests {
     #[test]
     fn secrets_block_outgoing() {
         let shield = HiveShield::new(test_config());
-        let result = shield.process_outgoing("key = AKIAIOSFODNN7EXAMPLE", "openai");
+        let fake_key = format!("AKIA{}", "IOSFODNN7EXAMPLE");
+        let result = shield.process_outgoing(&format!("key = {fake_key}"), "openai");
         assert!(matches!(result.action, ShieldAction::Block(_)));
     }
 

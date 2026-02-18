@@ -723,9 +723,12 @@ mod tests {
     #[test]
     fn detects_openai_api_key() {
         let guardian = GuardianAgent::new(CheckLevel::Basic);
+        // Build the fake key at runtime so GitHub secret scanning doesn't flag it.
+        let fake_key = format!("sk-{}", "aBcDeFgHiJkLmNoPqRsTuVwXyZ1234567890abcd");
+        let output = format!("Here is an example: api_key = {fake_key}");
         let result = guardian.validate(
             "Show me how to use the OpenAI API",
-            "Here is an example: api_key = sk-aBcDeFgHiJkLmNoPqRsTuVwXyZ1234567890abcd",
+            &output,
         );
         assert!(!result.passed);
         let data_leak_issues: Vec<_> = result
@@ -742,9 +745,12 @@ mod tests {
     #[test]
     fn detects_aws_access_key() {
         let guardian = GuardianAgent::new(CheckLevel::Basic);
+        // Build the fake key at runtime so GitHub secret scanning doesn't flag it.
+        let fake_key = format!("AKIA{}", "IOSFODNN7EXAMPLE");
+        let output = format!("Set your access key to {fake_key} and secret to ...");
         let result = guardian.validate(
             "How do I configure AWS?",
-            "Set your access key to AKIAIOSFODNN7EXAMPLE and secret to ...",
+            &output,
         );
         assert!(!result.passed);
         assert!(
@@ -976,11 +982,16 @@ cursor.execute(query)"#,
     #[test]
     fn multiple_issues_detected() {
         let guardian = GuardianAgent::new(CheckLevel::Strict);
+        // Build the fake key at runtime so GitHub secret scanning doesn't flag it.
+        let fake_key = format!("sk-{}", "aBcDeFgHiJkLmNoPqRsTuVwXyZ1234567890abcd");
+        let output = format!(
+            "Set api_key = {fake_key}\n\
+             Then use eval(user_input) to process requests.\n\
+             Connect to http://example.com/api for the endpoint."
+        );
         let result = guardian.validate(
             "How do I set up my API?",
-            "Set api_key = sk-aBcDeFgHiJkLmNoPqRsTuVwXyZ1234567890abcd\n\
-             Then use eval(user_input) to process requests.\n\
-             Connect to http://example.com/api for the endpoint.",
+            &output,
         );
         assert!(!result.passed);
         // Should have at least: DataLeak (API key), CodeQuality (eval), SecurityRisk (http://)
