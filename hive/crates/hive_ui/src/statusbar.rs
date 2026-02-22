@@ -228,3 +228,63 @@ impl StatusBar {
             )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn theme() -> HiveTheme {
+        HiveTheme::dark()
+    }
+
+    // ---- ConnectivityDisplay::label ----
+
+    #[test]
+    fn online_label() {
+        assert_eq!(ConnectivityDisplay::Online.label(), "Online");
+    }
+
+    #[test]
+    fn local_only_label() {
+        assert_eq!(ConnectivityDisplay::LocalOnly.label(), "Local Only");
+    }
+
+    #[test]
+    fn offline_label() {
+        assert_eq!(ConnectivityDisplay::Offline.label(), "Offline");
+    }
+
+    // ---- ConnectivityDisplay::color ----
+
+    #[test]
+    fn online_color_is_green() {
+        let t = theme();
+        assert_eq!(ConnectivityDisplay::Online.color(&t), t.accent_green);
+    }
+
+    #[test]
+    fn local_only_color_is_yellow() {
+        let t = theme();
+        assert_eq!(ConnectivityDisplay::LocalOnly.color(&t), t.accent_yellow);
+    }
+
+    #[test]
+    fn offline_color_is_red() {
+        let t = theme();
+        assert_eq!(ConnectivityDisplay::Offline.color(&t), t.accent_red);
+    }
+
+    // ---- StatusBar field mutations ----
+
+    #[test]
+    fn statusbar_default_connectivity_is_offline() {
+        let bar = StatusBar::new();
+        assert_eq!(bar.connectivity, ConnectivityDisplay::Offline);
+    }
+
+    #[test]
+    fn statusbar_default_model_is_select_model() {
+        let bar = StatusBar::new();
+        assert_eq!(bar.current_model, "Select Model");
+    }
+}

@@ -21,13 +21,14 @@ fn test_from_index_valid() {
     assert_eq!(Panel::from_index(16), Some(Panel::Shield));
     assert_eq!(Panel::from_index(17), Some(Panel::Assistant));
     assert_eq!(Panel::from_index(18), Some(Panel::TokenLaunch));
-    assert_eq!(Panel::from_index(19), Some(Panel::Settings));
-    assert_eq!(Panel::from_index(20), Some(Panel::Help));
+    assert_eq!(Panel::from_index(19), Some(Panel::Network));
+    assert_eq!(Panel::from_index(20), Some(Panel::Settings));
+    assert_eq!(Panel::from_index(21), Some(Panel::Help));
 }
 
 #[test]
 fn test_from_index_out_of_bounds() {
-    assert_eq!(Panel::from_index(21), None);
+    assert_eq!(Panel::from_index(22), None);
     assert_eq!(Panel::from_index(100), None);
     assert_eq!(Panel::from_index(usize::MAX), None);
 }
@@ -47,7 +48,7 @@ fn test_sidebar_default_panel_is_chat() {
 
 #[test]
 fn test_panel_all_count() {
-    assert_eq!(Panel::ALL.len(), 21);
+    assert_eq!(Panel::ALL.len(), 22);
 }
 
 // -- Panel stored round-trip tests --------------------------------------

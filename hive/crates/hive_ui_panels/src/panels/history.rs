@@ -120,6 +120,38 @@ impl HistoryData {
     pub fn total_count(&self) -> usize {
         self.conversations.len()
     }
+
+    /// Returns a sample dataset with 2 pre-built conversations for testing.
+    pub fn sample() -> Self {
+        let now = chrono::Utc::now();
+        Self {
+            conversations: vec![
+                ConversationSummary {
+                    id: "conv-1".into(),
+                    title: "Debugging auth flow".into(),
+                    preview: "Let me check the login handler".into(),
+                    message_count: 12,
+                    total_cost: 0.05,
+                    model: "claude-sonnet-4-5".into(),
+                    created_at: now - chrono::Duration::hours(2),
+                    updated_at: now - chrono::Duration::minutes(30),
+                },
+                ConversationSummary {
+                    id: "conv-2".into(),
+                    title: "Refactor database layer".into(),
+                    preview: "We should use connection pooling".into(),
+                    message_count: 8,
+                    total_cost: 0.03,
+                    model: "gpt-4o".into(),
+                    created_at: now - chrono::Duration::days(1),
+                    updated_at: now - chrono::Duration::hours(6),
+                },
+            ],
+            selected_id: None,
+            search_query: String::new(),
+            confirming_clear: false,
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -685,5 +717,91 @@ fn format_message_count(count: usize) -> String {
         "1 msg".to_string()
     } else {
         format!("{count} msgs")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ---- parse_sqlite_datetime ----
+
+    #[test]
+    fn parse_valid_sqlite_datetime() {
+        let dt = parse_sqlite_datetime("2026-02-08 14:30:00");
+        assert_eq!(dt.year(), 2026);
+        assert_eq!(dt.month(), 2);
+        assert_eq!(dt.day(), 8);
+    }
+
+    #[test]
+    fn parse_invalid_returns_now() {
+        let before = Utc::now();
+        let dt = parse_sqlite_datetime("not-a-date");
+        let after = Utc::now();
+        assert!(dt >= before && dt <= after);
+    }
+
+    // ---- truncate_title ----
+
+    #[test]
+    fn short_title_unchanged() {
+        assert_eq!(truncate_title("Hello", 10), "Hello");
+    }
+
+    #[test]
+    fn exact_length_title_unchanged() {
+        assert_eq!(truncate_title("12345", 5), "12345");
+    }
+
+    #[test]
+    fn over_limit_gets_ellipsis() {
+        assert_eq!(truncate_title("Hello World!", 5), "Hello...");
+    }
+
+    #[test]
+    fn unicode_safe_truncation() {
+        // 4-byte UTF-8 chars should not break mid-character
+        let title = "Hello \u{1F600} World";
+        let result = truncate_title(title, 8);
+        assert!(result.ends_with("..."));
+        assert!(result.is_char_boundary(result.len()));
+    }
+
+    // ---- format_message_count ----
+
+    #[test]
+    fn singular_message_count() {
+        assert_eq!(format_message_count(1), "1 msg");
+    }
+
+    #[test]
+    fn plural_message_count() {
+        assert_eq!(format_message_count(5), "5 msgs");
+    }
+
+    #[test]
+    fn zero_message_count() {
+        assert_eq!(format_message_count(0), "0 msgs");
+    }
+
+    // ---- format_relative_time ----
+
+    #[test]
+    fn just_now() {
+        let now = Utc::now();
+        assert_eq!(format_relative_time(&now), "Just now");
+    }
+
+    #[test]
+    fn minutes_ago() {
+        let dt = Utc::now() - chrono::Duration::minutes(5);
+        assert_eq!(format_relative_time(&dt), "5 minutes ago");
+    }
+
+    #[test]
+    fn hours_ago() {
+        let dt = Utc::now() - chrono::Duration::hours(3);
+        assert_eq!(format_relative_time(&dt), "3 hours ago");
     }
 }

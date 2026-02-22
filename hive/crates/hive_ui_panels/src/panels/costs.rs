@@ -525,3 +525,66 @@ impl CostsPanel {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn theme() -> HiveTheme {
+        HiveTheme::dark()
+    }
+
+    // ---- fmt_number ----
+
+    #[test]
+    fn fmt_number_zero() {
+        assert_eq!(CostsPanel::fmt_number(0), "0");
+    }
+
+    #[test]
+    fn fmt_number_single_digit() {
+        assert_eq!(CostsPanel::fmt_number(5), "5");
+    }
+
+    #[test]
+    fn fmt_number_three_digits() {
+        assert_eq!(CostsPanel::fmt_number(999), "999");
+    }
+
+    #[test]
+    fn fmt_number_thousand() {
+        assert_eq!(CostsPanel::fmt_number(1000), "1,000");
+    }
+
+    #[test]
+    fn fmt_number_millions() {
+        assert_eq!(CostsPanel::fmt_number(1_234_567), "1,234,567");
+    }
+
+    // ---- fmt_compact ----
+
+    #[test]
+    fn fmt_compact_small() {
+        assert_eq!(CostsPanel::fmt_compact(42), "42 ");
+    }
+
+    #[test]
+    fn fmt_compact_thousands() {
+        assert_eq!(CostsPanel::fmt_compact(519_000), "519K ");
+    }
+
+    #[test]
+    fn fmt_compact_millions() {
+        assert_eq!(CostsPanel::fmt_compact(1_200_000), "1.2M ");
+    }
+
+    // ---- provider_color ----
+
+    #[test]
+    fn provider_color_cycles_at_palette_length() {
+        let t = theme();
+        // Palette has 7 entries, so index 0 and 7 should be the same
+        assert_eq!(CostsPanel::provider_color(0, &t), CostsPanel::provider_color(7, &t));
+        assert_eq!(CostsPanel::provider_color(1, &t), CostsPanel::provider_color(8, &t));
+    }
+}

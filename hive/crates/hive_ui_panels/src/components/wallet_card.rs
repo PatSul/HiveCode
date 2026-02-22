@@ -66,6 +66,164 @@ pub fn render_wallet_card(
         )
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn theme() -> HiveTheme {
+        HiveTheme::dark()
+    }
+
+    // ---- truncate_address ----
+
+    #[test]
+    fn short_address_unchanged() {
+        assert_eq!(truncate_address("0x1234"), "0x1234");
+    }
+
+    #[test]
+    fn long_address_truncated() {
+        let addr = "0x1234567890abcdef1234567890abcdef12345678";
+        let result = truncate_address(addr);
+        assert_eq!(result, "0x1234...5678");
+    }
+
+    #[test]
+    fn exactly_12_chars_unchanged() {
+        assert_eq!(truncate_address("123456789012"), "123456789012");
+    }
+
+    #[test]
+    fn thirteen_chars_gets_truncated() {
+        let result = truncate_address("1234567890123");
+        assert_eq!(result, "123456...0123");
+    }
+
+    #[test]
+    fn empty_address() {
+        assert_eq!(truncate_address(""), "");
+    }
+
+    // ---- chain_initial ----
+
+    #[test]
+    fn ethereum_initial() {
+        assert_eq!(chain_initial("ethereum"), "E");
+    }
+
+    #[test]
+    fn solana_initial() {
+        assert_eq!(chain_initial("solana"), "S");
+    }
+
+    #[test]
+    fn empty_chain_initial() {
+        assert_eq!(chain_initial(""), "");
+    }
+
+    // ---- chain_accent ----
+
+    #[test]
+    fn solana_accent_is_pink() {
+        let t = theme();
+        assert_eq!(chain_accent("solana", &t), t.accent_pink);
+    }
+
+    #[test]
+    fn ethereum_accent_is_cyan() {
+        let t = theme();
+        assert_eq!(chain_accent("ethereum", &t), t.accent_cyan);
+    }
+
+    #[test]
+    fn base_accent_is_aqua() {
+        let t = theme();
+        assert_eq!(chain_accent("base", &t), t.accent_aqua);
+    }
+
+    #[test]
+    fn unknown_chain_accent_is_powder() {
+        let t = theme();
+        assert_eq!(chain_accent("polygon", &t), t.accent_powder);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn theme() -> HiveTheme {
+        HiveTheme::dark()
+    }
+
+    // ---- truncate_address ----
+
+    #[test]
+    fn short_address_unchanged() {
+        assert_eq!(truncate_address("0x1234"), "0x1234");
+    }
+
+    #[test]
+    fn twelve_char_address_unchanged() {
+        assert_eq!(truncate_address("0x12345abcde"), "0x12345abcde");
+    }
+
+    #[test]
+    fn long_address_truncated() {
+        let addr = "0x1234567890abcdef1234567890abcdef12345678";
+        let result = truncate_address(addr);
+        assert_eq!(result, "0x1234...5678");
+    }
+
+    #[test]
+    fn empty_address() {
+        assert_eq!(truncate_address(""), "");
+    }
+
+    // ---- chain_initial ----
+
+    #[test]
+    fn ethereum_initial() {
+        assert_eq!(chain_initial("ethereum"), "E");
+    }
+
+    #[test]
+    fn solana_initial() {
+        assert_eq!(chain_initial("solana"), "S");
+    }
+
+    #[test]
+    fn empty_chain_initial() {
+        assert_eq!(chain_initial(""), "");
+    }
+
+    // ---- chain_accent ----
+
+    #[test]
+    fn solana_accent_is_pink() {
+        let t = theme();
+        assert_eq!(chain_accent("solana", &t), t.accent_pink);
+    }
+
+    #[test]
+    fn ethereum_accent_is_cyan() {
+        let t = theme();
+        assert_eq!(chain_accent("ethereum", &t), t.accent_cyan);
+    }
+
+    #[test]
+    fn base_accent_is_aqua() {
+        let t = theme();
+        assert_eq!(chain_accent("base", &t), t.accent_aqua);
+    }
+
+    #[test]
+    fn unknown_chain_accent_is_powder() {
+        let t = theme();
+        assert_eq!(chain_accent("polygon", &t), t.accent_powder);
+    }
+}
+
 /// Truncate a blockchain address to `0x1234...abcd` form.
 fn truncate_address(address: &str) -> String {
     if address.len() <= 12 {

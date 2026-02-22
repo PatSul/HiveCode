@@ -28,6 +28,90 @@ impl ConnectivityState {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn theme() -> HiveTheme {
+        HiveTheme::dark()
+    }
+
+    #[test]
+    fn online_label() {
+        assert_eq!(ConnectivityState::Online.label(), "Online");
+    }
+
+    #[test]
+    fn local_only_label() {
+        assert_eq!(ConnectivityState::LocalOnly.label(), "Local Only");
+    }
+
+    #[test]
+    fn offline_label() {
+        assert_eq!(ConnectivityState::Offline.label(), "Offline");
+    }
+
+    #[test]
+    fn online_color_is_green() {
+        let t = theme();
+        assert_eq!(ConnectivityState::Online.color(&t), t.accent_green);
+    }
+
+    #[test]
+    fn local_only_color_is_yellow() {
+        let t = theme();
+        assert_eq!(ConnectivityState::LocalOnly.color(&t), t.accent_yellow);
+    }
+
+    #[test]
+    fn offline_color_is_red() {
+        let t = theme();
+        assert_eq!(ConnectivityState::Offline.color(&t), t.accent_red);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn theme() -> HiveTheme {
+        HiveTheme::dark()
+    }
+
+    #[test]
+    fn online_label() {
+        assert_eq!(ConnectivityState::Online.label(), "Online");
+    }
+
+    #[test]
+    fn local_only_label() {
+        assert_eq!(ConnectivityState::LocalOnly.label(), "Local Only");
+    }
+
+    #[test]
+    fn offline_label() {
+        assert_eq!(ConnectivityState::Offline.label(), "Offline");
+    }
+
+    #[test]
+    fn online_color_is_green() {
+        let t = theme();
+        assert_eq!(ConnectivityState::Online.color(&t), t.accent_green);
+    }
+
+    #[test]
+    fn local_only_color_is_yellow() {
+        let t = theme();
+        assert_eq!(ConnectivityState::LocalOnly.color(&t), t.accent_yellow);
+    }
+
+    #[test]
+    fn offline_color_is_red() {
+        let t = theme();
+        assert_eq!(ConnectivityState::Offline.color(&t), t.accent_red);
+    }
+}
+
 /// Render a connectivity indicator dot with label.
 pub fn render_connectivity_badge(state: ConnectivityState, theme: &HiveTheme) -> impl IntoElement {
     let color = state.color(theme);

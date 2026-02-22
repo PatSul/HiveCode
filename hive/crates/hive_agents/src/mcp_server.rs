@@ -435,6 +435,87 @@ impl McpServer {
                 }),
             );
         }
+
+        // -- click -----------------------------------------------------------
+        {
+            self.register(
+                McpTool {
+                    name: "click".into(),
+                    description: "Simulate a mouse click at specific screen coordinates (x, y).".into(),
+                    input_schema: json!({
+                        "type": "object",
+                        "properties": {
+                            "x": { "type": "integer", "description": "X coordinate" },
+                            "y": { "type": "integer", "description": "Y coordinate" }
+                        },
+                        "required": ["x", "y"]
+                    }),
+                },
+                Box::new(move |args| {
+                    let x = args
+                        .get("x")
+                        .and_then(|v| v.as_i64())
+                        .ok_or("Missing required argument 'x'")? as i32;
+                    let y = args
+                        .get("y")
+                        .and_then(|v| v.as_i64())
+                        .ok_or("Missing required argument 'y'")? as i32;
+
+                    let mut driver = crate::ui_automation::UiDriver::new().map_err(|e| format!("Driver init failed: {e}"))?;
+                    driver.click(x, y).map_err(|e| format!("Click failed: {e}"))?;
+                    
+                    Ok(json!(format!("Clicked at {}, {}", x, y)))
+                }),
+            );
+        }
+
+        // -- type_text -------------------------------------------------------
+        {
+            self.register(
+                McpTool {
+                    name: "type_text".into(),
+                    description: "Simulate typing text at the current cursor location.".into(),
+                    input_schema: json!({
+                        "type": "object",
+                        "properties": {
+                            "text": { "type": "string", "description": "Text to type" }
+                        },
+                        "required": ["text"]
+                    }),
+                },
+                Box::new(move |args| {
+                    let text = args
+                        .get("text")
+                        .and_then(|v| v.as_str())
+                        .ok_or("Missing required argument 'text'")?;
+
+                    let mut driver = crate::ui_automation::UiDriver::new().map_err(|e| format!("Driver init failed: {e}"))?;
+                    driver.type_text(text).map_err(|e| format!("Type failed: {e}"))?;
+                    
+                    Ok(json!(format!("Typed '{}'", text)))
+                }),
+            );
+        }
+
+        // -- press_enter -----------------------------------------------------
+        {
+            self.register(
+                McpTool {
+                    name: "press_enter".into(),
+                    description: "Simulate pressing the Enter key.".into(),
+                    input_schema: json!({
+                        "type": "object",
+                        "properties": {}
+                    }),
+                },
+                Box::new(move |_args| {
+                    let mut driver = crate::ui_automation::UiDriver::new().map_err(|e| format!("Driver init failed: {e}"))?;
+                    driver.press_enter().map_err(|e| format!("Enter failed: {e}"))?;
+                    
+                    Ok(json!("Pressed Enter".to_string()))
+                }),
+            );
+        }
     }
 }
 
@@ -511,7 +592,7 @@ mod tests {
         let (_dir, server) = setup_workspace();
         let tools = server.list_tools();
 
-        assert_eq!(tools.len(), 19);
+        assert_eq!(tools.len(), 22);
         let names: Vec<&str> = tools.iter().map(|t| t.name.as_str()).collect();
         assert!(names.contains(&"read_file"));
         assert!(names.contains(&"write_file"));
@@ -541,7 +622,7 @@ mod tests {
         assert!(resp.is_success());
         let result = resp.result.unwrap();
         let tools = result["tools"].as_array().unwrap();
-        assert_eq!(tools.len(), 19);
+        assert_eq!(tools.len(), 22);
     }
 
     // -- Initialize tests --

@@ -375,6 +375,106 @@ impl ToolHandler for GitStatusTool {
     }
 }
 
+/// Simulates a mouse click at specific screen coordinates (x, y).
+pub struct MouseClickTool;
+
+impl ToolHandler for MouseClickTool {
+    fn name(&self) -> &str {
+        "click"
+    }
+
+    fn description(&self) -> &str {
+        "Simulate a mouse click at specific screen coordinates (x, y)."
+    }
+
+    fn parameters_schema(&self) -> serde_json::Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "x": { "type": "integer", "description": "X coordinate" },
+                "y": { "type": "integer", "description": "Y coordinate" }
+            },
+            "required": ["x", "y"]
+        })
+    }
+
+    fn execute(&self, args: serde_json::Value) -> Result<String, String> {
+        let x = args
+            .get("x")
+            .and_then(|v| v.as_i64())
+            .ok_or_else(|| "Missing required argument: x".to_string())? as i32;
+        let y = args
+            .get("y")
+            .and_then(|v| v.as_i64())
+            .ok_or_else(|| "Missing required argument: y".to_string())? as i32;
+
+        let mut driver = crate::ui_automation::UiDriver::new().map_err(|e| format!("{e}"))?;
+        driver.click(x, y).map_err(|e| format!("{e}"))?;
+        Ok(format!("Clicked at {}, {}", x, y))
+    }
+}
+
+/// Simulates typing text at the current cursor location.
+pub struct TypeTextTool;
+
+impl ToolHandler for TypeTextTool {
+    fn name(&self) -> &str {
+        "type_text"
+    }
+
+    fn description(&self) -> &str {
+        "Simulate typing text at the current cursor location."
+    }
+
+    fn parameters_schema(&self) -> serde_json::Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {
+                "text": { "type": "string", "description": "The text to type" }
+            },
+            "required": ["text"]
+        })
+    }
+
+    fn execute(&self, args: serde_json::Value) -> Result<String, String> {
+        let text = args
+            .get("text")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| "Missing required argument: text".to_string())?;
+
+        let mut driver = crate::ui_automation::UiDriver::new().map_err(|e| format!("{e}"))?;
+        driver.type_text(text).map_err(|e| format!("{e}"))?;
+        Ok(format!("Typed '{}'", text))
+    }
+}
+
+/// Simulates pressing the Enter key.
+pub struct PressEnterTool;
+
+impl ToolHandler for PressEnterTool {
+    fn name(&self) -> &str {
+        "press_enter"
+    }
+
+    fn description(&self) -> &str {
+        "Simulate pressing the Enter key."
+    }
+
+    fn parameters_schema(&self) -> serde_json::Value {
+        serde_json::json!({
+            "type": "object",
+            "properties": {},
+            "required": []
+        })
+    }
+
+    fn execute(&self, _args: serde_json::Value) -> Result<String, String> {
+        let mut driver = crate::ui_automation::UiDriver::new().map_err(|e| format!("{e}"))?;
+        driver.press_enter().map_err(|e| format!("{e}"))?;
+        Ok("Pressed Enter".to_string())
+    }
+}
+
 /// Shows the git diff for the repository at a given path.
 pub struct GitDiffTool;
 
@@ -654,6 +754,9 @@ pub fn builtin_tool_definitions() -> Vec<ToolDefinition> {
         Box::new(ExecuteCommandTool::new()),
         Box::new(GitStatusTool),
         Box::new(GitDiffTool),
+        Box::new(MouseClickTool),
+        Box::new(TypeTextTool),
+        Box::new(PressEnterTool),
     ];
 
     handlers
@@ -676,6 +779,9 @@ pub fn builtin_registry() -> ToolRegistry {
     registry.register_tool(Box::new(ExecuteCommandTool::new()));
     registry.register_tool(Box::new(GitStatusTool));
     registry.register_tool(Box::new(GitDiffTool));
+    registry.register_tool(Box::new(MouseClickTool));
+    registry.register_tool(Box::new(TypeTextTool));
+    registry.register_tool(Box::new(PressEnterTool));
     registry
 }
 
@@ -1271,7 +1377,7 @@ mod tests {
     #[test]
     fn test_builtin_definitions_count() {
         let defs = builtin_tool_definitions();
-        assert_eq!(defs.len(), 7);
+        assert_eq!(defs.len(), 10);
         let names: Vec<&str> = defs.iter().map(|d| d.name.as_str()).collect();
         assert!(names.contains(&"read_file"));
         assert!(names.contains(&"write_file"));
@@ -1280,12 +1386,15 @@ mod tests {
         assert!(names.contains(&"list_directory"));
         assert!(names.contains(&"git_status"));
         assert!(names.contains(&"git_diff"));
+        assert!(names.contains(&"click"));
+        assert!(names.contains(&"type_text"));
+        assert!(names.contains(&"press_enter"));
     }
 
     #[test]
     fn test_builtin_registry_has_all_tools() {
         let registry = builtin_registry();
-        assert_eq!(registry.len(), 7);
+        assert_eq!(registry.len(), 10);
         assert!(registry.has_tool("read_file"));
         assert!(registry.has_tool("write_file"));
         assert!(registry.has_tool("list_directory"));
@@ -1293,6 +1402,9 @@ mod tests {
         assert!(registry.has_tool("execute_command"));
         assert!(registry.has_tool("git_status"));
         assert!(registry.has_tool("git_diff"));
+        assert!(registry.has_tool("click"));
+        assert!(registry.has_tool("type_text"));
+        assert!(registry.has_tool("press_enter"));
     }
 
     // -- ToolExecutor tests -------------------------------------------------

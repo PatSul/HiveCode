@@ -1114,7 +1114,7 @@ mod tests {
         );
 
         let google = models_for_provider(ProviderType::Google);
-        assert_eq!(google.len(), 6);
+        assert_eq!(google.len(), 8);
         assert!(
             google
                 .iter()

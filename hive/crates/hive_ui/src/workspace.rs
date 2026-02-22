@@ -22,7 +22,7 @@ use chrono::Utc;
 use hive_ui_core::{
     // Globals
     AppAiService, AppAssistant, AppAutomation, AppChannels, AppConfig, AppDatabase, AppLearning,
-    AppMarketplace, AppNetwork, AppNotifications, AppPersonas, AppRagService, AppSemanticSearch, AppContextEngine,
+    AppMarketplace, AppNetwork, AppNotifications, AppPersonas, AppRagService, AppContextEngine,
     AppSecurity, AppShield, AppSpecs, AppTheme, AppTts, AppUpdater,
     // Types
     HiveTheme, Panel, Sidebar,

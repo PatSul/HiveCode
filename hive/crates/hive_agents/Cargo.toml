@@ -27,6 +27,7 @@ url.workspace = true
 tracing.workspace = true
 regex.workspace = true
 git2.workspace = true
+enigo = "0.6.1"
 
 [dev-dependencies]
 tempfile = "3"

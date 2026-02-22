@@ -1190,6 +1190,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "core-graphics"
+version = "0.25.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "064badf302c3194842cf2c5d61f56cc88e54a759313879cdf03abdd27d0c3b97"
+dependencies = [
+ "bitflags 2.10.0",
+ "core-foundation 0.10.0",
+ "core-graphics-types 0.2.0",
+ "foreign-types 0.5.0",
+ "libc",
+]
+
+[[package]]
 name = "core-graphics-helmer-fork"
 version = "0.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1703,6 +1716,27 @@ name = "endi"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "66b7e2430c6dff6a955451e2cfc438f09cea1965a9d6f87f7e3b90decc014099"
+
+[[package]]
+name = "enigo"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "71c6c56e50f7acae2906a0dcbb34529ca647e40421119ad5d12e7f8ba6e50010"
+dependencies = [
+ "core-foundation 0.10.0",
+ "core-graphics 0.25.0",
+ "foreign-types-shared 0.3.1",
+ "libc",
+ "log",
+ "nom 8.0.0",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-foundation",
+ "windows 0.61.3",
+ "x11rb",
+ "xkbcommon 0.9.0",
+ "xkeysym",
+]
 
 [[package]]
 name = "enum-iterator"
@@ -2675,7 +2709,7 @@ dependencies = [
  "windows-registry 0.5.3",
  "x11-clipboard",
  "x11rb",
- "xkbcommon",
+ "xkbcommon 0.8.0",
  "zed-font-kit",
  "zed-scap",
  "zed-xim",
@@ -3066,10 +3100,11 @@ dependencies = [
 
 [[package]]
 name = "hive_agents"
-version = "0.3.7"
+version = "0.3.8"
 dependencies = [
  "anyhow",
  "chrono",
+ "enigo",
  "futures",
  "git2",
  "hive_ai",
@@ -3094,7 +3129,7 @@ dependencies = [
 
 [[package]]
 name = "hive_ai"
-version = "0.3.7"
+version = "0.3.8"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3119,7 +3154,7 @@ dependencies = [
 
 [[package]]
 name = "hive_app"
-version = "0.3.7"
+version = "0.3.8"
 dependencies = [
  "anyhow",
  "gpui",
@@ -3148,7 +3183,7 @@ dependencies = [
 
 [[package]]
 name = "hive_assistant"
-version = "0.3.7"
+version = "0.3.8"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3171,7 +3206,7 @@ dependencies = [
 
 [[package]]
 name = "hive_blockchain"
-version = "0.3.7"
+version = "0.3.8"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -3192,7 +3227,7 @@ dependencies = [
 
 [[package]]
 name = "hive_core"
-version = "0.3.7"
+version = "0.3.8"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -3223,7 +3258,7 @@ dependencies = [
 
 [[package]]
 name = "hive_docs"
-version = "0.3.7"
+version = "0.3.8"
 dependencies = [
  "anyhow",
  "chrono",
@@ -3238,7 +3273,7 @@ dependencies = [
 
 [[package]]
 name = "hive_fs"
-version = "0.3.7"
+version = "0.3.8"
 dependencies = [
  "anyhow",
  "chrono",
@@ -3258,7 +3293,7 @@ dependencies = [
 
 [[package]]
 name = "hive_integrations"
-version = "0.3.7"
+version = "0.3.8"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3279,7 +3314,7 @@ dependencies = [
 
 [[package]]
 name = "hive_learn"
-version = "0.3.7"
+version = "0.3.8"
 dependencies = [
  "anyhow",
  "chrono",
@@ -3297,7 +3332,7 @@ dependencies = [
 
 [[package]]
 name = "hive_network"
-version = "0.3.7"
+version = "0.3.8"
 dependencies = [
  "chrono",
  "futures",
@@ -3312,7 +3347,7 @@ dependencies = [
 
 [[package]]
 name = "hive_shield"
-version = "0.3.7"
+version = "0.3.8"
 dependencies = [
  "chrono",
  "once_cell",
@@ -3328,7 +3363,7 @@ dependencies = [
 
 [[package]]
 name = "hive_terminal"
-version = "0.3.7"
+version = "0.3.8"
 dependencies = [
  "anyhow",
  "chrono",
@@ -3349,7 +3384,7 @@ dependencies = [
 
 [[package]]
 name = "hive_ui"
-version = "0.3.7"
+version = "0.3.8"
 dependencies = [
  "anyhow",
  "chrono",
@@ -3378,7 +3413,7 @@ dependencies = [
 
 [[package]]
 name = "hive_ui_core"
-version = "0.3.7"
+version = "0.3.8"
 dependencies = [
  "gpui",
  "gpui-component",
@@ -3396,7 +3431,7 @@ dependencies = [
 
 [[package]]
 name = "hive_ui_panels"
-version = "0.3.7"
+version = "0.3.8"
 dependencies = [
  "anyhow",
  "chrono",
@@ -9077,6 +9112,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8d66ca9352cbd4eecbbc40871d8a11b4ac8107cfc528a6e14d7c19c69d0e1ac9"
 dependencies = [
  "as-raw-xcb-connection",
+ "libc",
+ "memmap2",
+ "xkeysym",
+]
+
+[[package]]
+name = "xkbcommon"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a7a974f48060a14e95705c01f24ad9c3345022f4d97441b8a36beb7ed5c4a02d"
+dependencies = [
  "libc",
  "memmap2",
  "xkeysym",

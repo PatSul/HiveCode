@@ -37,6 +37,93 @@ impl ThinkingPhase {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ---- label() ----
+
+    #[test]
+    fn thinking_label() {
+        assert_eq!(ThinkingPhase::Thinking.label(), "Thinking...");
+    }
+
+    #[test]
+    fn planning_label() {
+        assert_eq!(ThinkingPhase::Planning.label(), "Planning...");
+    }
+
+    #[test]
+    fn coding_label() {
+        assert_eq!(ThinkingPhase::Coding.label(), "Coding...");
+    }
+
+    #[test]
+    fn reviewing_label() {
+        assert_eq!(ThinkingPhase::Reviewing.label(), "Reviewing...");
+    }
+
+    #[test]
+    fn verifying_label() {
+        assert_eq!(ThinkingPhase::Verifying.label(), "Verifying...");
+    }
+
+    #[test]
+    fn done_label() {
+        assert_eq!(ThinkingPhase::Done.label(), "Done");
+    }
+
+    // ---- ordinal() ----
+
+    #[test]
+    fn ordinals_are_sequential() {
+        assert_eq!(ThinkingPhase::Thinking.ordinal(), 0);
+        assert_eq!(ThinkingPhase::Planning.ordinal(), 1);
+        assert_eq!(ThinkingPhase::Coding.ordinal(), 2);
+        assert_eq!(ThinkingPhase::Reviewing.ordinal(), 3);
+        assert_eq!(ThinkingPhase::Verifying.ordinal(), 4);
+        assert_eq!(ThinkingPhase::Done.ordinal(), 5);
+    }
+
+    #[test]
+    fn ordinals_are_unique() {
+        let all = [
+            ThinkingPhase::Thinking,
+            ThinkingPhase::Planning,
+            ThinkingPhase::Coding,
+            ThinkingPhase::Reviewing,
+            ThinkingPhase::Verifying,
+            ThinkingPhase::Done,
+        ];
+        let ordinals: Vec<usize> = all.iter().map(|p| p.ordinal()).collect();
+        for i in 0..ordinals.len() {
+            for j in (i + 1)..ordinals.len() {
+                assert_ne!(ordinals[i], ordinals[j], "duplicate ordinal at {i} and {j}");
+            }
+        }
+    }
+
+    #[test]
+    fn ordinals_are_ordered() {
+        let all = [
+            ThinkingPhase::Thinking,
+            ThinkingPhase::Planning,
+            ThinkingPhase::Coding,
+            ThinkingPhase::Reviewing,
+            ThinkingPhase::Verifying,
+            ThinkingPhase::Done,
+        ];
+        for w in all.windows(2) {
+            assert!(
+                w[0].ordinal() < w[1].ordinal(),
+                "{:?} should come before {:?}",
+                w[0],
+                w[1]
+            );
+        }
+    }
+}
+
 /// Render a thinking/progress indicator with a pulsing dot, phase label, and step dots.
 pub fn render_thinking_indicator(phase: ThinkingPhase, theme: &HiveTheme) -> impl IntoElement {
     let active = phase.ordinal();

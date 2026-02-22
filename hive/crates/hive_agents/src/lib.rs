@@ -21,6 +21,7 @@ pub mod specs;
 pub mod standup;
 pub mod swarm;
 pub mod tool_use;
+pub mod ui_automation;
 pub mod voice;
 pub mod worktree;
 

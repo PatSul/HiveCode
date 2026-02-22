@@ -38,6 +38,36 @@ impl NetworkPeerData {
     pub fn total_count(&self) -> usize {
         self.peers.len()
     }
+
+    /// Returns a sample dataset with 3 peers (2 Connected, 1 Discovered) for testing.
+    pub fn sample() -> Self {
+        Self {
+            our_peer_id: "peer-abc123".into(),
+            peers: vec![
+                PeerDisplayInfo {
+                    name: "Alice".into(),
+                    status: "Connected".into(),
+                    address: "192.168.1.10:9000".into(),
+                    latency_ms: Some(12),
+                    last_seen: "Just now".into(),
+                },
+                PeerDisplayInfo {
+                    name: "Bob".into(),
+                    status: "Connected".into(),
+                    address: "192.168.1.11:9000".into(),
+                    latency_ms: Some(45),
+                    last_seen: "2 min ago".into(),
+                },
+                PeerDisplayInfo {
+                    name: "Charlie".into(),
+                    status: "Discovered".into(),
+                    address: "192.168.1.12:9000".into(),
+                    latency_ms: None,
+                    last_seen: "5 min ago".into(),
+                },
+            ],
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
